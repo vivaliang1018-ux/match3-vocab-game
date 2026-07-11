@@ -63,6 +63,15 @@ export const fr: Messages = {
     signedInBadge: 'Connecté',
     signedInSubtitle: 'Progression synchronisée dans le cloud',
     signOutCta: 'Se déconnecter',
+    deleteAccountCta: 'Supprimer le compte',
+    deleteAccountConfirmTitle: 'Supprimer votre compte ?',
+    deleteAccountConfirmBody:
+      'Cela supprime définitivement votre compte et la progression cloud. Action irréversible.',
+    deleteAccountConfirmAction: 'Supprimer définitivement',
+    deleteAccountCancel: 'Annuler',
+    deleteAccountDone: 'Compte supprimé',
+    deleteAccountNeedsRelogin: 'Pour sécurité, déconnectez-vous, reconnectez-vous, puis réessayez.',
+    deleteAccountFailed: 'Échec de la suppression. Réessayez.',
   },
   auth: {
     dialogAria: 'Connexion',
@@ -87,6 +96,7 @@ export const fr: Messages = {
     errorTooManyRequests: 'Trop de tentatives. Réessayez plus tard.',
     errorNotConfigured: 'Firebase non configuré. Voir docs/auth-setup.md',
     errorProviderDisabled: "Cette méthode de connexion n'est pas activée dans Firebase",
+    errorRequiresRecentLogin: 'Reconnectez-vous avant de supprimer le compte',
     errorUnknown: 'Échec de la connexion. Réessayez.',
   },
   gameSettings: {

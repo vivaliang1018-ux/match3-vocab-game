@@ -7,8 +7,6 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f0f9ff;
-      --card: #fff;
       --text: #0c4a6e;
       --muted: #0369a1;
       --accent: #ec4899;
@@ -26,7 +24,7 @@
     main {
       max-width: 40rem;
       margin: 0 auto;
-      background: var(--card);
+      background: #fff;
       border: 1px solid var(--border);
       border-radius: 1rem;
       padding: 1.25rem 1.1rem 1.5rem;
@@ -73,91 +71,147 @@
   <main>
     <h1>隐私政策 / Privacy Policy</h1>
     <p class="meta">
-      最后更新 Last updated: July 9, 2026<br />
+      最后更新 Last updated: July 11, 2026<br />
       应用 App: 物品消消乐 (Match-3 Vocab Game)<br />
-      Bundle ID: com.match3vocab.game
+      Bundle ID: com.match3vocab.game<br />
+      联系 Contact: <a href="mailto:vivaliang1018@gmail.com">vivaliang1018@gmail.com</a>
     </p>
 
     <div class="lang-tag">English</div>
     <h2>Overview</h2>
     <p>
-      物品消消乐 is an offline-first vocabulary game. You can play without creating an account.
-      If you sign in, learning progress is stored in Firebase so it can sync across devices.
+      物品消消乐 is a vocabulary match-3 game. You can play as a guest without an account.
+      Optional sign-in (Apple, Google, or email/password via Firebase Authentication) lets you sync learning progress across devices using Cloud Firestore.
       We do not sell your personal information and do not use third-party advertising trackers.
     </p>
 
-    <h3>Information we collect</h3>
-    <p>We do not collect personal information on our servers. The app stores the following locally on your device only:</p>
+    <h3>Information we process</h3>
     <table>
-      <thead><tr><th>Data</th><th>Purpose</th></tr></thead>
+      <thead><tr><th>Data</th><th>Where</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td>Learning progress</td><td>Spaced repetition and learned-word stats</td></tr>
-        <tr><td>Preferences (language, music, SFX)</td><td>Remember your settings</td></tr>
-        <tr><td>Onboarding flag</td><td>Show tutorial only once</td></tr>
+        <tr>
+          <td>Account identifiers (email, Apple/Google account ID, display name/photo if provided by the provider)</td>
+          <td>Firebase Authentication</td>
+          <td>Sign-in and account recovery</td>
+        </tr>
+        <tr>
+          <td>Learning progress (word memory stages, review times, exposures)</td>
+          <td>On device; also Cloud Firestore when signed in</td>
+          <td>Spaced repetition and “Learned” stats; cross-device sync</td>
+        </tr>
+        <tr>
+          <td>Preferences (language, music, SFX, onboarding flag)</td>
+          <td>On device only</td>
+          <td>Remember settings</td>
+        </tr>
       </tbody>
     </table>
-    <p>This data stays on your device unless included in an Apple device backup (e.g. iCloud).</p>
+
+    <h3>Service providers</h3>
+    <p>
+      We use <strong>Google Firebase</strong> (Authentication and Cloud Firestore) to provide optional accounts and cloud sync.
+      Firebase processing is subject to
+      <a href="https://firebase.google.com/support/privacy">Google Firebase privacy information</a>
+      and the
+      <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.
+    </p>
 
     <h3>Information we do not collect</h3>
     <ul>
-      <li>Account credentials (no sign-in in v1)</li>
-      <li>Location, contacts, photos, or microphone recordings</li>
+      <li>Location, contacts, photos, or microphone recordings for our servers</li>
       <li>Advertising identifiers for cross-app tracking</li>
-      <li>Analytics or crash reports to third parties</li>
+      <li>Third-party analytics or crash SDKs beyond what Apple/Google platforms may collect for App Store / Play distribution</li>
     </ul>
 
     <h3>Speech and audio</h3>
     <p>
-      The app plays bundled pronunciation audio and may use your device&apos;s built-in text-to-speech when a recording is unavailable.
-      Speech is processed on-device; we do not receive microphone audio.
+      The app plays bundled pronunciation audio and may use on-device text-to-speech.
+      Speech is processed on-device; we do not upload microphone audio.
     </p>
 
-    <h3>Data deletion</h3>
-    <p>Uninstalling the app removes local progress from that device. We cannot restore deleted local data because we do not host copies.</p>
+    <h3>Account deletion and data deletion</h3>
+    <p>
+      While signed in, open <strong>Profile → Delete account</strong>. This permanently deletes your Firebase Authentication account and associated cloud learning data for this app, and clears related progress stored on that device.
+      Guest (local-only) progress is removed when you uninstall the app or clear app data.
+    </p>
+
+    <h3>Children’s privacy</h3>
+    <p>
+      The app is not directed at children under 13. Do not create an account for a child under 13.
+      If you believe we have collected such data, contact us and we will delete it.
+    </p>
 
     <h3>Contact</h3>
-    <p>Questions: <a href="mailto:support@yourdomain.com">support@yourdomain.com</a></p>
+    <p>Questions about this Privacy Policy: <a href="mailto:vivaliang1018@gmail.com">vivaliang1018@gmail.com</a></p>
 
     <div class="lang-tag" style="margin-top:1.5rem">简体中文</div>
     <h2>概述</h2>
     <p>
-      「物品消消乐」是一款以本地运行为主的词汇学习游戏。当前版本可不登录使用。
-      若您选择登录，学习进度会保存到云端以便跨设备同步。我们不会出售您的个人资料，也不使用第三方广告追踪。
+      「物品消消乐」是一款词汇消消乐学习应用。您可以不登录、以访客身份游玩。
+      可选登录（Apple、Google 或邮箱密码，由 Firebase Authentication 提供）后，学习进度可通过 Cloud Firestore 跨设备同步。
+      我们不会出售您的个人信息，也不使用第三方广告追踪。
     </p>
 
-    <h3>我们收集的信息</h3>
-    <p>我们不在服务器上收集个人信息。本应用仅在您的设备本地存储以下信息：</p>
+    <h3>我们处理的信息</h3>
     <table>
-      <thead><tr><th>数据</th><th>用途</th></tr></thead>
+      <thead><tr><th>数据</th><th>存储位置</th><th>用途</th></tr></thead>
       <tbody>
-        <tr><td>学习进度</td><td>间隔复习与「已学」统计</td></tr>
-        <tr><td>偏好设置（语言、音乐、音效）</td><td>记住您的设置</td></tr>
-        <tr><td>引导完成标记</td><td>首次安装后只显示一次教程</td></tr>
+        <tr>
+          <td>账号标识（邮箱、Apple/Google 账号标识，以及提供方返回的昵称/头像等）</td>
+          <td>Firebase Authentication</td>
+          <td>登录与账号管理</td>
+        </tr>
+        <tr>
+          <td>学习进度（复习阶段、下次复习时间、曝光次数等）</td>
+          <td>本机；登录后同步至 Cloud Firestore</td>
+          <td>间隔复习、「已学」统计与跨设备同步</td>
+        </tr>
+        <tr>
+          <td>偏好设置（语言、音乐、音效、引导标记）</td>
+          <td>仅本机</td>
+          <td>记住设置</td>
+        </tr>
       </tbody>
     </table>
-    <p>上述数据默认不会上传至我们的服务器；是否随 iCloud 等设备备份转移取决于 Apple 系统策略。</p>
+
+    <h3>第三方服务</h3>
+    <p>
+      我们使用 <strong>Google Firebase</strong>（Authentication 与 Cloud Firestore）提供可选账号与云同步。
+      相关处理适用
+      <a href="https://firebase.google.com/support/privacy">Firebase 隐私说明</a>
+      与
+      <a href="https://policies.google.com/privacy">Google 隐私政策</a>。
+    </p>
 
     <h3>我们不收集的信息</h3>
     <ul>
-      <li>账号凭证（v1 无登录功能）</li>
-      <li>地理位置、通讯录、照片或麦克风录音</li>
-      <li>用于跨应用追踪的广告标识符</li>
-      <li>发送至第三方分析/崩溃平台的数据</li>
+      <li>不会为向我们的服务器上传而收集地理位置、通讯录、照片或麦克风录音</li>
+      <li>不用于跨应用追踪的广告标识符</li>
+      <li>除 App Store / 平台可能自带的统计外，不接入第三方广告分析 SDK</li>
     </ul>
 
     <h3>语音与音频</h3>
     <p>
-      本应用播放内置录音；若无对应录音，将使用设备系统朗读（TTS）。朗读在设备本地处理，我们不会采集麦克风音频。
+      本应用播放内置发音；必要时使用设备系统朗读（TTS）。朗读在设备本地完成，我们不会上传麦克风音频。
     </p>
 
-    <h3>数据删除</h3>
-    <p>卸载应用后，该设备上的本地进度将被删除。我们无法代为恢复，因为服务器不保存副本。</p>
+    <h3>注销账号与数据删除</h3>
+    <p>
+      登录后，请到 <strong>我的 → 删除账号</strong>。将永久删除您的 Firebase 登录账号及本应用对应的云端学习数据，并清除该设备上相关进度。
+      访客（仅本地）进度可在卸载应用或清除应用数据后删除。
+    </p>
+
+    <h3>儿童隐私</h3>
+    <p>
+      本应用不以 13 岁以下儿童为目标用户。请勿为 13 岁以下儿童创建账号。
+      如认为我们误收集了相关数据，请联系我们删除。
+    </p>
 
     <h3>联系我们</h3>
-    <p>如有疑问，请联系：<a href="mailto:support@yourdomain.com">support@yourdomain.com</a></p>
+    <p>隐私相关问题请联系：<a href="mailto:vivaliang1018@gmail.com">vivaliang1018@gmail.com</a></p>
 
     <p class="meta" style="margin-top:1.25rem">
-      Apple App Store 分发适用
+      通过 Apple App Store 分发时，亦适用
       <a href="https://www.apple.com/legal/privacy/">Apple 隐私政策</a>。
     </p>
   </main>

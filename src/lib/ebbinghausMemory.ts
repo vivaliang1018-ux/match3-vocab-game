@@ -97,6 +97,14 @@ export function saveWordMemoriesForScope(map: Map<string, WordMemory>, scope: st
   }
 }
 
+export function clearWordMemoriesForScope(scope: string) {
+  try {
+    localStorage.removeItem(storageKeyForScope(scope));
+  } catch {
+    // ignore
+  }
+}
+
 export function memoryKeyForWord(word: string): string {
   return word.trim().toLowerCase();
 }

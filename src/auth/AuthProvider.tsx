@@ -19,6 +19,7 @@ import {
   signOutUser,
   signUpWithEmail,
 } from '../lib/firebase';
+import { deleteAccountUser } from '../lib/accountDeletion';
 
 type AuthContextValue = {
   user: User | null;
@@ -31,6 +32,7 @@ type AuthContextValue = {
   signInEmail: (email: string, password: string) => Promise<void>;
   signUpEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   clearError: () => void;
 };
 
@@ -81,6 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error instanceof Error && error.message === 'redirect_pending') {
         return;
       }
+      if (error instanceof Error && error.message === 'requires_recent_login') {
+        setLastError('requires_recent_login');
+        return;
+      }
       setLastError(authErrorMessage(error));
     } finally {
       setBusy(false);
@@ -113,6 +119,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: () =>
         runAuth(async () => {
           await signOutUser();
+        }),
+      deleteAccount: () =>
+        runAuth(async () => {
+          await deleteAccountUser();
         }),
       clearError: () => setLastError(null),
     }),

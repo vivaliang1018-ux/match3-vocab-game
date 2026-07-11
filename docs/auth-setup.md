@@ -11,6 +11,8 @@
 | 访客进度合并到账号 | ✅ |
 | Firestore 云同步学习记录 | ✅ |
 | 退出登录 | ✅ |
+| **删除账号**（Auth + 云端进度 + 本机该账号桶） | ✅ |
+| 隐私政策页（`public/privacy.html`） | ✅ |
 
 云同步路径：
 
@@ -25,9 +27,31 @@ users/{uid}/match3/state
 
 ---
 
+## 0. 推荐：用自己的 Firebase 项目（vivaliang）
+
+当前仓库里的 `src/firebase-applet-config.json` 指向临时项目 `gen-lang-client-0267908863`。正式发布前请：
+
+1. 用 **vivaliang1018@gmail.com** 登录 [Firebase Console](https://console.firebase.google.com/)
+2. **Create a project**（或把现有项目转让到该账号）
+3. 添加 **Web** App 与 **iOS** App（Bundle ID：`com.match3vocab.game`）
+4. 复制配置到本地：
+
+```bash
+cp .env.example .env.local
+# 填入 VITE_FIREBASE_* （优先于 firebase-applet-config.json）
+```
+
+5. 把 iOS 的 `GoogleService-Info.plist` 放到 `ios/App/App/`（或按 Capacitor 文档同步）
+6. Authentication → 启用 **Apple / Google / Email·Password**
+7. 创建 Firestore，部署本仓库根目录的 `firestore.rules`
+
+也可用新值直接改写 `src/firebase-applet-config.json`（无 `.env.local` 时的默认）。
+
+---
+
 ## 1. Firebase Authentication
 
-1. 打开 [Firebase Console](https://console.firebase.google.com/) → 项目 `gen-lang-client-0267908863`
+1. 打开 Firebase Console → 你的项目
 2. **Authentication → Sign-in method** 启用：
    - **Apple**
    - **Google**
@@ -64,10 +88,9 @@ npx cap sync ios
 
 ## 2. Firestore 规则
 
-仓库根目录有 `firestore.rules`。请部署到**同一数据库**（配置里的 `firestoreDatabaseId`）：
+仓库根目录有 `firestore.rules`（含 `allow delete`，供删除账号清云端文档）。请部署到**同一数据库**：
 
 ```bash
-# 若已安装 firebase-tools 并登录
 firebase deploy --only firestore:rules
 ```
 
@@ -77,7 +100,44 @@ firebase deploy --only firestore:rules
 
 ---
 
-## 3. 怎么测
+## 3. 隐私政策公网 URL（App Store 必填）
+
+源文件：`public/privacy.html`（构建后会进 `dist/`）。
+
+1. 把仓库推到 GitHub → **Settings → Pages** → Source: Deploy from branch → `/` 或 `/docs`（若用 `dist` 需单独 Actions；最简单是把 `privacy.html` 挂在 Pages 根）
+2. 公网地址示例：
+
+```
+https://YOUR_GITHUB_USERNAME.github.io/match3-vocab-game/privacy.html
+```
+
+3. 写入 `.env.local`：
+
+```
+VITE_PRIVACY_POLICY_URL=https://YOUR_GITHUB_USERNAME.github.io/match3-vocab-game/privacy.html
+```
+
+4. 重新 `npm run build` / `build:ios`。App 内「我的 → 隐私政策」与 App Store Connect 的 Privacy Policy URL 都用这个 HTTPS 链接。
+
+未设置时，应用会回退到包内 `privacy.html`（模拟器可用，**不能**填进 App Store Connect）。
+
+---
+
+## 4. 删除账号（App 内）
+
+路径：**我的 → 删除账号** → 确认。
+
+流程：
+
+1. 删除 Firestore `users/{uid}/match3/state`
+2. 清除本机该 uid 对应的学习进度
+3. 调用 Firebase Auth `deleteUser`
+
+若提示「需重新登录」：先退出再登录，然后立刻再删（Firebase `requires-recent-login`）。
+
+---
+
+## 5. 怎么测
 
 ```bash
 npm run dev
@@ -87,6 +147,7 @@ npm run dev
 2. 用 **Apple** / **Google** / **邮箱** 登录
 3. 玩几局产生学习记录
 4. 换浏览器无痕窗口（或另一台设备）登录同一账号 →「已学 / 复习」应恢复
+5. **删除账号** → 无法再登录；云端文档消失；本机该账号进度清空
 
 iOS：
 
@@ -98,13 +159,19 @@ npm run build:ios && npx cap open ios
 
 ---
 
-## 4. 常见问题
+## 6. 常见问题
 
 **Apple 按钮点了没反应 / provider_disabled**  
 → Firebase 未启用 Apple，或 Apple Developer 未开 Sign in with Apple。
 
+**邮箱登录失败 / operation-not-allowed**  
+→ Console 未启用「电子邮件/密码」。
+
 **云同步不生效**  
 → 检查 Firestore Rules 是否已发布；看控制台是否有 `[match3] cloud memory` 警告。
+
+**删除账号失败 / requires_recent_login**  
+→ 退出后重新登录，马上再点删除。
 
 **登录后进度变少**  
 → 合并取「更强」进度；若另一端几乎为空，会以上传端为准。

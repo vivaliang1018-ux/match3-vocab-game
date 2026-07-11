@@ -120,18 +120,21 @@
 
 ---
 
-## 6. Profile & settings
+## 6. Profile, auth & settings
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
 | 6.1 | Profile shows guest name +「本地存档」badge | | |
-| 6.2 | Login button shows「登录 / 注册」+ coming-soon hint (disabled for v1) | | |
-| 6.3 | SFX toggle works immediately | | |
-| 6.4 | BGM toggle works immediately | | |
-| 6.5 | BGM ducks during word playback | | |
-| 6.6 | Language switch (中 / EN / ES / FR / DE) updates UI | | |
-| 6.7 | Stats (completed emojis) match gameplay | | |
-| 6.8 | Version string visible in About | | |
+| 6.2 |「登录 / 注册」opens sheet; Apple / Google / email work (Firebase enabled) | | |
+| 6.3 | After sign-in: display name +「已登录」; progress syncs across devices | | |
+| 6.4 |「删除账号」确认后无法再登录；云端进度清除 | | |
+| 6.5 |「隐私政策」打开公网 HTTPS 页（或包内 privacy.html） | | |
+| 6.6 | SFX toggle works immediately | | |
+| 6.7 | BGM toggle works immediately | | |
+| 6.8 | BGM ducks during word playback | | |
+| 6.9 | Language switch (中 / EN / ES / FR / DE) updates UI | | |
+| 6.10 | Stats (completed emojis) match gameplay | | |
+| 6.11 | Version string visible in About | | |
 
 ---
 

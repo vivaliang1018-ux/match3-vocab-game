@@ -63,6 +63,15 @@ export const es: Messages = {
     signedInBadge: 'Conectado',
     signedInSubtitle: 'El progreso se sincroniza en la nube',
     signOutCta: 'Cerrar sesión',
+    deleteAccountCta: 'Eliminar cuenta',
+    deleteAccountConfirmTitle: '¿Eliminar tu cuenta?',
+    deleteAccountConfirmBody:
+      'Se eliminará permanentemente tu cuenta y el progreso en la nube. No se puede deshacer.',
+    deleteAccountConfirmAction: 'Eliminar definitivamente',
+    deleteAccountCancel: 'Cancelar',
+    deleteAccountDone: 'Cuenta eliminada',
+    deleteAccountNeedsRelogin: 'Por seguridad, cierra sesión, vuelve a entrar y reintenta.',
+    deleteAccountFailed: 'No se pudo eliminar. Inténtalo de nuevo.',
   },
   auth: {
     dialogAria: 'Iniciar sesión',
@@ -87,6 +96,7 @@ export const es: Messages = {
     errorTooManyRequests: 'Demasiados intentos. Inténtalo más tarde.',
     errorNotConfigured: 'Firebase no configurado. Ver docs/auth-setup.md',
     errorProviderDisabled: 'Este método de acceso no está habilitado en Firebase',
+    errorRequiresRecentLogin: 'Vuelve a iniciar sesión antes de eliminar la cuenta',
     errorUnknown: 'Error al iniciar sesión. Inténtalo de nuevo.',
   },
   gameSettings: {

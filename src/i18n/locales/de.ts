@@ -63,6 +63,15 @@ export const de: Messages = {
     signedInBadge: 'Angemeldet',
     signedInSubtitle: 'Lernfortschritt wird in der Cloud synchronisiert',
     signOutCta: 'Abmelden',
+    deleteAccountCta: 'Konto löschen',
+    deleteAccountConfirmTitle: 'Konto wirklich löschen?',
+    deleteAccountConfirmBody:
+      'Dein Login und der Cloud-Lernfortschritt werden dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.',
+    deleteAccountConfirmAction: 'Endgültig löschen',
+    deleteAccountCancel: 'Abbrechen',
+    deleteAccountDone: 'Konto gelöscht',
+    deleteAccountNeedsRelogin: 'Bitte abmelden, erneut anmelden und dann erneut löschen.',
+    deleteAccountFailed: 'Löschen fehlgeschlagen. Bitte erneut versuchen.',
   },
   auth: {
     dialogAria: 'Anmelden',
@@ -87,6 +96,7 @@ export const de: Messages = {
     errorTooManyRequests: 'Zu viele Versuche. Später erneut versuchen.',
     errorNotConfigured: 'Firebase nicht konfiguriert. Siehe docs/auth-setup.md',
     errorProviderDisabled: 'Diese Anmeldemethode ist in Firebase nicht aktiviert',
+    errorRequiresRecentLogin: 'Bitte erneut anmelden, bevor du das Konto löschst',
     errorUnknown: 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.',
   },
   gameSettings: {

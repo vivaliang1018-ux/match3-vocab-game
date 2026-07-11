@@ -105,6 +105,7 @@ function authErrorMessage(error: unknown): string {
     if (code === 'auth/weak-password') return 'weak_password';
     if (code === 'auth/too-many-requests') return 'too_many_requests';
     if (code === 'auth/operation-not-allowed') return 'provider_disabled';
+    if (code === 'auth/requires-recent-login') return 'requires_recent_login';
   }
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();

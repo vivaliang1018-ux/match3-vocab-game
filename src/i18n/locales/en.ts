@@ -63,6 +63,15 @@ export const en: Messages = {
     signedInBadge: 'Signed in',
     signedInSubtitle: 'Learning progress syncs to the cloud',
     signOutCta: 'Sign out',
+    deleteAccountCta: 'Delete account',
+    deleteAccountConfirmTitle: 'Delete your account?',
+    deleteAccountConfirmBody:
+      'This permanently deletes your sign-in account and cloud learning progress. This cannot be undone.',
+    deleteAccountConfirmAction: 'Delete permanently',
+    deleteAccountCancel: 'Cancel',
+    deleteAccountDone: 'Account deleted',
+    deleteAccountNeedsRelogin: 'For security, sign out, sign in again, then retry delete.',
+    deleteAccountFailed: 'Could not delete account. Please try again.',
   },
   auth: {
     dialogAria: 'Sign in',
@@ -87,6 +96,7 @@ export const en: Messages = {
     errorTooManyRequests: 'Too many attempts. Try again later.',
     errorNotConfigured: 'Firebase is not configured. See docs/auth-setup.md',
     errorProviderDisabled: 'Enable Email/Password in the Firebase Console first',
+    errorRequiresRecentLogin: 'Please sign in again before deleting your account',
     errorUnknown: 'Sign-in failed. Please try again.',
   },
   gameSettings: {

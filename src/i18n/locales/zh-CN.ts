@@ -63,6 +63,15 @@ export const zhCN: Messages = {
     signedInBadge: '已登录',
     signedInSubtitle: '学习记录已云同步到账号',
     signOutCta: '退出登录',
+    deleteAccountCta: '删除账号',
+    deleteAccountConfirmTitle: '确认删除账号？',
+    deleteAccountConfirmBody:
+      '将永久删除你的登录账号与云端学习进度，且无法恢复。本地该账号存档也会清除。',
+    deleteAccountConfirmAction: '确认删除',
+    deleteAccountCancel: '取消',
+    deleteAccountDone: '账号已删除',
+    deleteAccountNeedsRelogin: '为安全起见，请先退出再重新登录，然后再次删除账号。',
+    deleteAccountFailed: '删除失败，请稍后重试',
   },
   auth: {
     dialogAria: '登录',
@@ -87,6 +96,7 @@ export const zhCN: Messages = {
     errorTooManyRequests: '尝试次数过多，请稍后再试',
     errorNotConfigured: 'Firebase 未配置，请查看 docs/auth-setup.md',
     errorProviderDisabled: '请先在 Firebase 控制台启用「电子邮件/密码」登录',
+    errorRequiresRecentLogin: '请先重新登录后再删除账号',
     errorUnknown: '登录失败，请稍后再试',
   },
   gameSettings: {

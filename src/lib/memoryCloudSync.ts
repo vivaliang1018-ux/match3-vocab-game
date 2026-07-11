@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import {
   GUEST_MEMORY_SCOPE,
   hydrateMatch3Memories,
@@ -83,6 +83,17 @@ export async function pushCloudWordMemories(
     );
   } catch (error) {
     console.warn('[match3] cloud memory push failed', error);
+  }
+}
+
+/** Remove cloud learning doc for account deletion. */
+export async function deleteCloudWordMemories(uid: string): Promise<void> {
+  if (!isFirebaseConfigured()) return;
+  try {
+    await deleteDoc(memoriesDocRef(uid));
+  } catch (error) {
+    console.warn('[match3] cloud memory delete failed', error);
+    throw error;
   }
 }
 

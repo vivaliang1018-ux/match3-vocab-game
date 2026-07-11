@@ -61,6 +61,14 @@ export type Messages = {
     signedInBadge: string;
     signedInSubtitle: string;
     signOutCta: string;
+    deleteAccountCta: string;
+    deleteAccountConfirmTitle: string;
+    deleteAccountConfirmBody: string;
+    deleteAccountConfirmAction: string;
+    deleteAccountCancel: string;
+    deleteAccountDone: string;
+    deleteAccountNeedsRelogin: string;
+    deleteAccountFailed: string;
   };
   auth: {
     dialogAria: string;
@@ -85,6 +93,7 @@ export type Messages = {
     errorTooManyRequests: string;
     errorNotConfigured: string;
     errorProviderDisabled: string;
+    errorRequiresRecentLogin: string;
     errorUnknown: string;
   };
   gameSettings: {

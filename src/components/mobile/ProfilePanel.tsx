@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   LogIn,
   LogOut,
   Music,
+  Trash2,
   User,
   Volume2,
   VolumeX,
@@ -12,7 +13,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { WordMemory } from '../../lib/ebbinghausMemory';
 import { masteredEmojiCount } from '../../lib/ebbinghausMemory';
-import { assetUrl } from '../../lib/assetUrl';
+import { privacyPolicyUrl } from '../../lib/privacyPolicyUrl';
 import { useAuth } from '../../auth/AuthProvider';
 import { MOTION_PRESS_DEEP, MOTION_SPRING_BOUNCY } from '../../lib/motionPresets';
 import { LOCALE_OPTIONS, useI18n } from '../../i18n';
@@ -47,13 +48,32 @@ export function ProfilePanel({
   onSfxEnabledChange,
 }: ProfilePanelProps) {
   const { locale, setLocale, t } = useI18n();
-  const { user, signOut, busy } = useAuth();
+  const { user, signOut, deleteAccount, busy, lastError, clearError } = useAuth();
   const [signInOpen, setSignInOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const masteredCount = masteredEmojiCount(wordMemory, allPool);
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || t.profile.guestName;
   const badge = user ? t.profile.signedInBadge : t.profile.guestBadge;
   const subtitle = user ? t.profile.signedInSubtitle : t.profile.subtitle;
+
+  useEffect(() => {
+    if (!confirmDelete) return;
+    if (!user && !busy) {
+      setConfirmDelete(false);
+      setStatusMsg(t.profile.deleteAccountDone);
+    }
+  }, [user, busy, confirmDelete, t.profile.deleteAccountDone]);
+
+  const deleteError =
+    lastError === 'requires_recent_login'
+      ? t.profile.deleteAccountNeedsRelogin
+      : lastError === 'not_configured'
+        ? t.auth.errorNotConfigured
+        : confirmDelete && lastError
+          ? t.profile.deleteAccountFailed
+          : null;
 
   return (
     <div className="profile-candy-page pb-6">
@@ -86,18 +106,37 @@ export function ProfilePanel({
             </div>
           </div>
 
-          <div className="mt-3.5">
+          <div className="mt-3.5 space-y-2">
             {user ? (
-              <motion.button
-                type="button"
-                disabled={busy}
-                className="profile-candy-btn w-full border border-sky-200/80 bg-white/95 text-sky-900 disabled:opacity-60"
-                whileTap={busy ? undefined : MOTION_PRESS_DEEP}
-                onClick={() => void signOut()}
-              >
-                <LogOut size={18} aria-hidden />
-                {t.profile.signOutCta}
-              </motion.button>
+              <>
+                <motion.button
+                  type="button"
+                  disabled={busy}
+                  className="profile-candy-btn w-full border border-sky-200/80 bg-white/95 text-sky-900 disabled:opacity-60"
+                  whileTap={busy ? undefined : MOTION_PRESS_DEEP}
+                  onClick={() => void signOut()}
+                >
+                  <LogOut size={18} aria-hidden />
+                  {t.profile.signOutCta}
+                </motion.button>
+                <motion.button
+                  type="button"
+                  disabled={busy}
+                  className="profile-candy-btn w-full border border-rose-300 bg-rose-50 text-rose-700 disabled:opacity-60"
+                  whileTap={busy ? undefined : MOTION_PRESS_DEEP}
+                  onClick={() => {
+                    clearError();
+                    setStatusMsg(null);
+                    setConfirmDelete(true);
+                  }}
+                >
+                  <Trash2 size={18} aria-hidden />
+                  {t.profile.deleteAccountCta}
+                </motion.button>
+                {statusMsg && (
+                  <p className="text-center text-[11px] font-bold text-emerald-700">{statusMsg}</p>
+                )}
+              </>
             ) : (
               <>
                 <motion.button
@@ -190,7 +229,7 @@ export function ProfilePanel({
             <p className="mt-1.5">
               <a
                 className="text-[10px] font-bold text-pink-600 underline decoration-pink-400/60 underline-offset-2"
-                href={assetUrl('privacy.html')}
+                href={privacyPolicyUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -215,6 +254,49 @@ export function ProfilePanel({
       </div>
 
       <SignInSheet open={signInOpen} onClose={() => setSignInOpen(false)} />
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[320] flex items-end justify-center bg-sky-950/35 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.profile.deleteAccountConfirmTitle}
+          onClick={() => !busy && setConfirmDelete(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl border-2 border-rose-200 bg-white p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-black text-rose-800">
+              {t.profile.deleteAccountConfirmTitle}
+            </h3>
+            <p className="mt-2 text-xs font-semibold leading-relaxed text-sky-900/80">
+              {t.profile.deleteAccountConfirmBody}
+            </p>
+            {deleteError && (
+              <p className="mt-2 text-[11px] font-bold text-rose-600">{deleteError}</p>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                className="flex-1 rounded-full border border-sky-200 bg-sky-50 py-2.5 text-xs font-black text-sky-900 disabled:opacity-60"
+                onClick={() => setConfirmDelete(false)}
+              >
+                {t.profile.deleteAccountCancel}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                className="flex-1 rounded-full border border-rose-400 bg-rose-600 py-2.5 text-xs font-black text-white disabled:opacity-60"
+                onClick={() => void deleteAccount()}
+              >
+                {t.profile.deleteAccountConfirmAction}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
