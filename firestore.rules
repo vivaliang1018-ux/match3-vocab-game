@@ -1,0 +1,55 @@
+// ===============================================================
+// Match-3 Vocab Game — Firestore rules
+//
+// Path: /users/{userId}/match3/state
+// Fields:
+//   - memories: list of WordMemory objects
+//   - updatedAtMs: number
+//   - updatedAt: timestamp
+//
+// Deploy:
+//   firebase deploy --only firestore:rules
+// Or paste into Firebase Console → Firestore → Rules.
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isValidMatch3State() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['memories', 'updatedAtMs', 'updatedAt'])
+        && d.memories is list
+        && d.memories.size() <= 5000
+        && d.updatedAtMs is number
+        && d.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/match3/{docId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && docId == 'state'
+        && isValidMatch3State();
+      allow delete: if isOwner(userId);
+    }
+
+    // Shared project paths (smelly-cat-dictation) — owner-only.
+    match /users/{userId}/progress/{episodeId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/wordCards/{cardId} {
+      allow read, write: if isOwner(userId);
+    }
+    match /users/{userId}/savedNotes/{saveId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

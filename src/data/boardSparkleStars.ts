@@ -1,0 +1,16 @@
+export const BOARD_SPARKLE_STARS = [
+  { x: '6%', y: '18%', size: 9, delay: 0, dur: 2.3 },
+  { x: '14%', y: '62%', size: 7, delay: 0.55, dur: 2.8 },
+  { x: '22%', y: '34%', size: 11, delay: 1.1, dur: 2.5 },
+  { x: '31%', y: '72%', size: 8, delay: 0.25, dur: 3.0 },
+  { x: '38%', y: '22%', size: 10, delay: 1.45, dur: 2.6 },
+  { x: '46%', y: '58%', size: 12, delay: 0.8, dur: 2.9 },
+  { x: '52%', y: '38%', size: 8, delay: 1.7, dur: 2.4 },
+  { x: '58%', y: '78%', size: 9, delay: 0.35, dur: 3.1 },
+  { x: '64%', y: '16%', size: 11, delay: 1.25, dur: 2.7 },
+  { x: '70%', y: '48%', size: 7, delay: 0.65, dur: 2.5 },
+  { x: '76%', y: '68%', size: 10, delay: 1.55, dur: 2.8 },
+  { x: '82%', y: '28%', size: 8, delay: 0.15, dur: 3.0 },
+  { x: '88%', y: '56%', size: 9, delay: 1.0, dur: 2.6 },
+  { x: '94%', y: '36%', size: 7, delay: 1.85, dur: 2.3 },
+] as const;

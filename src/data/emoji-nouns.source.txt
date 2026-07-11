@@ -1,0 +1,876 @@
+# 1. 笑脸与情感 (Smileys & Emotion)
+😀 | 咧嘴笑 | Grinning Face
+😃 | 大笑 | Grinning Face with Big Eyes
+😄 | 微笑眼大笑 | Grinning Face with Smiling Eyes
+😁 | 笑嘻嘻 | Beaming Face with Smiling Eyes
+😆 | 眯眼笑 | Grinning Squinting Face
+😅 | 流汗笑 | Grinning Face with Sweat
+🤣 | 笑到打滚 | Rolling on the Floor Laughing
+😂 | 笑哭 | Face with Tears of Joy
+🙂 | 淡淡微笑 | Slightly Smiling Face
+🙃 | 倒脸笑 | Upside-Down Face
+😉 | 眨眼 | Winking Face
+😊 | 温柔笑 | Smiling Face with Smiling Eyes
+😇 | 天使笑 | Smiling Face with Halo
+🥰 | 爱心环绕 | Smiling Face with Hearts
+😍 | 花痴爱心眼 | Smiling Face with Heart-Eyes
+🤩 | 星星眼 | Star-Struck
+😘 | 飞吻 | Face Blowing a Kiss
+😗 | 亲亲 | Kissing Face
+😙 | 亲亲笑眼 | Kissing Face with Smiling Eyes
+😚 | 紧闭眼亲亲 | Kissing Face with Closed Eyes
+😜 | 吐舌眨眼 | Winking Face with Tongue
+😝 | 眯眼吐舌 | Squinting Face with Tongue
+😛 | 吐舌 | Face with Tongue
+🤑 | 钱眼笑 | Money-Mouth Face
+🤗 | 抱抱 | Smiling Face with Open Hands
+🤭 | 偷笑 | Face with Hand Over Mouth
+🫢 | 捂嘴惊讶 | Face with Open Eyes and Hand Over Mouth
+🫣 | 偷看 | Peeking Eye
+🤫 | 嘘安静 | Shushing Face
+🤔 | 思考 | Thinking Face
+🫡 | 敬礼 | Saluting Face
+🤐 | 闭嘴 | Zipper-Mouth Face
+🤨 | 挑眉怀疑 | Face with Raised Eyebrow
+😐 | 面无表情 | Neutral Face
+😑 | 无语 | Expressionless Face
+😶 | 沉默 | Face Without Mouth
+🫥 | 隐身脸 | Dotted Line Face
+😏 | 坏笑 | Smirking Face
+😒 | 不爽 | Unamused Face
+🙄 | 翻白眼 | Face with Rolling Eyes
+😬 | 尴尬龇牙 | Grimacing Face
+🤥 | 说谎 | Lying Face
+😌 | 放松欣慰 | Relieved Face
+😔 | 难过 | Pensive Face
+😪 | 困倦 | Tired Face
+🤤 | 流口水 | Drooling Face
+😋 | 馋嘴 | Face Savoring Food
+😛 | 吐舌 | Face with Tongue
+😜 | 眨眼吐舌 | Winking Face with Tongue
+😝 | 调皮吐舌 | Squinting Face with Tongue
+🤑 | 见钱眼开 | Money-Mouth Face
+🤗 | 拥抱 | Smiling Face with Open Hands
+🤭 | 偷笑 | Face with Hand Over Mouth
+🤫 | 嘘 | Shushing Face
+🤔 | 思考 | Thinking Face
+🫡 | 敬礼 | Saluting Face
+😶‍🌫️ | 雾脸 | Face in Clouds
+😷 | 口罩 | Face with Medical Mask
+🤒 | 发烧 | Face with Thermometer
+🤕 | 受伤 | Face with Head-Bandage
+🤢 | 恶心 | Nauseated Face
+🤮 | 呕吐 | Face Vomiting
+🤧 | 打喷嚏 | Sneezing Face
+🥵 | 热晕 | Hot Face
+🥶 | 冷僵 | Cold Face
+🥴 | 晕乎乎 | Woozy Face
+😵 | 晕圈 | Dizzy Face
+😵‍💫 | 晕头转向 | Face with Spiral Eyes
+🤯 | 爆炸头 | Exploding Head
+🤠 | 牛仔帽 | Cowboy Hat Face
+🥳 | 派对庆祝 | Face with Party Horn and Hat
+🥸 | 伪装 | Disguised Face
+😎 | 墨镜酷 | Smiling Face with Sunglasses
+🤓 | 书呆子 | Nerd Face
+🧐 | 侦探脸 | Face with Monocle
+😕 | 困惑 | Confused Face
+🫤 | 茫然 | Face with Diagonal Mouth
+😟 | 担忧 | Worried Face
+🙁 | 轻微难过 | Slightly Frowning Face
+😮 | 惊讶张嘴 | Face with Open Mouth
+😯 | hushed 安静惊讶 | Hushed Face
+😲 | 震惊 | Astonished Face
+😳 | 脸红 | Flushed Face
+🥺 | 恳求 | Pleading Face
+😦 | 难过张嘴 | Frowning Face with Open Mouth
+😧 | 痛苦 | Anguished Face
+😨 | 害怕 | Fearful Face
+😰 | 冷汗 | Anxious Face with Sweat
+😥 | 难过流汗 | Sad but Relieved Face
+😢 | 流泪 | Crying Face
+😭 | 大哭 | Loudly Crying Face
+😱 | 吓死 | Face Screaming in Fear
+😖 | 苦恼 | Confounded Face
+😣 | 痛苦 | Persevering Face
+😞 | 失望 | Disappointed Face
+😓 | 无奈 | Downcast Face with Sweat
+😩 | 累瘫 | Weary Face
+😫 | 痛苦 | Tired Face
+🥱 | 打哈欠 | Yawning Face
+😔 | 忧郁 | Pensive Face
+😕 | 困惑 | Confused Face
+😟 | 担心 | Worried Face
+🙁 | 不开心 | Slightly Frowning Face
+☹️ | 难过 | Frowning Face
+🙁 | 轻微皱眉 | Slightly Frowning Face
+😮‍💨 | 叹气 | Face Exhaling
+😤 | 鼻孔生气 | Face with Steam from Nose
+😠 | 生气 | Angry Face
+😡 | 暴怒 | Pouting Face
+🤬 | 脏话骂人 | Face with Symbols on Mouth
+🤯 | 头炸 | Exploding Head
+😈 | 恶魔笑 | Smiling Face with Horns
+👿 | 愤怒恶魔 | Angry Face with Horns
+💀 | 骷髅 | Skull
+💩 | 便便 | Pile of Poo
+🤡 | 小丑 | Clown Face
+👹 | 鬼怪 | Ogre
+👺 | 天狗 | Goblin
+👻 | 幽灵 | Ghost
+👽 | 外星人 | Alien
+👾 | 外星怪物 | Alien Monster
+🤖 | 机器人 | Robot
+😺 | 微笑猫 | Grinning Cat
+😸 | 开心猫 | Grinning Cat with Smiling Eyes
+😹 | 笑哭猫 | Cat with Tears of Joy
+😻 | 爱心眼猫 | Smiling Cat with Heart-Eyes
+😼 | 坏笑猫 | Cat with Wry Smile
+😽 | 亲亲猫 | Kissing Cat
+🙀 | 惊吓猫 | Weary Cat
+😿 | 难过猫 | Crying Cat
+😾 | 生气猫 | Pouting Cat
+💋 | 唇印 | Kiss Mark
+🩸 | 血滴 | Drop of Blood
+
+---
+
+# 2. 人物与身体 (People & Body)
+👋 | 挥手 | Waving Hand
+🤚 | 手背 | Raised Back of Hand
+🖐️ | 张开手掌 | Hand with Fingers Splayed
+🫱 | 右手 | Right Hand
+🫲 | 左手 | Left Hand
+🫳 | 手掌向下 | Hand Palm Down
+🫴 | 手掌向上 | Hand Palm Up
+🫷 | 推左手 | Left-Pushing Hand
+🫸 | 推右手 | Right-Pushing Hand
+✋ | 停止 | Raised Hand
+🖖 | 瓦肯举手 | Vulcan Salute
+🫰 | 手比心 | Hand with Index Finger and Thumb Crossed
+🤞 | 许愿交叉手指 | Crossed Fingers
+🫱🏻‍🫲🏿 | 握手牵手 | Handshake
+🤟 | 爱你手势 | Love-You Gesture
+🤘 | 金属礼 | Sign of the Horns
+🤙 | 召唤手 | Call Me Hand
+👌 | OK | OK Hand
+🤌 | 捏手指 | Pinched Fingers
+🤏 | 一点点 | Pinching Hand
+✌️ | 胜利/耶 | Victory Hand
+🫘 | 摊手 | Shrugging Hand（系统统一归类）
+🤞 | 交叉手指 | Crossed Fingers
+🤟 | 爱你 | Love-You Gesture
+🤘 | 摇滚手 | Sign of the Horns
+🤙 | 六/哈喽 | Call Me Hand
+👌 | OK | OK Hand
+🫰 | 比心 | Hand with Index Finger and Thumb Crossed
+🤌 | 捏手指 | Pinched Fingers
+🤏 | 微量 | Pinching Hand
+✌️ | 耶 | Victory Hand
+🫶 | 双手爱心 | Heart Hands
+👈 | 右指 | Backhand Index Pointing Right
+👉 | 左指 | Backhand Index Pointing Left
+👆 | 上指 | Backhand Index Pointing Up
+🫵 | 指你 | Index Pointing at the Viewer
+👇 | 下指 | Backhand Index Pointing Down
+☝️ | 食指上 | Index Pointing Up
+👍 | 赞 | Thumbs Up
+👎 | 踩 | Thumbs Down
+👊 | 拳头 | Oncoming Fist
+🤛 | 左拳 | Left-Facing Fist
+🤜 | 右拳 | Right-Facing Fist
+👏 | 鼓掌 | Clapping Hands
+🙌 | 举双手 | Raising Hands
+🫲 | 左手 | Left Hand
+🫱 | 右手 | Right Hand
+🫷 | 左推 | Left-Pushing Hand
+🫸 | 右推 | Right-Pushing Hand
+🤝 | 握手 | Handshake
+💪 | 肌肉 | Flexed Biceps
+🦵 | 腿 | Leg
+🦶 | 脚 | Foot
+👂 | 耳朵 | Ear
+🦻 | 助听器耳 | Ear with Hearing Aid
+👃 | 鼻子 | Nose
+👀 | 双眼 | Eyes
+👁️ | 单眼 | Eye
+👅 | 舌头 | Tongue
+👄 | 嘴巴 | Mouth
+🫦 | 嘴唇 | Lipstick
+🦷 | 牙齿 | Tooth
+🦴 | 骨头 | Bone
+👶 | 婴儿 | Baby
+🧒 | 儿童 | Child
+👦 | 男孩 | Boy
+👧 | 女孩 | Girl
+🧑 | 人 | Person
+👱 | 金发人 | Person: Blond Hair
+👨 | 男人 | Man
+🧔 | 胡子男 | Person: Beard
+👨‍🦰 | 男人红发 | Man: Red Hair
+👨‍🦱 | 男人卷发 | Man: Curly Hair
+👨‍🦳 | 男人白发 | Man: White Hair
+👨‍🦲 | 男人光头 | Man: Bald
+👩 | 女人 | Woman
+👩‍🦰 | 女人红发 | Woman: Red Hair
+👩‍🦱 | 女人卷发 | Woman: Curly Hair
+👩‍🦳 | 女人白发 | Woman: White Hair
+👩‍🦲 | 女人光头 | Woman: Bald
+🧓 | 老人 | Older Person
+👴 | 老爷爷 | Old Man
+👵 | 老奶奶 | Old Woman
+🙍 | 皱眉 | Person Frowning
+🙎 | 生气不说话 | Person Pouting
+🙅 | 不行 | Person Gesturing NO
+🙆 | 可以 | Person Gesturing OK
+💁 | 举手 | Person Tipping Hand
+🙋 | 举手提问 | Person Raising Hand
+🧏 | 失聪听手 | Deaf Person
+🙇 | 鞠躬 | Person Bowing
+🤦 | 捂脸 | Facepalming
+🤷 | 摊手 | Shrugging
+👨‍⚕️ | 男医生 | Man Health Worker
+👩‍⚕️ | 女医生 | Woman Health Worker
+👨‍🎓 | 男学生 | Man Student
+👩‍🎓 | 女学生 | Woman Student
+👨‍🏫 | 男老师 | Man Teacher
+👩‍🏫 | 女老师 | Woman Teacher
+👨‍⚖️ | 男法官 | Man Judge
+👩‍⚖️ | 女法官 | Woman Judge
+👨‍🌾 | 男农夫 | Man Farmer
+👩‍🌾 | 女农夫 | Woman Farmer
+👨‍🍳 | 男厨师 | Man Cook
+👩‍🍳 | 女厨师 | Woman Cook
+👨‍🔧 | 男技工 | Man Mechanic
+👩‍🔧 | 女技工 | Woman Mechanic
+👨‍🏭 | 男工人 | Man Factory Worker
+👩‍🏭 | 女工人 | Woman Factory Worker
+👨‍💼 | 男白领 | Man Office Worker
+👩‍💼 | 女白领 | Woman Office Worker
+👨‍🔬 | 男科学家 | Man Scientist
+👩‍🔬 | 女科学家 | Woman Scientist
+👨‍🚀 | 男宇航员 | Man Astronaut
+👩‍🚀 | 女宇航员 | Woman Astronaut
+👨‍🚒 | 男消防员 | Man Firefighter
+👩‍🚒 | 女消防员 | Woman Firefighter
+👮 | 警察 | Police Officer
+🕵️ | 侦探 | Detective
+💂 | 卫兵 | Guardsman
+👷 | 工人 | Construction Worker
+🫅 | 皇冠人 | Person with Crown
+🤴 | 王子 | Prince
+👸 | 公主 | Princess
+👳 | 头巾 | Person Wearing Turban
+👲 | 唐装 | Person with Skullcap
+🧕 | 头巾女 | Woman with Headscarf
+🤵 | 西装男 | Man in Tuxedo
+👰 | 头纱女 | Woman with Veil
+🤰 | 孕妇 | Pregnant Woman
+🫃 | 孕肚男 | Pregnant Man
+🫄 | 孕肚人 | Pregnant Person
+🤱 | 哺乳 | Breast-Feeding
+👼 | 天使 | Baby Angel
+🎅 | 圣诞老人 | Santa Claus
+🤶 | 圣诞奶奶 | Mrs. Claus
+🧑‍🎄 | 圣诞人 | MX Claus
+🦸 | 超人 | Superhero
+🦹 | 反派 | Supervillain
+🧙 | 巫师 | Mage
+🧚 | 精灵 | Fairy
+🧛 | 吸血鬼 | Vampire
+🧜 | 人鱼 | Merperson
+🧝 | 精灵 | Elf
+🧞 | 精灵 | Genie
+🧟 | 僵尸 | Zombie
+🧌 | 巨魔 | Troll
+👯 | 双人舞 | People with Bunny Ears
+🧖 | 蒸桑拿 | Person in Steamy Room
+🧗 | 攀岩 | Person Climbing
+🧘 | 瑜伽 | Person in Lotus Position
+
+---
+
+# 3. 动物与自然 (Animals & Nature)
+🐵 | 猴子脸 | Monkey Face
+🐒 | 猴子 | Monkey
+🦍 | 大猩猩 | Gorilla
+🦧 | 红毛猩猩 | Orangutan
+🐶 | 狗脸 | Dog Face
+🐕 | 狗 | Dog
+🦮 | 导盲犬 | Guide Dog
+🐩 | 贵宾犬 | Poodle
+🐺 | 狼 | Wolf
+🦊 | 狐狸 | Fox
+🦝 | 浣熊 | Raccoon
+🐱 | 猫脸 | Cat Face
+🐈 | 猫 | Cat
+🐯 | 老虎脸 | Tiger Face
+🐅 | 老虎 | Tiger
+🐆 | 豹子 | Leopard
+🦁 | 狮子 | Lion
+🐮 | 牛脸 | Cow Face
+🐂 | 公牛 | Ox
+🐃 | 水牛 | Water Buffalo
+🐄 | 奶牛 | Cow
+🐷 | 猪脸 | Pig Face
+🐖 | 猪 | Pig
+🐗 | 野猪 | Boar
+🐽 | 猪鼻子 | Pig Nose
+🐏 | 公羊 | Ram
+🐑 | 绵羊 | Sheep
+🐐 | 山羊 | Goat
+🐪 | 单峰驼 | Dromedary Camel
+🐫 | 双峰驼 | Bactrian Camel
+🦙 | 羊驼 | Llama
+🦒 | 长颈鹿 | Giraffe
+🐘 | 大象 | Elephant
+🦣 | 猛犸象 | Mammoth
+🦏 | 犀牛 | Rhinoceros
+🦛 | 河马 | Hippopotamus
+🐭 | 老鼠脸 | Mouse Face
+🐁 | 老鼠 | Mouse
+🐹 | 仓鼠 | Hamster
+🐰 | 兔子脸 | Rabbit Face
+🐇 | 兔子 | Rabbit
+🐿️ | 松鼠 | Chipmunk
+🦫 | 海狸 | Beaver
+🦔 | 刺猬 | Hedgehog
+🦇 | 蝙蝠 | Bat
+🐻 | 熊 | Bear
+🐨 | 考拉 | Koala
+🐼 | 熊猫 | Panda
+🦥 | 树懒 | Sloth
+🦦 | 水獭 | Otter
+🦨 | 臭鼬 | Skunk
+🦘 | 袋鼠 | Kangaroo
+🦡 | 獾 | Badger
+🐾 | 爪印 | Paw Prints
+🐔 | 鸡 | Chicken
+🐤 | 小鸡 | Baby Chick
+🐥 | 小鸡站立 | Front-Facing Baby Chick
+🐦 | 鸟 | Bird
+🐧 | 企鹅 | Penguin
+🕊️ | 鸽子 | Dove
+🦅 | 鹰 | Eagle
+🦆 | 鸭子 | Duck
+🦢 | 天鹅 | Swan
+🦉 | 猫头鹰 | Owl
+🦤 | 渡渡鸟 | Dodo
+🪶 | 羽毛 | Feather
+🦩 | 火烈鸟 | Flamingo
+🦚 | 孔雀 | Peacock
+🦜 | 鹦鹉 | Parrot
+🐸 | 青蛙 | Frog
+🐊 | 鳄鱼 | Crocodile
+🐢 | 乌龟 | Turtle
+🦎 | 蜥蜴 | Lizard
+🐍 | 蛇 | Snake
+🐲 | 龙脸 | Dragon Face
+🐉 | 龙 | Dragon
+🦕 | 恐龙 | T-Rex
+🦖 | 霸王龙 | T-Rex
+🐠 | 热带鱼 | Tropical Fish
+🐟 | 鱼 | Fish
+🐡 | 河豚 | Blowfish
+🦈 | 鲨鱼 | Shark
+🐙 | 章鱼 | Octopus
+🐳 | 鲸鱼 | Spouting Whale
+🐋 | 鲸鱼 | Whale
+🦭 | 海狮 | Seal
+🐬 | 海豚 | Dolphin
+🦀 | 螃蟹 | Crab
+🦞 | 龙虾 | Lobster
+🦐 | 虾 | Shrimp
+🦑 | 鱿鱼 | Squid
+🦪 | 牡蛎 | Oyster
+🐌 | 蜗牛 | Snail
+🐚 | 海螺 | Spiral Shell
+🪸 | 珊瑚 | Coral
+🪼 | 水母 | Jellyfish
+🌵 | 仙人掌 | Cactus
+🎄 | 圣诞树 | Christmas Tree
+🌲 | 常青树 | Evergreen Tree
+🌳 | 落叶树 | Deciduous Tree
+🌴 | 棕榈树 | Palm Tree
+🌱 | 幼苗 | Seedling
+🌿 | 药草 | Herb
+🍀 | 四叶草 | Four Leaf Clover
+🍃 | 风吹叶 | Leaf Fluttering in Wind
+🍂 | 秋叶 | Fallen Leaf
+🍁 | 枫叶 | Maple Leaf
+🍄 | 蘑菇 | Mushroom
+🍇 | 葡萄 | Grapes
+🍉 | 西瓜 | Watermelon
+🍊 | 橘子 | Tangerine
+🍋 | 柠檬 | Lemon
+🍌 | 香蕉 | Banana
+🍍 | 菠萝 | Pineapple
+🍎 | 红苹果 | Red Apple
+🍏 | 青苹果 | Green Apple
+🍐 | 梨 | Pear
+🍑 | 桃子 | Peach
+🍒 | 樱桃 | Cherries
+🍓 | 草莓 | Strawberry
+🫐 | 蓝莓 | Blueberries
+🥝 | 猕猴桃 | Kiwi Fruit
+🍅 | 番茄 | Tomato
+🥥 | 椰子 | Coconut
+🥑 | 牛油果 | Avocado
+🍆 | 茄子 | Eggplant
+🥔 | 土豆 | Potato
+🥕 | 胡萝卜 | Carrot
+🌽 | 玉米 | Ear of Corn
+🌶️ | 辣椒 | Hot Pepper
+🫑 | 甜椒 | Bell Pepper
+🥒 | 黄瓜 | Cucumber
+🥬 | 绿叶菜 | Leafy Green
+🥦 | 西兰花 | Broccoli
+🧄 | 大蒜 | Garlic
+🧅 | 洋葱 | Onion
+🥜 | 花生 | Peanuts
+🫘 | 豆子 | Beans
+🌰 | 栗子 | Chestnut
+🍞 | 面包 | Bread
+🥐 | 牛角包 | Croissant
+🥨 | 碱水结 | Pretzel
+🥯 | 贝果 | Bagel
+🥞 | 松饼 | Pancakes
+🧇 | 华夫饼 | Waffle
+🧀 | 奶酪 | Cheese Wedge
+🍖 | 烤肉 | Meat on Bone
+🍗 | 鸡腿 | Poultry Leg
+🥩 | 牛排 | Cut of Meat
+🥓 | 培根 | Bacon
+🥚 | 鸡蛋 | Egg
+🍳 | 煎蛋 | Cooking
+🥘 | 炖锅 | Shallow Pan of Food
+🍲 | 汤碗 | Pot of Food
+🥣 | 碗勺 | Bowl with Spoon
+🥗 | 沙拉 | Green Salad
+🍿 | 爆米花 | Popcorn
+🧈 | 黄油 | Butter
+🧂 | 盐 | Salt
+🥫 | 罐头 | Canned Food
+🍱 | 便当 | Bento Box
+🍘 | 米饼 | Rice Cracker
+🍙 | 饭团 | Rice Ball
+🍚 | 米饭 | Cooked Rice
+🍛 | 咖喱饭 | Curry Rice
+🥟 | 饺子 | Dumpling
+🥠 | fortune 饼干 | Fortune Cookie
+🥡 | 外卖盒 | Takeout Box
+🍝 | 意面 | Spaghetti
+🍠 | 烤红薯 | Roasted Sweet Potato
+🥘 | 锅料理 | Paella
+🍢 | 关东煮 | Oden
+🍣 | 寿司 | Sushi
+🍤 | 炸虾 | Fried Shrimp
+🍥 | 鱼饼 | Fish Cake with Swirl
+🥮 | 月饼 | Moon Cake
+🍡 | 团子 | Dango
+🍦 | 甜筒 | Soft Ice Cream
+🍧 | 刨冰 | Shaved Ice
+🍨 | 冰淇淋 | Ice Cream
+🍩 | 甜甜圈 | Doughnut
+🍪 | 曲奇 | Cookie
+🎂 | 生日蛋糕 | Birthday Cake
+🍰 | 蛋糕 | Shortcake
+🧁 | 纸杯蛋糕 | Cupcake
+🥧 | 派 | Pie
+🍫 | 巧克力 | Chocolate Bar
+🍬 | 糖果 | Candy
+🍭 | 棒棒糖 | Lollipop
+🍮 | 焦糖布丁 | Custard
+🍯 | 蜂蜜 | Honey Pot
+🍼 | 奶瓶 | Baby Bottle
+🥛 | 牛奶 | Glass of Milk
+🫖 | 茶壶 | Teapot
+🍵 | 茶杯 | Teacup Without Handle
+☕ | 咖啡 | Hot Beverage
+🍶 | 清酒 | Sake
+🍾 | 香槟 | Bottle with Popping Cork
+🍷 | 红酒 | Wine Glass
+🍸 | 鸡尾酒 | Cocktail Glass
+🍹 | 果汁 | Tropical Drink
+🍺 | 啤酒 | Beer Mug
+🍻 | 碰杯 | Clinking Beer Mugs
+🥂 | 碰杯香槟 | Clinking Glasses
+🥃 | 威士忌 | Tumbler Glass
+🫗 | 倾倒液体 | Pouring Liquid
+🥤 | 带吸管杯 | Cup with Straw
+🧋 | 奶茶 | Bubble Tea
+🧃 | 果汁盒 | Beverage Box
+🧉 | 玛黛茶 | Mate
+🧊 | 冰块 | Ice Cube
+
+---
+
+# 4. 旅行与地点 (Travel & Places)
+🚗 | 汽车 | Automobile
+🚕 | 出租车 | Taxi
+🚙 | 运动车 | Minibus
+🚌 | 公交车 | Bus
+🚎 | 电车 | Trolleybus
+🏎️ | 赛车 | Racing Car
+🚓 | 警车 | Police Car
+🚑 | 救护车 | Ambulance
+🚒 | 消防车 | Fire Engine
+🚐 | 面包车 | Minibus
+🚚 | 卡车 | Truck
+🚛 | 大卡车 | Articulated Lorry
+🚜 | 拖拉机 | Tractor
+🚲 | 自行车 | Bicycle
+🛵 | 小摩托 | Motor Scooter
+🏍️ | 摩托车 | Motorcycle
+🛺 | 三轮车 | Auto Rickshaw
+🚨 | 警灯 | Police Car Light
+🚔 | 警车飞驰 | Oncoming Police Car
+🚍 | 公交飞驰 | Oncoming Bus
+🚘 | 汽车飞驰 | Oncoming Automobile
+🚖 | 出租飞驰 | Oncoming Taxi
+🚡 | 缆车 | Aerial Tramway
+🚠 | 索道 | Mountain Cableway
+🚟 | 悬空缆车 | Suspension Railway
+🚃 | 电车 | Railway Car
+🚋 | 有轨电车 | Tram Car
+🚝 | 单轨 | Monorail
+🚞 | 山地火车 | Mountain Railway
+🚂 | 火车头 | Locomotive
+🚆 | 火车 | Train
+🚇 | 地铁 | Metro
+🚈 | 轻轨 | Light Rail
+🚉 | 车站 | Station
+🚊 | 有轨电车 | Tram
+🚝 | 单轨列车 | Monorail
+✈️ | 飞机 | Airplane
+🛫 | 起飞 | Airplane Departure
+🛬 | 降落 | Airplane Arrival
+🪂 | 跳伞 | Parachute
+💺 | 座位 | Seat
+🚁 | 直升机 | Helicopter
+🚟 | 吊索车 | Suspension Railway
+🚤 | 快艇 | Speedboat
+🛳️ | 轮船 | Passenger Ship
+⛴️ | 渡轮 | Ferry
+🛥️ | 摩托艇 | Motor Boat
+🚢 | 巨轮 | Ship
+🛶 | 独木舟 | Canoe
+🚀 | 火箭 | Rocket
+🛸 | UFO | Flying Saucer
+🛰️ | 卫星 | Satellite
+🚧 | 施工 | Construction
+🛟 | 救生圈 | Ring Buoy
+🛞 | 轮子 | Wheel
+🚦 | 红绿灯 | Vertical Traffic Light
+🚥 | 横向红绿灯 | Horizontal Traffic Light
+🛑 | 停车牌 | Stop Sign
+🚏 | 站牌 | Bus Stop
+🛣️ | 公路 | Motorway
+🛤️ | 铁轨 | Railway Track
+🛢️ | 油桶 | Oil Drum
+🛝 | 滑梯 | Playground Slide
+🛞 | 车轮 | Wheel
+🏠 | 房子 | House
+🏡 | 别墅 | House with Garden
+🏢 | 办公楼 | Office Building
+🏬 | 百货 | Department Store
+🏭 | 工厂 | Factory
+🏣 | 邮局 | Post Office
+🏤 | 银行 | Bank
+🏥 | 医院 | Hospital
+🏦 | 银行 | Bank
+🏨 | 酒店 | Hotel
+🏩 | 情侣酒店 | Love Hotel
+🏪 | 便利店 | Convenience Store
+🏫 | 学校 | School
+🏯 | 城堡 | Japanese Castle
+🏰 | 欧式城堡 | Castle
+💒 | 婚礼教堂 | Wedding
+🗼 | 东京塔 | Tokyo Tower
+🗽 | 自由女神 | Statue of Liberty
+🌁 | 雾桥 | Foggy
+🌉 | 桥 | Bridge
+🏁 | 终点旗 | Checkered Flag
+🎌 | 交叉旗 | Crossed Flags
+🏴 | 黑旗 | Black Flag
+🏳️ | 白旗 | White Flag
+🏴‍☠️ | 海盗旗 | Pirate Flag
+🗾 | 日本地图 | Map of Japan
+🧭 | 指南针 | Compass
+🏔️ | 雪山 | Snow-Capped Mountain
+🌋 | 火山 | Volcano
+🗻 | 富士山 | Mount Fuji
+🏕️ | 露营 | Camping
+🏖️ | 沙滩 | Beach
+🏜️ | 沙漠 | Desert
+🏝️ | 海岛 | Desert Island
+🏞️ | 国家公园 | National Park
+🏟️ | 体育场 | Stadium
+🏛️ | 古典建筑 | Classical Building
+🏗️ | 施工建筑 | Building Construction
+🧱 | 砖块 | Brick
+🪨 | 石头 | Rock
+🛕 | 寺庙 | Hindu Temple
+🕍 | 犹太教堂 | Synagogue
+🕋 | 清真寺 | Mosque
+🌅 | 日出 | Sunrise
+🌄 | 山日出 | Sunrise Over Mountains
+🌠 | 流星 | Shooting Star
+🌌 | 银河 | Milky Way
+🌇 | 夕阳 | Sunset
+🌆 | 城市黄昏 | Cityscape at Dusk
+🌉 | 夜景桥 | Bridge at Night
+🌃 | 星空夜景 | Night with Stars
+🌁 | 雾景 | Foggy
+🌊 | 海浪 | Wave
+🌫️ | 雾 | Fog
+🌬️ | 风 | Wind Face
+🌀 | 旋风 | Cyclone
+🌈 | 彩虹 | Rainbow
+🌂 | 伞 | Closed Umbrella
+☀️ | 太阳 | Sun
+🌙 | 弯月 | Crescent Moon
+🌚 | 黑脸满月 | New Moon Face
+🌛 | 上弦月 | First Quarter Moon Face
+🌜 | 下弦月 | Last Quarter Moon Face
+🌡️ | 温度计 | Thermometer
+🌧️ | 雨 | Cloud with Rain
+🌨️ | 雪 | Cloud with Snow
+🌩️ | 雷 | Cloud with Lightning
+🌊 | 海浪 | Water Wave
+
+---
+
+# 5. 物品 (Objects)
+⌚ | 手表 | Watch
+📱 | 手机 | Mobile Phone
+📲 | 来电手机 | Mobile Phone with Arrow
+💻 | 笔记本电脑 | Laptop Computer
+🖥️ | 台式电脑 | Desktop Computer
+🖨️ | 打印机 | Printer
+🖱️ | 鼠标 | Computer Mouse
+🖲️ | 轨迹球 | Trackball
+💽 | 磁盘 | Computer Disk
+💾 | 软盘 | Floppy Disk
+📀 | 光盘 | DVD
+🧮 | 计算器 | Abacus
+🎥 | 摄像机 | Movie Camera
+🎞️ | 胶卷 | Film Frames
+📽️ | 放映机 | Film Projector
+🎬 | 场记板 | Clapper Board
+📷 | 相机 | Camera
+📸 | 拍照相机 | Camera with Flash
+📹 | 摄像机 | Video Camera
+📼 | 录像带 | Videocassette
+🔋 | 电池 | Battery
+🔌 | 插头 | Electric Plug
+💡 | 灯泡 | Light Bulb
+🔦 | 手电筒 | Flashlight
+🏮 | 御手玉 | Paper Lantern
+🪔 | 蜡烛 | Diya Lamp
+📔 | 笔记本 | Notebook with Decorative Cover
+📕 | 合本书 | Closed Book
+📖 | 打开书 | Open Book
+📗 | 绿皮书 | Green Book
+📘 | 蓝皮书 | Blue Book
+📙 | 橙皮书 | Orange Book
+📚 | 书籍堆 | Books
+📓 | 笔记本 | Notebook
+📒 | 账本 | Ledger
+📃 | 卷纸 | Page with Curl
+📜 | 卷轴 | Scroll
+📄 | 纸页 | Page Facing Up
+📑 | 书签 | Bookmark Tabs
+🔖 | 书签 | Bookmark
+🏷️ | 标签 | Label
+💰 | 钱袋 | Money Bag
+🪙 | 硬币 | Coin
+💴 | 日元 | Yen Banknote
+💵 | 美元 | Dollar Banknote
+💶 | 欧元 | Euro Banknote
+💷 | 英镑 | Pound Banknote
+💳 | 银行卡 | Credit Card
+💸 | 飞钱 | Money with Wings
+📧 | 邮件 | E-Mail
+📨 | 来信 | Incoming Envelope
+📩 | 拆信 | Envelope with Arrow
+📤 | 发信 | Outbox Tray
+📥 | 收信 | Inbox Tray
+📦 | 包裹 | Package
+📫 | 闭合邮箱 | Closed Mailbox with Raised Flag
+📪 | lowered 邮箱 | Closed Mailbox with Lowered Flag
+📬 | 打开邮箱 | Open Mailbox with Raised Flag
+📭 | 打开无信邮箱 | Open Mailbox with Lowered Flag
+📮 | 邮筒 | Postbox
+🗳️ | 投票箱 | Ballot Box
+🖋️ | 钢笔 | Fountain Pen
+🖊️ | 圆珠笔 | Pen
+📝 | 备忘录 | Memo
+💼 | 公文包 | Briefcase
+📁 | 文件夹 | Folder
+📂 | 打开文件夹 | Open Folder
+🗂️ | 索引卡 | Card Index
+📅 | 日历 | Calendar
+📆 | 翻页日历 | Tear-Off Calendar
+🗒️ | 便签 | Spiral Notepad
+🗓️ | 线圈日历 | Spiral Calendar
+📇 | 名片夹 | Card Index
+🔗 | 链接 | Link
+📎 | 回形针 | Paperclip
+🖇️ | 双回形针 | Linked Paperclips
+📌 | 图钉 | Pushpin
+📍 | 定位针 | Round Pushpin
+📏 | 直尺 | Straight Ruler
+📐 | 三角尺 | Triangular Ruler
+🗃️ | 文件盒 | Card File Box
+🗄️ | 档案柜 | File Cabinet
+🔒 | 锁 | Lock
+🔓 | 开锁 | Unlock
+🔏 | 钢笔锁 | Lock with Ink Pen
+🔐 | 钥匙锁 | Lock with Key
+🔑 | 钥匙 | Key
+🗝️ | 复古钥匙 | Old Key
+🔨 | 锤子 | Hammer
+🪓 | 斧头 | Axe
+🛠️ | 工具 | Hammer and Wrench
+🗡️ | 剑 | Dagger
+💣 | 炸弹 | Bomb
+🪃 | 回旋镖 | Boomerang
+🏹 | 弓箭 | Bow and Arrow
+🛡️ | 盾牌 | Shield
+🚬 | 香烟 | Cigarette
+🪦 | 墓碑 | Headstone
+🧿 | 邪眼 | Nazar Amulet
+🪬 | 护符 | Hamsa
+📿 | 念珠 | Prayer Beads
+💎 | 钻石 | Gem Stone
+🔮 | 水晶球 | Crystal Ball
+📿 | 念珠 | Prayer Beads
+🪄 | 魔法棒 | Magic Wand
+🎁 | 礼物 | Wrapped Gift
+🎀 | 蝴蝶结 | Ribbon
+🎗️ | 纪念丝带 | Reminder Ribbon
+🎟️ | 票 | Admission Tickets
+🎫 | 门票 | Ticket
+🎪 | 马戏团帐篷 | Circus Tent
+🤹 | 杂耍 | Person Juggling
+🎭 | 面具 | Performing Arts
+🩰 | 舞鞋 | Ballet Shoes
+🎨 | 调色板 | Artist Palette
+🧵 | 针线 | Thread
+🪡 | 缝纫针 | Sewing Needle
+🧶 | 毛线 | Yarn
+🪭 | 折扇 | Folding Hand Fan
+🎤 | 麦克风 | Microphone
+🎧 | 耳机 | Headphone
+🎼 | 乐谱 | Musical Score
+🎹 | 钢琴 | Musical Keyboard
+🥁 | 鼓 | Drum
+🪘 | 长鼓 | Long Drum
+🎷 | 萨克斯 | Saxophone
+🎺 | 小号 | Trumpet
+🎸 | 吉他 | Guitar
+🪕 | 班卓琴 | Banjo
+🎻 | 小提琴 | Violin
+🪗 | 手风琴 | Accordion
+🥁 | 鼓 | Drum
+🪇 | 响葫芦 | Maracas
+🪈 | 长笛 | Flute
+📯 | 邮号 | Postal Horn
+🔔 | 铃铛 | Bell
+🔕 | 静音铃 | Bell with Slash
+🎶 | 音符 | Musical Notes
+🎵 | 单音符 | Musical Note
+
+---
+
+# 6. 符号 (Symbols)
+❤️ | 红心 | Red Heart
+🧡 | 橙心 | Orange Heart
+💛 | 黄心 | Yellow Heart
+💚 | 绿心 | Green Heart
+💙 | 蓝心 | Blue Heart
+💜 | 紫心 | Purple Heart
+🖤 | 黑心 | Black Heart
+🤍 | 白心 | White Heart
+🤎 | 棕心 | Brown Heart
+💔 | 心碎 | Broken Heart
+❣️ | 感叹心 | Heart Exclamation
+💕 | 双心 | Two Hearts
+💞 | 旋转心 | Revolving Hearts
+💓 | 心跳 | Beating Heart
+💗 | 生长心 | Growing Heart
+💖 | 闪光心 | Sparkling Heart
+💘 | 箭穿心 | Heart with Arrow
+💝 | 礼盒心 | Heart with Ribbon
+💌 | 爱心信 | Love Letter
+🕳️ | 黑洞 | Hole
+💢 | 怒符号 | Anger Symbol
+💬 | 对话气泡 | Speech Balloon
+💭 | 思考气泡 | Thought Balloon
+💤 | 睡觉 | ZZZ
+🚸 | 儿童 | Children Crossing
+🔞 | 18禁 | No One Under Eighteen
+📵 | 禁手机 | Mobile Phone with Prohibited Sign
+🔃 | 循环箭头 | Clockwise Arrows
+🔄 | 反向循环 | Anticlockwise Arrows
+🔙 | 返回 | Back Arrow
+🔚 | 结束 | End Arrow
+🔛 | 开关 | On! Arrow
+🔜 | 马上 | Soon Arrow
+🔝 | 置顶 | Top Arrow
+🛐 | 祈祷 | Place of Worship
+🕉️ | 欧姆 | Om Symbol
+🕎 | 灯台 | Menorah
+🔯 | 六芒星 | Dotted Six-Pointed Star
+🪯 | 卡帕拉 | Khanda
+🔀 | 随机 | Shuffle Tracks Button
+🔁 | 循环 | Repeat Button
+🔂 | 单次循环 | Repeat Single Button
+▶️ | 播放 | Play Button
+⏩ | 快进 | Fast-Forward Button
+⏭️ | 下一曲 | Next Track Button
+⏯️ | 播放暂停 | Play or Pause Button
+◀️ | 倒放 | Reverse Button
+⏪ | 快退 | Fast Reverse Button
+⏮️ | 上一曲 | Previous Track Button
+🔼 | 上箭头 | Upwards Button
+⏫ | 快上 | Fast Up Button
+🔽 | 下箭头 | Downwards Button
+⏬ | 快下 | Fast Down Button
+⏸️ | 暂停 | Pause Button
+⏹️ | 停止 | Stop Button
+⏺️ | 录制 | Record Button
+⏏️ | 弹出 | Eject Button
+🎦 | 影院标志 | Cinema Light
+🔅 | 低亮 | Dim Button
+🔆 | 高亮 | Bright Button
+📶 | 信号 | Antenna Bars
+🛜 | 无线 | Wireless
+📳 | 震动 | Vibration Mode
+📴 | 关机 | Mobile Phone Off
+🟰 | 等号 | Heavy Equals Sign
+#️⃣ | 井号 | Keycap Number Sign
+⚛️ | 原子 | Atom Symbol
+🕉️ | 欧姆 | Om
+☸️ | 法轮 | Wheel of Dharma
+☯️ | 太极 | Yin Yang
+✡️ | 大卫之星 | Star of David
+☢️ | 辐射 | Radioactive
+☣️ | 生物危害 | Biohazard
+📴 | 关机 | Mobile Phone Off
+📳 | 震动 | Vibration Mode
+♀️ | 女性符号 | Female Sign
+♂️ | 男性符号 | Male Sign
+⚧️ | 跨性别 | Transgender Symbol
+✝️ | 十字 | Latin Cross
+☦️ | 东正十字 | Orthodox Cross
+☪️ | 星月 | Star and Crescent
+☮️ | 和平 | Peace Symbol
+🕊️ | 和平鸽 | Dove
+⚕️ | 医疗 | Medical Symbol
+♻️ | 回收 | Recycling Symbol
+⚜️ | 鸢尾花 | Fleur-de-lis
+🔱 | 三叉戟 | Trident Emblem
+📛 | 名牌 | Name Badge
+🔰 | 徽章 | Japanese Symbol

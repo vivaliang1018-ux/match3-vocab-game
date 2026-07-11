@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TestFlight QA 清单 — 物品消消乐</title>
+  <style>
+    :root { --bg:#f0f9ff; --card:#fff; --text:#0c4a6e; --muted:#0369a1; --border:rgba(14,116,144,.15); --ok:#16a34a; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,sans-serif; background:linear-gradient(180deg,#e0f2fe,#fff7ed); color:var(--text); line-height:1.5; padding:1rem; }
+    main { max-width:52rem; margin:0 auto; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:1rem; padding:1rem 1.1rem; margin-bottom:1rem; box-shadow:0 6px 20px rgba(14,116,144,.07); }
+    h1 { font-size:1.35rem; margin:0 0 .5rem; }
+    h2 { font-size:1rem; margin:0 0 .6rem; color:var(--muted); }
+    h3 { font-size:.95rem; margin:1rem 0 .4rem; }
+    p, li { font-size:.88rem; }
+    .how { background:#fffbeb; border:1px solid #fde68a; border-radius:.75rem; padding:.75rem; margin-bottom:1rem; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; margin:.5rem 0; }
+    th, td { border:1px solid var(--border); padding:.4rem .45rem; vertical-align:top; }
+    th { background:#f0f9ff; text-align:left; }
+    input[type="text"] { width:100%; border:0; border-bottom:1px dashed var(--border); background:transparent; font:inherit; }
+    input[type="checkbox"] { width:1rem; height:1rem; accent-color:var(--ok); }
+    .pass-col { text-align:center; width:4.5rem; }
+    @media print { body { background:#fff; } .card { box-shadow:none; page-break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <h1>TestFlight QA 测试清单</h1>
+      <p><strong>应用：</strong>物品消消乐 · <strong>Bundle ID：</strong>com.match3vocab.game</p>
+      <p>
+        <label>测试设备 <input type="text" placeholder="例如 iPhone 15 / iOS 18" /></label><br />
+        <label>Build 号 <input type="text" placeholder="TestFlight 里的构建版本" /></label><br />
+        <label>测试人 <input type="text" /></label>
+        <label>日期 <input type="text" placeholder="2026-07-09" /></label>
+      </p>
+      <div class="how">
+        <strong>怎么用：</strong>
+        <ol>
+          <li>在真机上安装 TestFlight 版本（尽量别只用模拟器）。</li>
+          <li>按下面表格逐项操作，勾选 ✅ 通过；有问题在「备注」里写复现步骤。</li>
+          <li>四种模式各至少玩一局，再签字确认能否提审。</li>
+          <li>可用浏览器「打印 → 存为 PDF」，或复制到 Notion / 飞书文档。</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="card"><h2>1. 安装与首次启动</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+      <tr><td>1.1</td><td>全新安装不闪退</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.2</td><td>启动页正常，约 3 秒内进入游戏</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.3</td><td>刘海 / 灵动岛安全区正常</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.4</td><td>首次进入显示使用引导</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.5</td><td>引导可完成或跳过</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.6</td><td>杀进程重开不再自动弹引导</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>1.7</td><td>设置里可再次打开「使用引导」</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+    </tbody></table></div>
+
+    <div class="card"><h2>2. 核心玩法（随机模式）</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+      <tr><td>2.1</td><td>7×7 棋盘与 emoji 正常显示</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.2</td><td>相邻格子可交换</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.3</td><td>无效交换会弹回</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.4</td><td>三连及以上消除动画正常</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.5</td><td>下落补位流畅，无卡顿/白屏</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.6</td><td>连锁消除正常</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.7</td><td>消除后弹出单词</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.8</td><td>英文发音正常（录音或系统 TTS）</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.9</td><td>顶部分数/进度更新</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.10</td><td>词组图标行可滚动、选中缩放自然</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>2.11</td><td>连续玩 5 分钟以上不卡死/闪退</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+    </tbody></table></div>
+
+    <div class="card"><h2>3. 回合测验</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+      <tr><td>3.1</td><td>清完一轮后自动弹出测验</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.2</td><td>星星背景不挡按钮</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.3</td><td>连线题：英文连 emoji</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.4</td><td>选择题：选对单词</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.5</td><td>换题时布局不抖动</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.6</td><td>上一步/下一步始终可见</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.7</td><td>换题时朗读不被打断</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.8</td><td>「再听一次」只播英文</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.9</td><td>答错有反馈，可重试</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.10</td><td>完成后有庆祝动画</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.11</td><td>测验结束后进入新一局</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+    </tbody></table></div>
+
+    <div class="card"><h2>4. 游戏模式</h2>
+      <h3>4a 趣味模式</h3><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+        <tr><td>4.1</td><td>目标横幅与倒计时环</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.2</td><td>长单词在横幅内自适应</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.3</td><td>短单词字号够大</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.4</td><td>消除目标词后倒计时/目标更新</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.5</td><td>全部 3/3 后自动换关</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      </tbody></table>
+      <h3>4b 分类 / 4c 复习 / 4d 切换</h3><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+        <tr><td>4.6–4.8</td><td>分类模式可选类别、棋盘词池正确</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.9–4.12</td><td>复习模式、到期词、空池提示</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.13–4.15</td><td>模式切换、换一批词、重新开始</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="card"><h2>5–7. 已学 / 我的 / 音频</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+      <tr><td>5.x</td><td>已学列表、详情、发音、词库浏览</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>6.x</td><td>访客存档、即将推出文案、音效/语言、隐私政策链接</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>7.x</td><td>BGM/SFX、静音键、蓝牙、测验朗读不重叠</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+    </tbody></table></div>
+
+    <div class="card"><h2>8–11. 持久化 / 性能 / 提审</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
+      <tr><td>8.x</td><td>杀进程恢复、离线可玩、卸载清数据</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>9.x</td><td>小屏/大屏、长时间流畅、包体可接受</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>10.x</td><td>VoiceOver 粗测</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>11.x</td><td>Release 构建、图标、隐私政策 URL</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+    </tbody></table>
+      <p><strong>阻塞问题（必须修）：</strong></p><ol><li><input type="text" style="width:100%" /></li><li><input type="text" style="width:100%" /></li></ol>
+      <p><strong>结论：</strong> ☐ 可以提审 &nbsp; ☐ 还需修 bug</p>
+    </div>
+  </main>
+</body>
+</html>

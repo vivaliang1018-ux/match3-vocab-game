@@ -1,0 +1,200 @@
+export type Locale = 'zh-CN' | 'en' | 'es' | 'fr' | 'de';
+
+export const LOCALES: readonly Locale[] = ['zh-CN', 'en', 'es', 'fr', 'de'] as const;
+
+export type OnboardingStepCopy = { title: string; body: string };
+
+export type CountdownCopy = {
+  due: string;
+  days: (n: number) => string;
+  hours: (n: number) => string;
+  minutes: (n: number) => string;
+  seconds: (n: number) => string;
+};
+
+export type Messages = {
+  meta: { appTitle: string; uiVersion: string };
+  common: {
+    close: string;
+    skip: string;
+    prev: string;
+    next: string;
+    done: string;
+    current: string;
+    preview: string;
+    words: string;
+  };
+  tabs: {
+    navAria: string;
+    game: string;
+    learned: string;
+    words: string;
+    profile: string;
+    dueBadge: (n: number) => string;
+  };
+  profile: {
+    guestName: string;
+    guestBadge: string;
+    subtitle: string;
+    signInCta: string;
+    signInComingSoonHint: string;
+    statsTitle: string;
+    emojisCleared: string;
+    emojiProgress: string;
+    emojiProgressDetail: (cleared: number, total: number) => string;
+    language: string;
+    preferencesTitle: string;
+    toggleOn: string;
+    toggleOff: string;
+    bgm: string;
+    sfx: string;
+    actionsTitle: string;
+    replayTutorial: string;
+    openLearned: string;
+    openWords: string;
+    aboutTitle: string;
+    description: string;
+    version: string;
+    privacyPolicy: string;
+    ttsUnavailable: string;
+    thiingsCredit: string;
+    signedInBadge: string;
+    signedInSubtitle: string;
+    signOutCta: string;
+  };
+  auth: {
+    dialogAria: string;
+    dialogTitle: string;
+    dialogBody: string;
+    appleCta: string;
+    googleCta: string;
+    emailDivider: string;
+    socialDivider: string;
+    email: string;
+    password: string;
+    emailSignInCta: string;
+    emailSignUpCta: string;
+    noAccount: string;
+    hasAccount: string;
+    switchToSignUp: string;
+    switchToSignIn: string;
+    errorPopupClosed: string;
+    errorInvalidCredentials: string;
+    errorEmailInUse: string;
+    errorWeakPassword: string;
+    errorTooManyRequests: string;
+    errorNotConfigured: string;
+    errorProviderDisabled: string;
+    errorUnknown: string;
+  };
+  gameSettings: {
+    title: string;
+    dialogAria: string;
+    bgm: string;
+    mute: string;
+    restart: string;
+    onboarding: string;
+  };
+  modes: {
+    pickerTitle: string;
+    random: string;
+    randomDesc: string;
+    category: string;
+    categoryDesc: string;
+    review: string;
+    reviewDesc: string;
+    fun: string;
+    funDesc: string;
+    funChallenge: string;
+    funFindHint: string;
+    categoryThemes: string;
+    shuffle: string;
+    randomChallenge: string;
+    reviewMode: string;
+    categoryFallback: string;
+    thiingsLabel: string;
+    thiingsSubtitle: string;
+    insufficientReview: string;
+    insufficientPool: string;
+    insufficientReviewHint: string;
+    insufficientPoolHint: string;
+  };
+  hud: {
+    wordSet: string;
+    score: string;
+    matchesCleared: (n: number) => string;
+    modePickerAria: string;
+    tileAria: string;
+  };
+  onboarding: {
+    dialogAria: string;
+    closeAria: string;
+    title: (step: number, total: number) => string;
+    steps: readonly OnboardingStepCopy[];
+  };
+  celebration: {
+    roundComplete: string;
+    roundQuiz: string;
+    default: string;
+    quizConnect: string;
+    quizConnectNext: string;
+    quizDone: string;
+    quizDoneNext: string;
+  };
+  quiz: {
+    dialogAria: string;
+    phaseConnect: string;
+    phasePick: string;
+    connectHint: string;
+    pickHint: string;
+    colEnglish: string;
+    colPicture: string;
+    reviewTag: string;
+    peekCn: string;
+    peekCnAria: string;
+    prevQuestion: string;
+    nextQuestion: string;
+    tryAgain: string;
+    tryAgainCn: string;
+    connectProgress: (done: number, total: number) => string;
+    pickProgress: (done: number, total: number) => string;
+    pickReview: (current: number, furthest: number) => string;
+    exit: string;
+    exitAria: string;
+  };
+  learned: {
+    title: string;
+    statsTitle: string;
+    emojisCleared: string;
+    emojiProgress: string;
+    emojiProgressDetail: (cleared: number, total: number) => string;
+    collectionTitle: string;
+    wordDialogAria: string;
+    playPronunciation: string;
+    openWord: (word: string) => string;
+  };
+  review: {
+    title: string;
+    whatIsThis: string;
+    summary: string;
+    intro: string;
+    tracked: (n: number) => string;
+    curveTitle: string;
+    curveHint: string;
+    ebbinghausLabels: readonly string[];
+    dueTitle: string;
+    dueSubtitle: string;
+    dueList: string;
+    dueEmpty: string;
+    stage: (n: number) => string;
+    upcoming: string;
+    countdown: CountdownCopy;
+  };
+  words: {
+    title: string;
+    stats: (categories: number, total: number) => string;
+    searchPlaceholder: string;
+    noResults: string;
+    categoryCount: (subtitle: string, n: number) => string;
+  };
+};

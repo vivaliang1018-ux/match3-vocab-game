@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyBIAR9MePb8-Cp6ei8aorm7dje_wvqMQDE</string>
+	<key>GCM_SENDER_ID</key>
+	<string>36839354879</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.match3vocab.game</string>
+	<key>PROJECT_ID</key>
+	<string>gen-lang-client-0267908863</string>
+	<key>STORAGE_BUCKET</key>
+	<string>gen-lang-client-0267908863.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<false/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:36839354879:ios:2106d48eb358b4aa2737ca</string>
+</dict>
+</plist>
