@@ -11,6 +11,7 @@ import {
   memoryScopeForUserId,
 } from './ebbinghausMemory';
 import { deleteCloudWordMemories } from './memoryCloudSync';
+import { clearAvatarPreset } from './accountProfile';
 
 /**
  * Permanently delete the signed-in account: cloud progress, local user bucket, then Auth user.
@@ -35,6 +36,7 @@ export async function deleteAccountUser(): Promise<void> {
     // Best-effort: still delete Auth user so the account cannot sign in.
   }
   clearWordMemoriesForScope(scope);
+  clearAvatarPreset(uid);
 
   try {
     await deleteUser(user);

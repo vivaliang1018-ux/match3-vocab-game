@@ -10,6 +10,8 @@ import {
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
   authErrorMessage,
+  changeUserEmail,
+  changeUserPassword,
   completeAuthRedirect,
   getFirebaseAuth,
   isFirebaseConfigured,
@@ -18,6 +20,8 @@ import {
   signInWithGoogle,
   signOutUser,
   signUpWithEmail,
+  updateUserDisplayName,
+  userHasPasswordProvider,
 } from '../lib/firebase';
 import { deleteAccountUser } from '../lib/accountDeletion';
 
@@ -27,12 +31,17 @@ type AuthContextValue = {
   configured: boolean;
   busy: boolean;
   lastError: string | null;
-  signInGoogle: () => Promise<void>;
-  signInApple: () => Promise<void>;
-  signInEmail: (email: string, password: string) => Promise<void>;
-  signUpEmail: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  hasPasswordProvider: boolean;
+  signInGoogle: () => Promise<string | null>;
+  signInApple: () => Promise<string | null>;
+  signInEmail: (email: string, password: string) => Promise<string | null>;
+  signUpEmail: (email: string, password: string) => Promise<string | null>;
+  updateDisplayName: (displayName: string) => Promise<boolean>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
+  changeEmail: (currentPassword: string, newEmail: string) => Promise<string | null>;
+  refreshUser: () => Promise<void>;
+  signOut: () => Promise<string | null>;
+  deleteAccount: () => Promise<string | null>;
   clearError: () => void;
 };
 
@@ -70,28 +79,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [configured]);
 
-  const runAuth = useCallback(async (fn: () => Promise<void>) => {
+  const runAuth = useCallback(async (fn: () => Promise<void>): Promise<string | null> => {
     if (!configured) {
       setLastError('not_configured');
-      return;
+      return 'not_configured';
     }
     setBusy(true);
     setLastError(null);
     try {
       await fn();
+      return null;
     } catch (error) {
       if (error instanceof Error && error.message === 'redirect_pending') {
-        return;
+        return 'redirect_pending';
       }
       if (error instanceof Error && error.message === 'requires_recent_login') {
         setLastError('requires_recent_login');
-        return;
+        return 'requires_recent_login';
       }
-      setLastError(authErrorMessage(error));
+      const mapped = authErrorMessage(error);
+      setLastError(mapped);
+      return mapped;
     } finally {
       setBusy(false);
     }
   }, [configured]);
+
+  const clearError = useCallback(() => {
+    setLastError(null);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -100,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       configured,
       busy,
       lastError,
+      hasPasswordProvider: userHasPasswordProvider(user),
       signInGoogle: () =>
         runAuth(async () => {
           await signInWithGoogle();
@@ -116,6 +133,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         runAuth(async () => {
           await signUpWithEmail(email, password);
         }),
+      updateDisplayName: async (displayName) => {
+        if (!configured) {
+          setLastError('not_configured');
+          return false;
+        }
+        setBusy(true);
+        setLastError(null);
+        try {
+          const next = await updateUserDisplayName(displayName);
+          setUser(next);
+          return true;
+        } catch (error) {
+          setLastError(authErrorMessage(error));
+          return false;
+        } finally {
+          setBusy(false);
+        }
+      },
+      changePassword: (currentPassword, newPassword) =>
+        runAuth(async () => {
+          await changeUserPassword(currentPassword, newPassword);
+        }),
+      changeEmail: (currentPassword, newEmail) =>
+        runAuth(async () => {
+          await changeUserEmail(currentPassword, newEmail);
+        }),
+      refreshUser: async () => {
+        if (!configured) return;
+        const current = getFirebaseAuth().currentUser;
+        if (!current) {
+          setUser(null);
+          return;
+        }
+        await current.reload();
+        setUser(getFirebaseAuth().currentUser);
+      },
       signOut: () =>
         runAuth(async () => {
           await signOutUser();
@@ -124,9 +177,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         runAuth(async () => {
           await deleteAccountUser();
         }),
-      clearError: () => setLastError(null),
+      clearError,
     }),
-    [user, ready, configured, busy, lastError, runAuth],
+    [user, ready, configured, busy, lastError, runAuth, clearError],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

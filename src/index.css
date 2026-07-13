@@ -1793,6 +1793,28 @@
   color: #e11d48;
 }
 
+.auth-sheet-status {
+  margin: 0;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.auth-sheet-status-error {
+  border: 1.5px solid #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.auth-sheet-status-ok {
+  border: 1.5px solid #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
 .auth-sheet-btn {
   display: inline-flex;
   min-height: 40px;
@@ -1880,6 +1902,323 @@
   background: #fff;
   color: #0f172a;
   box-shadow: 0 2px 0 #94a3b8;
+}
+
+.account-sheet-panel {
+  max-height: min(94vh, 720px);
+}
+
+.account-sheet-body {
+  padding-bottom: 0.35rem;
+}
+
+.account-avatar-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+}
+
+.account-avatar-btn {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.account-avatar-face {
+  display: grid;
+  height: 3.6rem;
+  width: 3.6rem;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 3px solid #fff;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+.account-avatar-face-lg {
+  height: 4.5rem;
+  width: 4.5rem;
+}
+
+.account-avatar-emoji {
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.account-avatar-face-lg .account-avatar-emoji {
+  font-size: 1.9rem;
+}
+
+.account-avatar-edit {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  height: 1.45rem;
+  width: 1.45rem;
+  place-items: center;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  background: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 100%);
+  color: #fff;
+  box-shadow: 0 2px 0 #0284c7;
+}
+
+.account-avatar-hint {
+  margin: 0;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: rgba(7, 89, 133, 0.65);
+}
+
+.account-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.account-avatar-option {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 16px;
+  border: 2px solid #e0f2fe;
+  font-size: 1.35rem;
+  box-shadow: 0 2px 0 #bae6fd;
+}
+
+.account-avatar-option-on {
+  border-color: #0ea5e9;
+  box-shadow:
+    0 0 0 2px rgba(14, 165, 233, 0.28),
+    0 2px 0 #0284c7;
+}
+
+.account-saved-flash {
+  margin: -0.15rem 0 0;
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #059669;
+}
+
+.account-section {
+  margin-top: 0.25rem;
+}
+
+.account-section-label {
+  margin-bottom: 0.35rem;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(7, 89, 133, 0.55);
+}
+
+.account-info-card {
+  border-radius: 14px;
+  border: 1.5px solid #bae6fd;
+  background: rgba(255, 255, 255, 0.88);
+  overflow: hidden;
+}
+
+.account-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-top: 1px solid #e0f2fe;
+  font-size: 0.72rem;
+}
+
+.account-info-row:first-child {
+  border-top: none;
+}
+
+.account-info-row > span {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: rgba(7, 89, 133, 0.62);
+}
+
+.account-info-row > strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-weight: 800;
+  color: #0c4a6e;
+}
+
+.account-provider-ok {
+  color: #059669 !important;
+}
+
+.account-security {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.account-security-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.account-security-toggle {
+  min-height: 2.2rem;
+  border-radius: 12px;
+  border: 1.5px solid #bae6fd;
+  background: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #0c4a6e;
+}
+
+.account-security-toggle-on {
+  border-color: #0ea5e9;
+  background: #e0f2fe;
+}
+
+.account-security-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border-radius: 14px;
+  border: 1.5px solid #bae6fd;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.65rem 0.7rem;
+}
+
+.account-security-hint {
+  margin: 0;
+  border-radius: 12px;
+  border: 1px solid #e0f2fe;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 0.55rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: rgba(7, 89, 133, 0.75);
+}
+
+.account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+}
+
+.account-action-btn {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 14px;
+  border: 1.5px solid #7dd3fc;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.account-action-signout {
+  background: linear-gradient(180deg, #fff 0%, #e0f2fe 100%);
+  color: #0c4a6e;
+  box-shadow: 0 2px 0 #7dd3fc;
+}
+
+.account-action-chevron {
+  margin-left: auto;
+  opacity: 0.55;
+}
+
+.account-delete-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  align-self: center;
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #e11d48;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.account-delete-confirm {
+  border-radius: 14px;
+  border: 1.5px solid #fecdd3;
+  background: #fff1f2;
+  padding: 0.65rem 0.7rem;
+}
+
+.account-delete-body {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.4;
+  color: #9f1239;
+}
+
+.account-delete-row {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.account-delete-cancel,
+.account-delete-confirm-btn {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.account-delete-cancel {
+  border: 1.5px solid #bae6fd;
+  background: #fff;
+  color: #0c4a6e;
+}
+
+.account-delete-confirm-btn {
+  border: 1.5px solid #e11d48;
+  background: #e11d48;
+  color: #fff;
+  box-shadow: 0 2px 0 #9f1239;
+}
+
+.profile-candy-user-card-btn {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-ios);
+}
+
+.profile-candy-user-card-btn:active {
+  transform: scale(0.985);
+}
+
+.profile-candy-avatar-flush {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.profile-candy-avatar-flush .account-avatar-face {
+  height: 100%;
+  width: 100%;
 }
 
 

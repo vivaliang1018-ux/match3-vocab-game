@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Mail, X } from 'lucide-react';
@@ -12,11 +12,26 @@ type SignInSheetProps = {
   onClose: () => void;
 };
 
+function mapAuthCode(
+  code: string | null,
+  t: ReturnType<typeof useI18n>['t'],
+): string | null {
+  if (!code || code === 'redirect_pending') return null;
+  if (code === 'popup_closed') return t.auth.errorPopupClosed;
+  if (code === 'invalid_credentials') return t.auth.errorInvalidCredentials;
+  if (code === 'email_in_use') return t.auth.errorEmailInUse;
+  if (code === 'weak_password') return t.auth.errorWeakPassword;
+  if (code === 'too_many_requests') return t.auth.errorTooManyRequests;
+  if (code === 'not_configured') return t.auth.errorNotConfigured;
+  if (code === 'provider_disabled') return t.auth.errorProviderDisabled;
+  if (code === 'network') return t.auth.errorNetwork;
+  return t.auth.errorUnknown;
+}
+
 export function SignInSheet({ open, onClose }: SignInSheetProps) {
   const { t } = useI18n();
   const {
     busy,
-    lastError,
     signInGoogle,
     signInApple,
     signInEmail,
@@ -29,52 +44,57 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const wasOpen = useRef(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    setMode('signIn');
-    clearError();
+    if (open && !wasOpen.current) {
+      setMode('signIn');
+      setStatusError(null);
+      setSuccessMsg(null);
+      clearError();
+    }
+    wasOpen.current = open;
   }, [open, clearError]);
 
   useEffect(() => {
-    if (open && user) onClose();
-  }, [open, user, onClose]);
+    if (!open || !user || !successMsg) return;
+    const id = window.setTimeout(() => onClose(), 900);
+    return () => window.clearTimeout(id);
+  }, [open, user, successMsg, onClose]);
 
-  const errorText =
-    lastError === 'popup_closed'
-      ? t.auth.errorPopupClosed
-      : lastError === 'invalid_credentials'
-        ? t.auth.errorInvalidCredentials
-        : lastError === 'email_in_use'
-          ? t.auth.errorEmailInUse
-          : lastError === 'weak_password'
-            ? t.auth.errorWeakPassword
-            : lastError === 'too_many_requests'
-              ? t.auth.errorTooManyRequests
-              : lastError === 'not_configured'
-                ? t.auth.errorNotConfigured
-                : lastError === 'provider_disabled'
-                  ? t.auth.errorProviderDisabled
-                  : lastError
-                    ? t.auth.errorUnknown
-                    : null;
+  useEffect(() => {
+    if (open && user && !successMsg && !busy) onClose();
+  }, [open, user, successMsg, busy, onClose]);
 
   const switchMode = (next: 'signIn' | 'signUp') => {
     clearError();
+    setStatusError(null);
+    setSuccessMsg(null);
     setMode(next);
   };
 
   const submitEmail = async () => {
-    if (!email.trim() || password.length < 6) return;
-    if (mode === 'signIn') {
-      await signInEmail(email, password);
-    } else {
-      await signUpEmail(email, password);
+    setStatusError(null);
+    setSuccessMsg(null);
+    if (!email.trim() || password.length < 6) {
+      setStatusError(t.auth.errorNeedEmail);
+      return;
     }
+    const code =
+      mode === 'signIn'
+        ? await signInEmail(email, password)
+        : await signUpEmail(email, password);
+    if (code) {
+      setStatusError(mapAuthCode(code, t));
+      return;
+    }
+    setSuccessMsg(mode === 'signIn' ? t.auth.successSignIn : t.auth.successSignUp);
   };
 
   const sheet = (
@@ -124,9 +144,14 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                 <input
                   type="email"
                   autoComplete="email"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => {
-                    clearError();
+                    setStatusError(null);
+                    setSuccessMsg(null);
                     setEmail(e.target.value);
                   }}
                   placeholder="you@example.com"
@@ -140,7 +165,8 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                   autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
                   value={password}
                   onChange={(e) => {
-                    clearError();
+                    setStatusError(null);
+                    setSuccessMsg(null);
                     setPassword(e.target.value);
                   }}
                   onKeyDown={(e) => {
@@ -153,17 +179,32 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                 />
               </label>
 
-              {errorText && <p className="auth-sheet-error">{errorText}</p>}
+              {statusError && (
+                <p className="auth-sheet-status auth-sheet-status-error" role="alert">
+                  {statusError}
+                </p>
+              )}
+              {successMsg && !statusError && (
+                <p className="auth-sheet-status auth-sheet-status-ok" role="status">
+                  {successMsg}
+                </p>
+              )}
 
               <motion.button
                 type="button"
-                disabled={busy || !configured || !email.trim() || password.length < 6}
+                disabled={busy || !configured}
                 className="auth-sheet-btn auth-sheet-btn-primary"
                 whileTap={busy ? undefined : MOTION_PRESS_TAP}
                 onClick={() => void submitEmail()}
               >
                 <Mail size={15} aria-hidden />
-                {mode === 'signIn' ? t.auth.emailSignInCta : t.auth.emailSignUpCta}
+                {busy
+                  ? mode === 'signIn'
+                    ? t.auth.emailSigningIn
+                    : t.auth.emailSigningUp
+                  : mode === 'signIn'
+                    ? t.auth.emailSignInCta
+                    : t.auth.emailSignUpCta}
               </motion.button>
 
               <p className="auth-sheet-switch">
@@ -185,7 +226,6 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
               </p>
             </div>
 
-            {/* Footer always visible — not inside a clipped scroll parent */}
             <div className="auth-sheet-footer">
               <div className="auth-sheet-divider">
                 <span>{t.auth.socialDivider}</span>
@@ -195,7 +235,13 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                   type="button"
                   disabled={busy || !configured}
                   className="auth-sheet-btn auth-sheet-btn-apple"
-                  onClick={() => void signInApple()}
+                  onClick={() => {
+                    void (async () => {
+                      setStatusError(null);
+                      const code = await signInApple();
+                      if (code) setStatusError(mapAuthCode(code, t));
+                    })();
+                  }}
                 >
                   <AppleMark />
                   Apple
@@ -204,7 +250,13 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                   type="button"
                   disabled={busy || !configured}
                   className="auth-sheet-btn auth-sheet-btn-google"
-                  onClick={() => void signInGoogle()}
+                  onClick={() => {
+                    void (async () => {
+                      setStatusError(null);
+                      const code = await signInGoogle();
+                      if (code) setStatusError(mapAuthCode(code, t));
+                    })();
+                  }}
                 >
                   <GoogleMark />
                   Google

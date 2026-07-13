@@ -2,29 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>188497501196-kg0kobag55dc3pov6nvsg1ampj20oa13.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.188497501196-kg0kobag55dc3pov6nvsg1ampj20oa13</string>
 	<key>API_KEY</key>
-	<string>AIzaSyBIAR9MePb8-Cp6ei8aorm7dje_wvqMQDE</string>
+	<string>AIzaSyBO5Z9m_a79g5falHyaO4gZiaO-LRHX2fk</string>
 	<key>GCM_SENDER_ID</key>
-	<string>36839354879</string>
+	<string>188497501196</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.match3vocab.game</string>
 	<key>PROJECT_ID</key>
-	<string>gen-lang-client-0267908863</string>
+	<string>match3-vocab-game</string>
 	<key>STORAGE_BUCKET</key>
-	<string>gen-lang-client-0267908863.firebasestorage.app</string>
+	<string>match3-vocab-game.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false/>
+	<false></false>
 	<key>IS_APPINVITE_ENABLED</key>
-	<false/>
+	<true></true>
 	<key>IS_GCM_ENABLED</key>
-	<true/>
+	<true></true>
 	<key>IS_SIGNIN_ENABLED</key>
-	<true/>
+	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:36839354879:ios:2106d48eb358b4aa2737ca</string>
+	<string>1:188497501196:ios:9d0f8935625057b690a229</string>
 </dict>
 </plist>

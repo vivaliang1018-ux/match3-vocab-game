@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0267908863",
-  "appId": "1:36839354879:web:2106d48eb358b4aa2737ca",
-  "apiKey": "AIzaSyBIAR9MePb8-Cp6ei8aorm7dje_wvqMQDE",
-  "authDomain": "gen-lang-client-0267908863.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-aba126c5-6ba2-4ebf-bd57-75625b77dfce",
-  "storageBucket": "gen-lang-client-0267908863.firebasestorage.app",
-  "messagingSenderId": "36839354879",
-  "measurementId": ""
+  "projectId": "match3-vocab-game",
+  "appId": "1:188497501196:web:85012e259a6ffc2590a229",
+  "apiKey": "AIzaSyBS3dtU7S_ShBsZhGYSUCpbKnRgB6VaHZs",
+  "authDomain": "match3-vocab-game.firebaseapp.com",
+  "firestoreDatabaseId": "",
+  "storageBucket": "match3-vocab-game.firebasestorage.app",
+  "messagingSenderId": "188497501196",
+  "measurementId": "G-EN4JZ0Q7Q1"
 }

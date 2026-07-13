@@ -27,25 +27,17 @@ users/{uid}/match3/state
 
 ---
 
-## 0. 推荐：用自己的 Firebase 项目（vivaliang）
+## 0. Firebase 项目（vivaliang）
 
-当前仓库里的 `src/firebase-applet-config.json` 指向临时项目 `gen-lang-client-0267908863`。正式发布前请：
+正式配置已指向项目 **`match3-vocab-game`**（`vivaliang1018@gmail.com`）。本地用 `.env.local` 的 `VITE_FIREBASE_*`（优先于 `firebase-applet-config.json`）。
 
-1. 用 **vivaliang1018@gmail.com** 登录 [Firebase Console](https://console.firebase.google.com/)
-2. **Create a project**（或把现有项目转让到该账号）
-3. 添加 **Web** App 与 **iOS** App（Bundle ID：`com.match3vocab.game`）
-4. 复制配置到本地：
+隐私政策公网地址（GitHub Pages · `/docs`）：
 
-```bash
-cp .env.example .env.local
-# 填入 VITE_FIREBASE_* （优先于 firebase-applet-config.json）
+```
+https://vivaliang1018-ux.github.io/match3-vocab-game/privacy.html
 ```
 
-5. 把 iOS 的 `GoogleService-Info.plist` 放到 `ios/App/App/`（或按 Capacitor 文档同步）
-6. Authentication → 启用 **Apple / Google / Email·Password**
-7. 创建 Firestore，部署本仓库根目录的 `firestore.rules`
-
-也可用新值直接改写 `src/firebase-applet-config.json`（无 `.env.local` 时的默认）。
+写入 `.env.local` 的 `VITE_PRIVACY_POLICY_URL` 后重新 `npm run build` / `build:ios`。
 
 ---
 
