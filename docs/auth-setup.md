@@ -51,7 +51,7 @@ https://vivaliang1018-ux.github.io/match3-vocab-game/privacy.html
 
 ### Apple 额外步骤（必做）
 
-1. [Apple Developer](https://developer.apple.com/account) → Identifiers → 为 Bundle ID `com.match3vocab.game` 开启 **Sign In with Apple**
+1. [Apple Developer](https://developer.apple.com/account) → Identifiers → 为 Bundle ID `com.matchingo.game` 开启 **Sign In with Apple**
 2. Firebase → Authentication → Apple → 按提示填写 Services ID / Team ID / Key（Web 登录需要；纯 iOS App 内登录主要靠原生能力）
 3. Xcode 中确认 Target 已有 **Sign in with Apple** capability（本仓库已加 `App/App.entitlements`）
 

@@ -2,10 +2,13 @@ import type { CSSProperties } from 'react';
 import { BOARD_SPARKLE_STARS } from '../../data/boardSparkleStars';
 import { cn } from '../../lib/utils';
 
+/** A small accent under the board is enough; every star is a continuous compositor animation. */
+const VISIBLE_BOARD_SPARKLE_STARS = BOARD_SPARKLE_STARS.filter((_, i) => i % 2 === 0);
+
 export function BoardBottomSparkles() {
   return (
     <div className="game-board-sparkles pointer-events-none" aria-hidden>
-      {BOARD_SPARKLE_STARS.map((star, i) => (
+      {VISIBLE_BOARD_SPARKLE_STARS.map((star, i) => (
         <span
           key={i}
           className={cn(

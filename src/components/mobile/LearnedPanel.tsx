@@ -12,21 +12,25 @@ import type { WordItem } from '../../types/game';
 import { EmojiClearStatsBlock } from './EmojiClearStatsBlock';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 import { LearnedWordModal } from './LearnedWordModal';
+import { cn } from '../../lib/utils';
 
 type LearnedPanelProps = {
-  learnedAreaRef: React.RefObject<HTMLDivElement | null>;
   roundLearnedIds: string[];
   totalEmojiPool: number;
   itemById: Map<string, WordItem>;
   allPool: WordItem[];
+  /** Enough words + unlock to start review mode. */
+  canGoReview: boolean;
+  onGoReview: () => void;
 };
 
 export function LearnedPanel({
-  learnedAreaRef,
   roundLearnedIds,
   totalEmojiPool,
   itemById,
   allPool,
+  canGoReview,
+  onGoReview,
 }: LearnedPanelProps) {
   const { t, showChinese } = useI18n();
   const [selectedItem, setSelectedItem] = useState<WordItem | null>(null);
@@ -43,7 +47,7 @@ export function LearnedPanel({
 
   return (
     <>
-      <div className="profile-candy-page pb-6" ref={learnedAreaRef}>
+      <div className="profile-candy-page pb-6">
         <div className="profile-candy-board">
           <CandyFrostingHeader title="LEARNED" />
 
@@ -56,6 +60,24 @@ export function LearnedPanel({
                   variant="learned"
                   theme="candy"
                 />
+                <motion.button
+                  type="button"
+                  whileTap={canGoReview ? MOTION_PRESS_TAP : undefined}
+                  disabled={!canGoReview}
+                  onClick={onGoReview}
+                  className={cn(
+                    'candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full',
+                    !canGoReview && 'candy-sheet-action-btn-disabled',
+                  )}
+                  aria-label={t.learned.goReview}
+                >
+                  {t.learned.goReview}
+                </motion.button>
+                {!canGoReview ? (
+                  <p className="mt-2 text-center text-[11px] font-semibold leading-snug text-sky-800/75">
+                    {t.modes.insufficientReviewHint}
+                  </p>
+                ) : null}
               </div>
             </section>
 

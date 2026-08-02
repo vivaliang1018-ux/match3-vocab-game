@@ -12,6 +12,10 @@ import {
 } from './ebbinghausMemory';
 import { deleteCloudWordMemories } from './memoryCloudSync';
 import { clearAvatarPreset } from './accountProfile';
+import { clearRoundLearnedIds } from './roundLearned';
+import { clearModeUnlocks } from './modeUnlocks';
+import { clearAdventureSetHistory } from './adventureSetHistory';
+import { clearFirstTimeGuideState } from './firstTimeGuide';
 
 /**
  * Permanently delete the signed-in account: cloud progress, local user bucket, then Auth user.
@@ -36,6 +40,10 @@ export async function deleteAccountUser(): Promise<void> {
     // Best-effort: still delete Auth user so the account cannot sign in.
   }
   clearWordMemoriesForScope(scope);
+  clearRoundLearnedIds(uid);
+  clearModeUnlocks(uid);
+  clearAdventureSetHistory(uid);
+  clearFirstTimeGuideState(uid);
   clearAvatarPreset(uid);
 
   try {

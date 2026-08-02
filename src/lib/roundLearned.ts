@@ -1,8 +1,16 @@
+import {
+  claimGuestProgress,
+  clearScopedProgress,
+  readScopedProgress,
+  writeScopedProgress,
+} from './progressScope';
+
 const STORAGE_KEY = 'smellycat-match3-round-learned-v1';
 
-export function loadRoundLearnedIds(): string[] {
+export function loadRoundLearnedIds(userUid?: string | null): string[] {
+  claimGuestProgress(STORAGE_KEY, userUid);
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readScopedProgress(STORAGE_KEY, userUid);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
@@ -11,18 +19,19 @@ export function loadRoundLearnedIds(): string[] {
   }
 }
 
-export function saveRoundLearnedIds(ids: string[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-  } catch {
-    // ignore quota
-  }
+export function saveRoundLearnedIds(ids: string[], userUid?: string | null): void {
+  writeScopedProgress(STORAGE_KEY, JSON.stringify(ids), userUid);
+}
+
+export function clearRoundLearnedIds(userUid?: string | null): void {
+  clearScopedProgress(STORAGE_KEY, userUid);
 }
 
 /** Words that cleared match-3 for the round and finished the quiz. */
 export function markRoundLearnedItems(
   existing: string[],
   items: { id: string }[],
+  userUid?: string | null,
 ): string[] {
   if (items.length === 0) return existing;
   const set = new Set(existing);
@@ -30,7 +39,7 @@ export function markRoundLearnedItems(
     if (it.id) set.add(it.id);
   }
   const next = [...set];
-  saveRoundLearnedIds(next);
+  saveRoundLearnedIds(next, userUid);
   return next;
 }
 

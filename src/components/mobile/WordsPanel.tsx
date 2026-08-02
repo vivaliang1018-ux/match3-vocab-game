@@ -6,11 +6,7 @@ import { speakWordQuick } from '../../lib/wordSpeech';
 import { cn } from '../../lib/utils';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 
-type WordsPanelProps = {
-  emojiIndexAreaRef: React.RefObject<HTMLDivElement | null>;
-};
-
-export function WordsPanel({ emojiIndexAreaRef }: WordsPanelProps) {
+export function WordsPanel() {
   const { locale, t, showChinese } = useI18n();
   const [query, setQuery] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(EMOJI_NOUN_CATEGORIES[0]?.id ?? null);
@@ -35,7 +31,7 @@ export function WordsPanel({ emojiIndexAreaRef }: WordsPanelProps) {
       <div className="profile-candy-board">
         <CandyFrostingHeader title="EMOJI" />
 
-        <div className="profile-candy-body" ref={emojiIndexAreaRef}>
+        <div className="profile-candy-body">
           <div className="words-candy-search-plate">
             <div className="words-candy-search-plate-field">
               <Search className="words-candy-search-plate-icon" size={20} aria-hidden />

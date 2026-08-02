@@ -1,9 +1,13 @@
+import { useRef } from 'react';
 import { motion } from 'motion/react';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { MOTION_TAB_SPRING } from '../../lib/motionChoreography';
 import { useI18n } from '../../i18n';
+import { triggerGameHaptic } from '../../lib/gameHaptics';
 import { cn } from '../../lib/utils';
 import type { AppTab } from './types';
+import { GuidedTapHint } from './GuidedTapHint';
+import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
 
 const TAB_EMOJI: Record<AppTab, string> = {
   game: '🎮',
@@ -16,10 +20,25 @@ type MobileTabBarProps = {
   active: AppTab;
   onChange: (tab: AppTab) => void;
   badges?: Partial<Record<AppTab, number>>;
+  learnedGuide?: {
+    playCount: number;
+    onPlaybackStart: () => void;
+  } | null;
 };
 
-export function MobileTabBar({ active, onChange, badges }: MobileTabBarProps) {
+export function MobileTabBar({
+  active,
+  onChange,
+  badges,
+  learnedGuide = null,
+}: MobileTabBarProps) {
   const { t } = useI18n();
+  const learnedButtonRef = useRef<HTMLButtonElement | null>(null);
+  const learnedGuidePlaying = useLimitedGuidePrompt({
+    eligible: learnedGuide !== null,
+    persistedPlayCount: learnedGuide?.playCount ?? 0,
+    onPlaybackStart: () => learnedGuide?.onPlaybackStart(),
+  });
   const tabs: { id: AppTab; label: string }[] = [
     { id: 'game', label: t.tabs.game },
     { id: 'learned', label: t.tabs.learned },
@@ -28,11 +47,12 @@ export function MobileTabBar({ active, onChange, badges }: MobileTabBarProps) {
   ];
 
   return (
-    <nav
-      className="tab-bar-candy relative z-30 shrink-0"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      aria-label={t.tabs.navAria}
-    >
+    <>
+      <nav
+        className="tab-bar-candy relative z-30 shrink-0"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        aria-label={t.tabs.navAria}
+      >
       <div className="tab-bar-candy-board" aria-hidden />
       <div className="tab-bar-candy-inner mx-auto flex max-w-lg items-end justify-around gap-0.5 px-2 pb-1.5">
         {tabs.map(({ id, label }) => {
@@ -43,9 +63,17 @@ export function MobileTabBar({ active, onChange, badges }: MobileTabBarProps) {
           return (
             <motion.button
               key={id}
+              ref={id === 'learned' ? learnedButtonRef : undefined}
               type="button"
-              onClick={() => onChange(id)}
-              className={cn('tab-candy-item', isActive && 'tab-candy-item-active')}
+              onClick={() => {
+                if (!isActive) triggerGameHaptic('tabSelection');
+                onChange(id);
+              }}
+              className={cn(
+                'tab-candy-item',
+                isActive && 'tab-candy-item-active',
+                id === 'learned' && learnedGuidePlaying && 'first-time-guide-target-pulse',
+              )}
               aria-current={isActive ? 'page' : undefined}
               aria-label={label}
               whileTap={MOTION_PRESS_TAP}
@@ -106,7 +134,13 @@ export function MobileTabBar({ active, onChange, badges }: MobileTabBarProps) {
             </motion.button>
           );
         })}
-      </div>
-    </nav>
+        </div>
+      </nav>
+      <GuidedTapHint
+        visible={learnedGuidePlaying}
+        targetRef={learnedButtonRef}
+        fingerOffset={{ x: 18, y: 30 }}
+      />
+    </>
   );
 }

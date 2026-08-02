@@ -1,8 +1,8 @@
 # Privacy Policy / 隐私政策
 
 **Last updated / 最后更新:** July 11, 2026  
-**App / 应用名称:** 物品消消乐 (Match-3 Vocab Game)  
-**Bundle ID:** `com.match3vocab.game`  
+**App / 应用名称:** Matchingo  
+**Bundle ID:** `com.matchingo.game`  
 **Contact / 联系方式:** vivaliang1018@gmail.com
 
 > **Canonical public page:** [`public/privacy.html`](../public/privacy.html)  
@@ -14,7 +14,7 @@
 
 ### Overview
 
-物品消消乐 is a vocabulary match-3 game. You can play as a guest without an account. Optional sign-in (Apple, Google, or email/password via Firebase Authentication) lets you sync learning progress across devices using Cloud Firestore. We do not sell your personal information and do not use third-party advertising trackers.
+Matchingo is a vocabulary match-3 game. You can play as a guest without an account. Optional sign-in (Apple, Google, or email/password via Firebase Authentication) lets you sync learning progress across devices using Cloud Firestore. We do not sell your personal information and do not use third-party advertising trackers.
 
 ### Information we process
 
@@ -22,7 +22,7 @@
 |------|--------|---------|
 | Account identifiers (email, Apple/Google account ID, display name/photo if provided) | Firebase Authentication | Sign-in and account management |
 | Learning progress (word memory stages, review times, exposures) | On device; also Cloud Firestore when signed in | Spaced repetition and “Learned” stats; cross-device sync |
-| Preferences (language, music, SFX, onboarding flag) | On device only | Remember settings |
+| Preferences (language, music, SFX, legal consent) | On device only | Remember settings |
 
 ### Service providers
 
@@ -56,7 +56,7 @@ Questions: [vivaliang1018@gmail.com](mailto:vivaliang1018@gmail.com)
 
 ### 概述
 
-「物品消消乐」是一款词汇消消乐学习应用。您可以不登录、以访客身份游玩。可选登录（Apple、Google 或邮箱密码，由 Firebase Authentication 提供）后，学习进度可通过 Cloud Firestore 跨设备同步。我们不会出售您的个人信息，也不使用第三方广告追踪。
+「Matchingo」是一款词汇消消乐学习应用。您可以不登录、以访客身份游玩。可选登录（Apple、Google 或邮箱密码，由 Firebase Authentication 提供）后，学习进度可通过 Cloud Firestore 跨设备同步。我们不会出售您的个人信息，也不使用第三方广告追踪。
 
 ### 我们处理的信息
 
@@ -64,7 +64,7 @@ Questions: [vivaliang1018@gmail.com](mailto:vivaliang1018@gmail.com)
 |------|----------|------|
 | 账号标识（邮箱、Apple/Google 账号标识，以及提供方返回的昵称/头像等） | Firebase Authentication | 登录与账号管理 |
 | 学习进度（复习阶段、下次复习时间、曝光次数等） | 本机；登录后同步至 Cloud Firestore | 间隔复习、「已学」统计与跨设备同步 |
-| 偏好设置（语言、音乐、音效、引导标记） | 仅本机 | 记住设置 |
+| 偏好设置（语言、音乐、音效、法律同意标记） | 仅本机 | 记住设置 |
 
 ### 第三方服务
 

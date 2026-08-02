@@ -36,6 +36,7 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
     signInApple,
     signInEmail,
     signUpEmail,
+    sendPasswordReset,
     clearError,
     configured,
     user,
@@ -95,6 +96,23 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
       return;
     }
     setSuccessMsg(mode === 'signIn' ? t.auth.successSignIn : t.auth.successSignUp);
+  };
+
+  const submitPasswordReset = async () => {
+    setStatusError(null);
+    setSuccessMsg(null);
+    if (!email.trim() || !email.includes('@')) {
+      setStatusError(t.auth.resetPasswordNeedEmail);
+      return;
+    }
+    const code = await sendPasswordReset(email);
+    if (code) {
+      setStatusError(
+        code === 'invalid_email' ? t.profile.accountInvalidEmail : mapAuthCode(code, t),
+      );
+      return;
+    }
+    setSuccessMsg(t.auth.resetPasswordSent);
   };
 
   const sheet = (
@@ -206,6 +224,14 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                     ? t.auth.emailSignInCta
                     : t.auth.emailSignUpCta}
               </motion.button>
+
+              {mode === 'signIn' && (
+                <p className="auth-sheet-switch">
+                  <button type="button" disabled={busy || !configured} onClick={() => void submitPasswordReset()}>
+                    {t.auth.forgotPassword}
+                  </button>
+                </p>
+              )}
 
               <p className="auth-sheet-switch">
                 {mode === 'signIn' ? (

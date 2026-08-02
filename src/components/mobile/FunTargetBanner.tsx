@@ -1,15 +1,17 @@
 import { motion } from 'motion/react';
 import { MOTION_SPRING_SNAPPY } from '../../lib/motionPresets';
 import { MOTION_FUN_BANNER } from '../../lib/motionChoreography';
-import { FUN_COUNTDOWN_SEC } from '../../lib/scoring';
+import { TIMED_TARGET_COUNTDOWN_SEC } from '../../lib/scoring';
 import { useI18n } from '../../i18n';
 import { cn } from '../../lib/utils';
 import type { WordItem } from '../../types/game';
 
-type FunTargetBannerProps = {
+type TimedTargetBannerProps = {
   item: WordItem;
   pulseKey: number;
   countdownSec: number;
+  /** Full countdown length for the progress ring (defaults to review/revive timer). */
+  countdownMaxSec?: number;
 };
 
 function wordSizeClass(word: string): string {
@@ -20,10 +22,16 @@ function wordSizeClass(word: string): string {
   return 'text-[clamp(0.76rem,2.8vw,0.96rem)]';
 }
 
-export function FunTargetBanner({ item, pulseKey, countdownSec }: FunTargetBannerProps) {
+export function TimedTargetBanner({
+  item,
+  pulseKey,
+  countdownSec,
+  countdownMaxSec = TIMED_TARGET_COUNTDOWN_SEC,
+}: TimedTargetBannerProps) {
   const { t } = useI18n();
-  const urgent = countdownSec <= 3;
-  const progress = Math.max(0, Math.min(1, countdownSec / FUN_COUNTDOWN_SEC));
+  const maxSec = Math.max(1, countdownMaxSec);
+  const urgent = countdownSec <= Math.min(3, Math.ceil(maxSec * 0.4));
+  const progress = Math.max(0, Math.min(1, countdownSec / maxSec));
 
   return (
     <motion.div
@@ -85,7 +93,7 @@ export function FunTargetBanner({ item, pulseKey, countdownSec }: FunTargetBanne
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-center text-center">
           <div className="shrink-0 truncate text-[9px] font-bold uppercase tracking-wide text-amber-700/90">
-            {t.modes.funFindHint}
+            {t.modes.timedTargetFindHint}
           </div>
           <div className="mt-0.5 flex h-[2.5rem] min-w-0 items-center justify-center overflow-hidden">
             <motion.div
@@ -106,3 +114,6 @@ export function FunTargetBanner({ item, pulseKey, countdownSec }: FunTargetBanne
     </motion.div>
   );
 }
+
+/** @deprecated Use TimedTargetBanner */
+export const FunTargetBanner = TimedTargetBanner;

@@ -1,6 +1,8 @@
 /**
- * Ebbinghaus-inspired spaced repetition for match-3 word popups.
- * Intervals after each successful recall (when popup shows at/after due time).
+ * Ebbinghaus-inspired spaced repetition.
+ * - Board match popups only record exposure (no stage advance).
+ * - Quiz success advances the schedule.
+ * - Review / revive misses pull the word back to a shorter interval.
  */
 
 export const EBBINGHAUS_LABELS = ['12 小时', '1 天', '2 天', '4 天', '7 天', '15 天', '30 天'] as const;
@@ -24,7 +26,7 @@ export type WordMemory = {
   key: string;
   word: string;
   cn?: string;
-  /** Successful recalls completed (0 = seen once, not yet due). */
+  /** Successful quiz recalls completed (0 = seen on board, not yet quizzed). */
   stage: number;
   lastReviewAt: number;
   nextReviewAt: number;
@@ -110,7 +112,8 @@ export function memoryKeyForWord(word: string): string {
 }
 
 /**
- * Load memories for the signed-in user or guest; if signed in, merge in guest local progress once into the user bucket.
+ * Load memories for the signed-in user or guest. Signing in drains the guest
+ * bucket into that account so the same guest data cannot leak into later users.
  */
 export function hydrateMatch3Memories(userUid: string | null | undefined): {
   map: Map<string, WordMemory>;
@@ -124,12 +127,12 @@ export function hydrateMatch3Memories(userUid: string | null | undefined): {
   const guestMap = loadWordMemoriesForScope(GUEST_MEMORY_SCOPE);
   const merged = mergeWordMemoryMaps(userMap, guestMap);
   saveWordMemoriesForScope(merged, scope);
+  if (guestMap.size > 0) clearWordMemoriesForScope(GUEST_MEMORY_SCOPE);
   return { map: merged, scope };
 }
 
 /**
- * Call when the game shows a word popup (user matched tiles).
- * If current time >= nextReviewAt (or first time), advance schedule.
+ * Board match popup: track exposure only — does not advance the forgetting curve.
  */
 export function recordWordExposure(
   map: Map<string, WordMemory>,
@@ -140,7 +143,7 @@ export function recordWordExposure(
   const now = Date.now();
   const prev = map.get(key);
   if (!prev) {
-    const next = {
+    map.set(key, {
       key,
       word: word.trim(),
       cn,
@@ -148,22 +151,78 @@ export function recordWordExposure(
       lastReviewAt: now,
       nextReviewAt: now + intervalMsForStage(0),
       exposures: 1,
-    };
-    map.set(key, next);
+    });
     return map;
   }
-
-  const due = now >= prev.nextReviewAt;
-  const nextStage = due ? Math.min(prev.stage + 1, EBBINGHAUS_LABELS.length - 1) : prev.stage;
-  const nextReviewAt = due ? now + intervalMsForStage(nextStage) : prev.nextReviewAt;
 
   map.set(key, {
     ...prev,
     word: word.trim(),
     cn: cn ?? prev.cn,
     lastReviewAt: now,
-    nextReviewAt,
+    exposures: prev.exposures + 1,
+  });
+  return map;
+}
+
+/**
+ * Quiz passed: successful recall — advance stage and schedule the next review.
+ */
+export function recordWordRecallSuccess(
+  map: Map<string, WordMemory>,
+  word: string,
+  cn?: string,
+): Map<string, WordMemory> {
+  const key = memoryKeyForWord(word);
+  const now = Date.now();
+  const prev = map.get(key);
+  const nextStage = Math.min((prev?.stage ?? 0) + 1, EBBINGHAUS_LABELS.length - 1);
+  map.set(key, {
+    key,
+    word: word.trim(),
+    cn: cn ?? prev?.cn,
     stage: nextStage,
+    lastReviewAt: now,
+    nextReviewAt: now + intervalMsForStage(nextStage),
+    exposures: (prev?.exposures ?? 0) + 1,
+  });
+  return map;
+}
+
+/**
+ * Review / revive miss (wrong match or timeout): pull schedule back.
+ * Stage drops by 1 (min 0); next review is due now at stage 0, else after the shorter interval.
+ */
+export function recordWordRecallFailure(
+  map: Map<string, WordMemory>,
+  word: string,
+  cn?: string,
+): Map<string, WordMemory> {
+  const key = memoryKeyForWord(word);
+  const now = Date.now();
+  const prev = map.get(key);
+  if (!prev) {
+    map.set(key, {
+      key,
+      word: word.trim(),
+      cn,
+      stage: 0,
+      lastReviewAt: now,
+      nextReviewAt: now,
+      exposures: 1,
+    });
+    return map;
+  }
+
+  const nextStage = Math.max(0, prev.stage - 1);
+  map.set(key, {
+    ...prev,
+    word: word.trim(),
+    cn: cn ?? prev.cn,
+    stage: nextStage,
+    lastReviewAt: now,
+    // Already at the shortest stage → due immediately so it reappears in review picks.
+    nextReviewAt: nextStage === 0 ? now : now + intervalMsForStage(nextStage),
     exposures: prev.exposures + 1,
   });
   return map;
@@ -191,6 +250,40 @@ export function masteredEmojiCount(
   pool: { id: string; word: string }[],
 ): number {
   return masteredEmojiItemIds(wordMemory, pool).length;
+}
+
+/**
+ * Queue order for voluntary review: overdue / due first, then soonest schedule,
+ * then oldest lastReviewAt — matches spaced-repetition “distant memories first”.
+ */
+export function compareWordsForSpacedReview(
+  a: WordMemory | undefined,
+  b: WordMemory | undefined,
+  now = Date.now(),
+): number {
+  const aDue = a ? isDue(a, now) : true;
+  const bDue = b ? isDue(b, now) : true;
+  if (aDue !== bDue) return (bDue ? 1 : 0) - (aDue ? 1 : 0);
+
+  if (aDue && bDue) {
+    const aOverdue = now - (a?.nextReviewAt ?? 0);
+    const bOverdue = now - (b?.nextReviewAt ?? 0);
+    if (aOverdue !== bOverdue) return bOverdue - aOverdue;
+  }
+
+  const aNext = a?.nextReviewAt ?? 0;
+  const bNext = b?.nextReviewAt ?? 0;
+  if (aNext !== bNext) return aNext - bNext;
+
+  const aLast = a?.lastReviewAt ?? 0;
+  const bLast = b?.lastReviewAt ?? 0;
+  if (aLast !== bLast) return aLast - bLast;
+
+  const aStage = a?.stage ?? 0;
+  const bStage = b?.stage ?? 0;
+  if (aStage !== bStage) return aStage - bStage;
+
+  return 0;
 }
 
 export function isDue(m: WordMemory, now = Date.now()): boolean {

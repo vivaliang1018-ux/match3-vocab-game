@@ -1,4 +1,6 @@
-export type ChallengeMode = 'random' | 'category' | 'review' | 'fun';
+export type ChallengeMode = 'random' | 'mood' | 'category' | 'review';
+
+export type QuizKind = 'connect' | 'pick';
 
 export type WordItem = {
   id: string;
@@ -8,9 +10,9 @@ export type WordItem = {
   imgSrc?: string;
 };
 
+export type Cell = { r: number; c: number };
+
 export type Tile = {
   id: string;
   itemId: string;
 };
-
-export type Cell = { r: number; c: number };

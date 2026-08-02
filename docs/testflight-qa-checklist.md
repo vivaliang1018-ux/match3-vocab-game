@@ -1,7 +1,7 @@
 # TestFlight QA Checklist
 
-**App:** 物品消消乐 (Match-3 Vocab Game)  
-**Bundle ID:** `com.match3vocab.game`  
+**App:** Matchingo  
+**Bundle ID:** `com.matchingo.game`  
 **Build type:** Release (Archive → TestFlight, not Debug simulator)  
 **Tester device:** iPhone _____ / iOS _____  
 **Build number:** _____  
@@ -26,10 +26,10 @@
 | 1.1 | Fresh install opens without crash | | |
 | 1.2 | Splash screen shows logo, then enters game within ~3s | | |
 | 1.3 | Status bar / safe area look correct (notch, Dynamic Island) | | |
-| 1.4 | Onboarding appears on first launch | | |
-| 1.5 | Onboarding can be completed or skipped | | |
-| 1.6 | Onboarding does not reappear after kill + reopen | | |
-| 1.7 |「使用引导」can reopen tutorial from settings | | |
+| 1.4 | Legal consent modal appears on first launch | | |
+| 1.5 | Terms of Service & Privacy Policy links open | | |
+| 1.6 | Tapping OK dismisses consent and does not reappear after kill + reopen | | |
+| 1.7 | Me → About still links to Terms & Privacy | | |
 
 ---
 
@@ -71,40 +71,45 @@
 
 ## 4. Game modes
 
-### 4a. Fun mode (趣味)
+### 4a. Adventure (闯关)
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.1 | Target banner shows with countdown ring | | |
-| 4.2 | Long target words fit in fixed banner (scale, no overflow) | | |
-| 4.3 | Short words display large | | |
-| 4.4 | Clearing target word updates countdown / target | | |
-| 4.5 | All words reach 3/3 → auto advances to next round | | |
+| 4.1 | Starts with 20 moves; HUD shows 当前组 (= cleared+1) and stamina as hearts + n/3 | | |
+| 4.2 | Normal 3-match costs 1 move; 4+/line clear nets 0 (−1+1) | | |
+| 4.3 | At ≤6 moves, unfinished words drop more often | | |
+| 4.4 | Out of moves → revive: 6 words ×2 hits, 3 misses = fail | | |
+| 4.5 | Every 3 cleared sets → mandatory review from a random mix of those 3 sets (not only the latest); leaving keeps 「待完成复习」 | | |
+| 4.6 | Quiz skip confirms restart and does not count as cleared | | |
+| 4.7 | No stamina → dead-machine sheet with Review CTA | | |
 
 ### 4b. Category mode (分类)
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.6 | Mode picker opens from settings chip | | |
-| 4.7 | Category list shows; picking one starts that pool | | |
-| 4.8 | Board uses only emojis from selected category | | |
+| 4.8 | Hidden until 5 adventure clears; then appears in mode picker | | |
+| 4.9 | Category list shows; picking one starts that pool | | |
+| 4.10 | Board uses only emojis from selected category | | |
+| 4.11 | Free play (no moves / stamina) | | |
 
 ### 4c. Review mode (复习)
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.9 | Tab badge shows due review count | | |
-| 4.10 | Review mode uses due words when available | | |
-| 4.11 | Empty review pool shows helpful message | | |
-| 4.12 | Completing review updates spaced-repetition schedule | | |
+| 4.12 | Hidden until 1 adventure clear | | |
+| 4.13 | Timed-target banner (8s); only target clears count | | |
+| 4.14 | Empty review pool shows CTA to Adventure | | |
+| 4.15 | Quiz success advances Ebbinghaus stage; miss/timeout regresses | | |
+| 4.15b | Voluntary / continue review prefers overdue & oldest lastReviewAt (not just-finished set) | | |
+| 4.16 | Pending forced review banner + resume CTA when owed | | |
 
 ### 4d. Mode switching
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.13 | Switch random ↔ fun ↔ category ↔ review without crash | | |
-| 4.14 |「换一批词」shuffles word set | | |
-| 4.15 |「重新开始」resets board cleanly | | |
+| 4.17 | Switch adventure ↔ review ↔ category without crash | | |
+| 4.18 |「换一组词」is free until you make a matching move (then −1 energy);「重排棋盘」is free | | |
+| 4.19 | Leaving forced review mid-way keeps pending until a review quiz finishes | | |
 
 ---
 
@@ -196,7 +201,7 @@
 |---|------|-------|-------|
 | 11.1 | Built with Release / Archive (not Debug) | | |
 | 11.2 | App icon correct on home screen | | |
-| 11.3 | Display name「物品消消乐」correct | | |
+| 11.3 | Display name「Matchingo」correct | | |
 | 11.4 | No debug overlays or console-only UI | | |
 | 11.5 | Privacy policy URL ready for App Store Connect | | |
 

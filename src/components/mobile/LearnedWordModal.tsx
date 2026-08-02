@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { IOS_EASE, MOTION_PRESS_TAP } from '../../lib/motionPresets';
+import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import {
-  MOTION_MODAL_CARD,
+  MOTION_CARD_POP,
   MOTION_VIGNETTE,
 } from '../../lib/motionChoreography';
 import { Volume2, X } from 'lucide-react';
@@ -46,7 +46,7 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
         >
           <motion.div className="absolute inset-0 bg-black/45" aria-hidden />
           <motion.div
-            variants={MOTION_MODAL_CARD}
+            variants={MOTION_CARD_POP}
             className="learned-word-modal relative w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
@@ -55,10 +55,10 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
               onClick={onClose}
               className="learned-word-modal-close"
               aria-label={t.common.close}
-              initial={{ scale: 0, rotate: -40 }}
-              animate={{ scale: 1, rotate: 11 }}
-              exit={{ scale: 0.8, rotate: 20, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 480, damping: 22, delay: 0.12 }}
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 480, damping: 24, delay: 0.1 }}
               whileTap={MOTION_PRESS_TAP}
             >
               <X size={16} strokeWidth={2.75} aria-hidden />
@@ -66,9 +66,9 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
 
             <motion.div
               className="learned-word-modal-emoji-wrap"
-              initial={{ scale: 0.5, y: 20, opacity: 0 }}
-              animate={{ scale: [0.5, 1.12, 0.96, 1], y: [20, -6, 2, 0], opacity: 1 }}
-              transition={{ delay: 0.08, duration: 0.48, times: [0, 0.5, 0.78, 1], ease: IOS_EASE }}
+              initial={{ scale: 0.72, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 440, damping: 22, delay: 0.06 }}
             >
               {item.imgSrc ? (
                 <img src={item.imgSrc} alt="" className="h-20 w-20 object-contain" />
@@ -79,18 +79,18 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
 
             <motion.h3
               className="learned-word-modal-word"
-              initial={{ opacity: 0, y: 14, scale: 0.92 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.16, type: 'spring', stiffness: 400, damping: 26 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.12, type: 'spring', stiffness: 400, damping: 28 }}
             >
               {item.word}
             </motion.h3>
             {showChinese && item.cn && (
               <motion.p
                 className="learned-word-modal-cn"
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.22, type: 'spring', stiffness: 360, damping: 28 }}
+                transition={{ delay: 0.16, type: 'spring', stiffness: 380, damping: 28 }}
               >
                 {item.cn}
               </motion.p>
@@ -98,9 +98,9 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
 
             <motion.div
               className="learned-word-modal-play-wrap"
-              initial={{ opacity: 0, y: 12, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.28, type: 'spring', stiffness: 420, damping: 24 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, type: 'spring', stiffness: 400, damping: 26 }}
             >
               <motion.button
                 type="button"

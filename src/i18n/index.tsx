@@ -3,6 +3,8 @@ import { de } from './locales/de';
 import { en } from './locales/en';
 import { es } from './locales/es';
 import { fr } from './locales/fr';
+import { ja } from './locales/ja';
+import { ko } from './locales/ko';
 import { zhCN } from './locales/zh-CN';
 import { LOCALES, type Locale, type Messages } from './types';
 
@@ -11,11 +13,13 @@ export type { Locale, Messages } from './types';
 export const LOCALE_STORAGE_KEY = 'smellycat-match3-locale';
 
 export const LOCALE_OPTIONS: { id: Locale; label: string; shortLabel: string }[] = [
-  { id: 'zh-CN', label: '中文', shortLabel: '中文' },
   { id: 'en', label: 'English', shortLabel: 'EN' },
   { id: 'es', label: 'Español', shortLabel: 'ES' },
   { id: 'fr', label: 'Français', shortLabel: 'FR' },
   { id: 'de', label: 'Deutsch', shortLabel: 'DE' },
+  { id: 'ja', label: '日本語', shortLabel: 'JP' },
+  { id: 'ko', label: '한국어', shortLabel: 'KR' },
+  { id: 'zh-CN', label: '中文', shortLabel: '中文' },
 ];
 
 const MESSAGES: Record<Locale, Messages> = {
@@ -24,7 +28,42 @@ const MESSAGES: Record<Locale, Messages> = {
   es,
   fr,
   de,
+  ja,
+  ko,
 };
+
+/** Map device / browser language tags to a supported locale; unknown → English. */
+export function detectSystemLocale(): Locale {
+  const candidates: string[] = [];
+  try {
+    if (typeof navigator !== 'undefined') {
+      if (Array.isArray(navigator.languages)) candidates.push(...navigator.languages);
+      if (navigator.language) candidates.push(navigator.language);
+    }
+  } catch {
+    // ignore
+  }
+
+  for (const raw of candidates) {
+    const tag = raw.trim().toLowerCase().replace(/_/g, '-');
+    if (!tag) continue;
+
+    // Only Simplified Chinese maps to zh-CN; Traditional (zh-TW / zh-Hant / …) falls through → en
+    if (tag === 'zh-cn' || tag === 'zh-hans' || tag.startsWith('zh-hans-') || tag === 'zh') {
+      return 'zh-CN';
+    }
+
+    const primary = tag.split('-')[0] ?? '';
+    if (primary === 'en') return 'en';
+    if (primary === 'es') return 'es';
+    if (primary === 'fr') return 'fr';
+    if (primary === 'de') return 'de';
+    if (primary === 'ja') return 'ja';
+    if (primary === 'ko') return 'ko';
+  }
+
+  return 'en';
+}
 
 export function loadLocale(): Locale {
   try {
@@ -33,7 +72,7 @@ export function loadLocale(): Locale {
   } catch {
     // ignore
   }
-  return 'zh-CN';
+  return detectSystemLocale();
 }
 
 export function saveLocale(locale: Locale): void {

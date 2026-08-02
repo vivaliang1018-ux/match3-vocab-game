@@ -1,34 +1,43 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { MOTION_SPRING_SNAPPY, MOTION_TWEEN_MED, MOTION_PRESS_TAP } from '../../lib/motionPresets';
+import { MOTION_SPRING_SNAPPY, MOTION_PRESS_TAP, IOS_EASE } from '../../lib/motionPresets';
 import {
   MOTION_STAGGER_TIGHT_CONTAINER,
   MOTION_STAGGER_TIGHT_ITEM,
-  MOTION_WORD_POP,
 } from '../../lib/motionChoreography';
-import { ChevronDown, Settings } from 'lucide-react';
-import { cellCenterOffset, cellCenterPx } from '../../lib/gridLayout';
+import { ChevronDown, Pause, Play, RefreshCw, Settings } from 'lucide-react';
+import { cellCenterPx } from '../../lib/gridLayout';
 import { useI18n } from '../../i18n';
 import { cn } from '../../lib/utils';
+import { TIMED_TARGET_COUNTDOWN_SEC } from '../../lib/scoring';
 import { BoardBottomSparkles } from './BoardBottomSparkles';
-import { MatchClearEnergy } from './MatchClearEnergy';
+import { LineShockwave } from './LineShockwave';
 import { SkySparkleBackground } from '../SkySparkleBackground';
 import { HudPlaque, HudStatNumber } from './HudPlaque';
 import { WordLinkChain } from './WordLinkChain';
-import { FunTargetBanner } from './FunTargetBanner';
+import { TimedTargetBanner } from './FunTargetBanner';
 import { ModePickerSheet } from './ModePickerSheet';
-import { ScoreHud, type ScorePop } from './ScoreHud';
+import { StepsHud } from './ScoreHud';
 import type { Cell, ChallengeMode, Tile, WordItem } from '../../types/game';
 import type { RefillBurst } from '../../lib/boardRefill';
 import { useBoardGravityRefill } from './useBoardGravityRefill';
+import { STAMINA_MAX } from '../../lib/stamina';
+import type { FeatureGuideTarget } from '../../lib/firstTimeGuide';
+import { GuidedTapHint } from './GuidedTapHint';
+import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
 
 const GRID_SIZE = 7;
 const SWIPE_THRESHOLD_PX = 16;
 const TAP_THRESHOLD_PX = 10;
-const SHELF_STEP_MS = 200;
+const SHELF_STEP_MS = 72;
+const SHELF_COL_STAGGER_MS = 14;
+const SHELF_BASE_FALL_MS = 200;
+const SHELF_PER_ROW_MS = 82;
 
 function shelfIntroTotalMs(): number {
-  return (GRID_SIZE - 1) * SHELF_STEP_MS + 120;
+  const maxFall = SHELF_BASE_FALL_MS + GRID_SIZE * SHELF_PER_ROW_MS;
+  const maxDelay = (GRID_SIZE - 1) * SHELF_STEP_MS + (GRID_SIZE - 1) * SHELF_COL_STAGGER_MS;
+  return maxDelay + maxFall + 80;
 }
 
 type ShelfMetrics = {
@@ -69,7 +78,8 @@ function measureShelfMetrics(boardEl: HTMLElement): ShelfMetrics | null {
 }
 
 function shelfSpawnStep(r: number): number {
-  return GRID_SIZE - 1 - r;
+  // Top row first — matches Candy Crush–style refill from above.
+  return r;
 }
 
 function BoardShelfEmojiLayer({
@@ -103,43 +113,19 @@ function BoardShelfEmojiLayer({
   useLayoutEffect(() => {
     const board = boardRef.current;
     const layer = layerRef.current;
-    if (!board || !layer) return;
-
-    const metrics = measureShelfMetrics(board);
-    if (!metrics) return;
-
-    const totalMs = shelfIntroTotalMs();
-    const children = layer.children;
-
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i];
-      const el = children[i] as HTMLElement | undefined;
-      if (!el) continue;
-
-      const spawn = shelfSpawnStep(slot.r);
-      const delay = spawn * SHELF_STEP_MS;
-      const duration = Math.max(slot.r * SHELF_STEP_MS, 1);
-      const x = metrics.originX + slot.c * metrics.stepX;
-      const y0 = metrics.originY;
-      const y1 = metrics.originY + slot.r * metrics.stepY;
-
-      el.style.width = `${metrics.cellW}px`;
-      el.style.height = `${metrics.cellH}px`;
-      el.style.setProperty('--shelf-x', `${x}px`);
-      el.style.setProperty('--shelf-y0', `${y0}px`);
-      el.style.setProperty('--shelf-y1', `${y1}px`);
-      el.style.setProperty('--shelf-dur', `${duration}ms`);
-      el.style.setProperty('--shelf-delay', `${delay}ms`);
-      el.style.zIndex = String(GRID_SIZE - slot.r);
-      el.classList.add('shelf-emoji-intro');
+    if (!board || !layer) {
+      const t = window.setTimeout(() => onCompleteRef.current(), 0);
+      return () => window.clearTimeout(t);
     }
 
-    const timerId = window.setTimeout(() => {
-      onCompleteRef.current();
-    }, totalMs);
+    let cancelled = false;
+    let introTimer: number | null = null;
+    let retryTimer: number | null = null;
+    let attempts = 0;
 
-    return () => {
-      window.clearTimeout(timerId);
+    const clearIntroStyles = () => {
+      layer.style.opacity = '0';
+      const children = layer.children;
       for (let i = 0; i < children.length; i++) {
         const el = children[i] as HTMLElement;
         el.classList.remove('shelf-emoji-intro');
@@ -150,10 +136,80 @@ function BoardShelfEmojiLayer({
         el.style.removeProperty('--shelf-delay');
       }
     };
+
+    const runIntro = () => {
+      if (cancelled) return;
+      const metrics = measureShelfMetrics(board);
+      if (!metrics) {
+        attempts += 1;
+        if (attempts >= 12) {
+          // Board never laid out (e.g. entered review under a modal) — skip intro.
+          onCompleteRef.current();
+          return;
+        }
+        retryTimer = window.setTimeout(() => {
+          retryTimer = null;
+          requestAnimationFrame(runIntro);
+        }, 32);
+        return;
+      }
+
+      const totalMs = shelfIntroTotalMs();
+      const children = layer.children;
+
+      for (let i = 0; i < slots.length; i++) {
+        const slot = slots[i];
+        const el = children[i] as HTMLElement | undefined;
+        if (!el) continue;
+
+        const spawn = shelfSpawnStep(slot.r);
+        const delay = spawn * SHELF_STEP_MS + slot.c * SHELF_COL_STAGGER_MS;
+        // Fall from stacked above the board into the seat (row 0 travels farthest).
+        const rowsAbove = GRID_SIZE - slot.r;
+        const y1 = metrics.originY + slot.r * metrics.stepY;
+        const y0 = y1 - rowsAbove * metrics.stepY;
+        const duration = Math.max(
+          SHELF_BASE_FALL_MS + rowsAbove * SHELF_PER_ROW_MS,
+          1,
+        );
+        const x = metrics.originX + slot.c * metrics.stepX;
+
+        el.style.width = `${metrics.cellW}px`;
+        el.style.height = `${metrics.cellH}px`;
+        el.style.setProperty('--shelf-x', `${x}px`);
+        el.style.setProperty('--shelf-y0', `${y0}px`);
+        el.style.setProperty('--shelf-y1', `${y1}px`);
+        el.style.setProperty('--shelf-dur', `${duration}ms`);
+        el.style.setProperty('--shelf-delay', `${delay}ms`);
+        el.style.zIndex = String(GRID_SIZE - slot.r);
+        el.classList.add('shelf-emoji-intro');
+      }
+
+      // Show only after every tile is positioned for the drop (same frame, no flash).
+      layer.style.opacity = '1';
+
+      introTimer = window.setTimeout(() => {
+        introTimer = null;
+        if (!cancelled) onCompleteRef.current();
+      }, totalMs);
+    };
+
+    requestAnimationFrame(runIntro);
+
+    return () => {
+      cancelled = true;
+      if (introTimer !== null) window.clearTimeout(introTimer);
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
+      clearIntroStyles();
+    };
   }, [boardRef, slots]);
 
   return (
-    <div ref={layerRef} className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+    <div
+      ref={layerRef}
+      className="pointer-events-none absolute inset-0 z-20 overflow-hidden opacity-0"
+      aria-hidden
+    >
       {slots.map((slot) => (
         <div
           key={slot.tileId}
@@ -180,10 +236,53 @@ function BoardShelfEmojiLayer({
 type PointerStart = {
   r: number;
   c: number;
+  tileId: string;
   x: number;
   y: number;
   pointerId: number;
+  cellSize: number;
+  axis: 'x' | 'y' | null;
 };
+
+type DragPreview = {
+  tileId: string;
+  x: number;
+  y: number;
+  companionTileId?: string;
+  companionX?: number;
+  companionY?: number;
+  returning?: boolean;
+};
+
+function swapPreviewGrid(grid: Tile[][], from: Cell, to: Cell): Tile[][] {
+  const next = grid.map((row) => [...row]);
+  const fromTile = next[from.r]?.[from.c];
+  const toTile = next[to.r]?.[to.c];
+  if (!fromTile || !toTile) return next;
+  next[from.r][from.c] = toTile;
+  next[to.r][to.c] = fromTile;
+  return next;
+}
+
+function previewGridHasMatch(grid: Tile[][]): boolean {
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const id = grid[r]?.[c]?.itemId;
+      if (!id) continue;
+      if (
+        (c + 2 < GRID_SIZE &&
+          grid[r][c + 1]?.itemId === id &&
+          grid[r][c + 2]?.itemId === id) ||
+        (r + 2 < GRID_SIZE &&
+          grid[r + 1]?.[c]?.itemId === id &&
+          grid[r + 2]?.[c]?.itemId === id)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 type ChallengePool = {
   id: string;
@@ -198,20 +297,45 @@ export type WordLinkPayload = {
 };
 
 type GamePanelProps = {
-  gridRef: React.RefObject<HTMLDivElement | null>;
-  modesButtonsRef: React.RefObject<HTMLButtonElement | null>;
   onRestart: () => void;
-  score: number;
-  scorePops: ScorePop[];
-  level: number;
+  /** Adventure sets cleared — used as current set = cleared + 1. */
+  clearedSets: number;
   gameItems: WordItem[];
   itemHitCount: Record<string, number>;
   challengeMode: ChallengeMode;
   modeLabel: string;
+  reviveActive: boolean;
+  /** Show timed-target banner (revive challenge or review mode). */
+  timedHuntActive?: boolean;
   funTargetItem: WordItem | null;
   funTargetKey: number;
   funCountdown: number;
+  /** Full timed-hunt length for the banner ring. */
+  funCountdownMaxSec?: number;
+  reviveWrongs: number;
+  reviveWrongLimit: number;
+  reviveCorrects: number;
+  reviveCorrectNeeded: number;
+  onReviveExit?: () => void;
+  movesLeft: number | null;
+  stamina: number;
+  staminaBanked?: number;
   canPlay: boolean;
+  playBlockedReason?: 'stamina' | 'pool' | null;
+  onGoReview?: () => void;
+  onGoAdventure?: () => void;
+  reviewAvailable?: boolean;
+  /** Mandatory review still owed after leaving mid-exam. */
+  pendingForcedReview?: boolean;
+  onResumeForcedReview?: () => void;
+  /** Review-only: cover board tiles + pause timed hunt. */
+  reviewPaused?: boolean;
+  onToggleReviewPause?: () => void;
+  /** Test-only control for previewing each mood-board palette. */
+  moodBoardActive?: boolean;
+  onCycleMoodBoard?: () => void;
+  /** Shelf hits needed per word (review 2 / else 3). */
+  hitsNeeded?: number;
   grid: Tile[][];
   itemById: Map<string, WordItem>;
   selected: Cell | null;
@@ -226,14 +350,22 @@ type GamePanelProps = {
   onCellClick: (r: number, c: number) => void;
   onSwapCells: (from: Cell, to: Cell) => void;
   onChallengeModeChange: (mode: ChallengeMode) => void;
+  onOpenSayBlast: () => void;
   challengePools: ChallengePool[];
   selectedCategoryId: string;
   onCategoryChange: (id: string) => void;
   onShuffleWords: () => void;
+  reviewUnlocked: boolean;
+  categoryUnlocked: boolean;
   boardIntroActive?: boolean;
   onBoardIntroComplete?: () => void;
   refillBurst?: RefillBurst | null;
   onRefillActiveChange?: (active: boolean) => void;
+  firstSwapTutorialMove?: { source: Cell; target: Cell } | null;
+  featureGuideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard'> | null;
+  featureGuideModePickerPlayCount?: number;
+  featureGuidePlayCount?: number;
+  onFeatureGuidePlaybackStart?: (target: FeatureGuideTarget) => void;
 };
 
 type PopWordPayload = {
@@ -246,50 +378,26 @@ type PopWordPayload = {
 
 function PopWordOverlay({
   popWord,
-  boardRef,
   showChinese,
 }: {
   popWord: PopWordPayload;
-  boardRef: React.RefObject<HTMLDivElement | null>;
   showChinese: boolean;
 }) {
-  const exitFromRef = useRef({ x: 0, y: 0, scale: 0.16 });
-  const [from, setFrom] = useState({ x: 0, y: 0, scale: 0.16 });
-  const [ready, setReady] = useState(false);
-
-  useLayoutEffect(() => {
-    const board = boardRef.current;
-    const offset =
-      board && popWord.originCell
-        ? cellCenterOffset(board.clientWidth, board.clientHeight, popWord.originCell)
-        : { x: 0, y: 0, scale: 0.18 };
-    exitFromRef.current = offset;
-    setFrom(offset);
-    setReady(true);
-  }, [popWord, boardRef]);
-
-  if (!ready) return null;
-
   return (
     <motion.div
-      className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center"
-      custom={from}
-      variants={MOTION_WORD_POP}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center"
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+      aria-live="polite"
     >
-      <motion.div
-        className="rounded-[24px] border border-white/90 bg-white/78 px-6 py-4 text-center text-sky-950 shadow-xl shadow-black/10 backdrop-blur-md"
-        initial={{ rotate: -3 }}
-        animate={{ rotate: [ -3, 2, 0 ] }}
-        transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-      >
+      <div className="rounded-[24px] border border-white/90 bg-white/94 px-6 py-4 text-center text-sky-950 shadow-xl shadow-black/12">
         {popWord.imgSrc ? (
           <img
             src={popWord.imgSrc}
             alt=""
-            className="mx-auto h-14 w-14 object-contain drop-shadow-sm"
+            className="mx-auto h-14 w-14 object-contain"
             loading="eager"
             decoding="async"
             referrerPolicy="no-referrer"
@@ -310,32 +418,50 @@ function PopWordOverlay({
         {showChinese && !!popWord.cn && (
           <div className="mt-1 text-xs font-semibold text-sky-700/75">{popWord.cn}</div>
         )}
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
 
 export function GamePanel({
-  gridRef,
-  modesButtonsRef,
   onRestart,
-  score,
-  scorePops,
-  level,
+  clearedSets,
   gameItems,
   itemHitCount,
   challengeMode,
   modeLabel,
+  reviveActive,
+  timedHuntActive = false,
   funTargetItem,
   funTargetKey,
   funCountdown,
+  funCountdownMaxSec = TIMED_TARGET_COUNTDOWN_SEC,
+  reviveWrongs,
+  reviveWrongLimit,
+  reviveCorrects,
+  reviveCorrectNeeded: reviveNeeded,
+  onReviveExit,
+  movesLeft,
+  stamina,
+  staminaBanked = 0,
   canPlay,
+  playBlockedReason = null,
+  onGoReview,
+  onGoAdventure,
+  reviewAvailable = false,
+  pendingForcedReview = false,
+  onResumeForcedReview,
+  reviewPaused = false,
+  onToggleReviewPause,
+  moodBoardActive = false,
+  onCycleMoodBoard,
+  hitsNeeded = 3,
   grid,
   itemById,
   selected,
   hintMove,
   popWord,
-  matchShakeKey,
+  matchShakeKey: _matchShakeKey,
   matchClearCells,
   matchClearKey,
   gridLocked,
@@ -344,33 +470,81 @@ export function GamePanel({
   onCellClick,
   onSwapCells,
   onChallengeModeChange,
+  onOpenSayBlast,
   challengePools,
   selectedCategoryId,
   onCategoryChange,
   onShuffleWords,
+  reviewUnlocked,
+  categoryUnlocked,
   boardIntroActive = false,
   onBoardIntroComplete,
   refillBurst = null,
   onRefillActiveChange,
+  firstSwapTutorialMove = null,
+  featureGuideTarget = null,
+  featureGuideModePickerPlayCount = 0,
+  featureGuidePlayCount = 0,
+  onFeatureGuidePlaybackStart,
 }: GamePanelProps) {
   const { t, showChinese } = useI18n();
   const [modePickerOpen, setModePickerOpen] = useState(false);
   const pointerStartRef = useRef<PointerStart | null>(null);
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+  const [swapAnimationTileIds, setSwapAnimationTileIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const swapAnimationTimerRef = useRef<number | null>(null);
+  const tutorialSourceButtonRef = useRef<HTMLButtonElement | null>(null);
+  const tutorialTargetButtonRef = useRef<HTMLButtonElement | null>(null);
+  const modePickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const panelRootRef = useRef<HTMLDivElement | null>(null);
   const popBoardRef = useRef<HTMLDivElement | null>(null);
   const wordIconRefs = useRef<Map<string, HTMLElement>>(new Map());
   const [linkGeom, setLinkGeom] = useState<{ from: { x: number; y: number }; to: { x: number; y: number } } | null>(
     null,
   );
-  const [bgShaking, setBgShaking] = useState(false);
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null);
   const [shelfCascadeDone, setShelfCascadeDone] = useState(!boardIntroActive);
   const boardInnerRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const showShelfCascade = boardIntroActive && !prefersReducedMotion && !shelfCascadeDone;
+  /** Keep tile emojis hidden for the whole intro — don't wait a paint for shelfCascadeDone. */
+  const hideTileEmojisForIntro = boardIntroActive && !prefersReducedMotion;
+  const showShelfCascade = hideTileEmojisForIntro && !shelfCascadeDone;
+  const modePickerGuideTarget: Extract<
+    FeatureGuideTarget,
+    'sayAndBlastModePicker' | 'moodBoardModePicker'
+  > | null =
+    featureGuideTarget === 'sayAndBlast'
+      ? 'sayAndBlastModePicker'
+      : featureGuideTarget === 'moodBoard'
+        ? 'moodBoardModePicker'
+        : null;
+  const modePickerGuidePlaying = useLimitedGuidePrompt({
+    eligible: modePickerGuideTarget !== null && !modePickerOpen,
+    persistedPlayCount: featureGuideModePickerPlayCount,
+    onPlaybackStart: () => {
+      if (modePickerGuideTarget) {
+        onFeatureGuidePlaybackStart?.(modePickerGuideTarget);
+      }
+    },
+  });
 
-  const refillActive = useBoardGravityRefill({
+  const cellEquals = (left: Cell, right: Cell) =>
+    left.r === right.r && left.c === right.c;
+  const isTutorialCell = (cell: Cell) =>
+    firstSwapTutorialMove !== null &&
+    (cellEquals(cell, firstSwapTutorialMove.source) ||
+      cellEquals(cell, firstSwapTutorialMove.target));
+  const isTutorialPair = (from: Cell, to: Cell) =>
+    firstSwapTutorialMove !== null &&
+    ((cellEquals(from, firstSwapTutorialMove.source) &&
+      cellEquals(to, firstSwapTutorialMove.target)) ||
+      (cellEquals(from, firstSwapTutorialMove.target) &&
+        cellEquals(to, firstSwapTutorialMove.source)));
+
+  useBoardGravityRefill({
     boardRef: boardInnerRef,
     burst: refillBurst,
     enabled: !prefersReducedMotion && !boardIntroActive,
@@ -386,7 +560,8 @@ export function GamePanel({
     };
   }, [onBoardIntroComplete]);
 
-  useEffect(() => {
+  // Sync before paint so we never flash settled emojis, then play the drop intro.
+  useLayoutEffect(() => {
     if (!boardIntroActive) {
       setShelfCascadeDone(true);
       return;
@@ -396,8 +571,17 @@ export function GamePanel({
       onBoardIntroComplete?.();
       return;
     }
-
     setShelfCascadeDone(false);
+  }, [boardIntroActive, onBoardIntroComplete, prefersReducedMotion]);
+
+  // Hard fallback: never leave tiles blank if shelf intro stalls (dead-machine → review).
+  useEffect(() => {
+    if (!boardIntroActive || prefersReducedMotion) return;
+    const failsafe = window.setTimeout(() => {
+      setShelfCascadeDone(true);
+      onBoardIntroComplete?.();
+    }, 2200);
+    return () => window.clearTimeout(failsafe);
   }, [boardIntroActive, onBoardIntroComplete, prefersReducedMotion]);
 
   useLayoutEffect(() => {
@@ -421,15 +605,23 @@ export function GamePanel({
   }, [wordLink]);
 
   useEffect(() => {
-    if (matchShakeKey === 0) return;
-    setBgShaking(true);
-    const t = window.setTimeout(() => setBgShaking(false), 400);
-    return () => window.clearTimeout(t);
-  }, [matchShakeKey]);
-
-  useEffect(() => {
     setRevealedItemId(null);
   }, [gameItems]);
+
+  useEffect(() => {
+    if (!gridLocked && !reviewPaused) return;
+    pointerStartRef.current = null;
+    setDragPreview(null);
+  }, [gridLocked, reviewPaused]);
+
+  useEffect(
+    () => () => {
+      if (swapAnimationTimerRef.current !== null) {
+        window.clearTimeout(swapAnimationTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const revealedWord = useMemo(() => {
     if (!revealedItemId) return null;
@@ -442,53 +634,264 @@ export function GamePanel({
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, [revealedItemId]);
 
-  const isClearingCell = (r: number, c: number) =>
-    matchClearCells?.some((cell) => cell.r === r && cell.c === c) ?? false;
+  const clearingKeySet = useMemo(() => {
+    if (!matchClearCells?.length) return null;
+    return new Set(matchClearCells.map((cell) => `${cell.r}:${cell.c}`));
+  }, [matchClearCells]);
 
   const isLineClearAnim = (matchClearCells?.length ?? 0) >= GRID_SIZE;
 
-  const handleTilePointerDown = (r: number, c: number, e: React.PointerEvent<HTMLButtonElement>) => {
+  /** row / col / cross — used for stagger from epicenter. */
+  const lineClearDir = useMemo<'row' | 'col' | 'cross' | null>(() => {
+    if (!matchClearCells || matchClearCells.length < GRID_SIZE) return null;
+    const rowCounts = new Map<number, number>();
+    const colCounts = new Map<number, number>();
+    for (const cell of matchClearCells) {
+      rowCounts.set(cell.r, (rowCounts.get(cell.r) ?? 0) + 1);
+      colCounts.set(cell.c, (colCounts.get(cell.c) ?? 0) + 1);
+    }
+    const fullRows = [...rowCounts.values()].some((n) => n >= GRID_SIZE);
+    const fullCols = [...colCounts.values()].some((n) => n >= GRID_SIZE);
+    if (fullRows && fullCols) return 'cross';
+    if (fullRows) return 'row';
+    if (fullCols) return 'col';
+    return null;
+  }, [matchClearCells]);
+
+  const clearOrigin = useMemo(() => {
+    if (!isLineClearAnim || !matchClearCells) return null;
+    return (
+      popWord?.originCell ??
+      wordLink?.originCell ??
+      matchClearCells[Math.floor(matchClearCells.length / 2)] ??
+      null
+    );
+  }, [isLineClearAnim, matchClearCells, popWord?.originCell, wordLink?.originCell]);
+
+  const lineClearDelaySec = useMemo(() => {
+    if (!isLineClearAnim || !matchClearCells) return null;
+    const map = new Map<string, string>();
+    for (const cell of matchClearCells) {
+      let dist = 0;
+      if (clearOrigin) {
+        dist =
+          lineClearDir === 'col'
+            ? Math.abs(cell.r - clearOrigin.r)
+            : lineClearDir === 'row'
+              ? Math.abs(cell.c - clearOrigin.c)
+              : Math.max(
+                  Math.abs(cell.r - clearOrigin.r),
+                  Math.abs(cell.c - clearOrigin.c),
+                );
+      } else {
+        dist = lineClearDir === 'col' ? cell.r : cell.c;
+      }
+      map.set(`${cell.r}:${cell.c}`, `${Math.min(dist, 4) * 0.045}s`);
+    }
+    return map;
+  }, [isLineClearAnim, matchClearCells, clearOrigin, lineClearDir]);
+
+  /** Full row/col: shockwave overlay. Linger briefly after cells clear. */
+  const [lingerShockwave, setLingerShockwave] = useState<{
+    cells: Cell[];
+    key: number;
+    origin: Cell | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (matchClearCells && matchClearCells.length >= GRID_SIZE) {
+      setLingerShockwave({
+        cells: matchClearCells,
+        key: matchClearKey,
+        origin: clearOrigin,
+      });
+      return;
+    }
+    if (matchClearCells && matchClearCells.length > 0) {
+      setLingerShockwave(null);
+      return;
+    }
+    // Finish just past the clear handoff without covering most of the refill.
+    const waveTimer = window.setTimeout(() => setLingerShockwave(null), 80);
+    return () => window.clearTimeout(waveTimer);
+  }, [matchClearCells, matchClearKey, clearOrigin]);
+
+  const lineShockwave =
+    matchClearCells && matchClearCells.length >= GRID_SIZE
+      ? {
+          cells: matchClearCells,
+          key: matchClearKey,
+          origin: clearOrigin,
+        }
+      : lingerShockwave;
+
+  const handleTilePointerDown = (
+    r: number,
+    c: number,
+    tileId: string,
+    e: React.PointerEvent<HTMLButtonElement>,
+  ) => {
     if (!canPlay || gridLocked || e.button !== 0) return;
+    if (firstSwapTutorialMove && !isTutorialCell({ r, c })) {
+      e.preventDefault();
+      return;
+    }
     e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
     pointerStartRef.current = {
       r,
       c,
+      tileId,
       x: e.clientX,
       y: e.clientY,
       pointerId: e.pointerId,
+      cellSize: Math.max(1, Math.min(rect.width, rect.height)),
+      axis: null,
     };
+    setDragPreview({ tileId, x: 0, y: 0 });
     e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const commitPointerSwap = (
+    start: PointerStart,
+    dx: number,
+    dy: number,
+    target: HTMLButtonElement,
+  ): boolean => {
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    const axis = start.axis ?? (absX > absY ? 'x' : 'y');
+    let toR = start.r;
+    let toC = start.c;
+    if (axis === 'x') toC += dx > 0 ? 1 : -1;
+    else toR += dy > 0 ? 1 : -1;
+    if (toR < 0 || toR >= GRID_SIZE || toC < 0 || toC >= GRID_SIZE) return false;
+
+    if (
+      firstSwapTutorialMove &&
+      !isTutorialPair({ r: start.r, c: start.c }, { r: toR, c: toC })
+    ) {
+      pointerStartRef.current = null;
+      if (target.hasPointerCapture(start.pointerId)) {
+        target.releasePointerCapture(start.pointerId);
+      }
+      setDragPreview(null);
+      return true;
+    }
+
+    const companionTileId = grid[toR]?.[toC]?.id;
+    const validSwap = previewGridHasMatch(
+      swapPreviewGrid(grid, { r: start.r, c: start.c }, { r: toR, c: toC }),
+    );
+    pointerStartRef.current = null;
+    if (target.hasPointerCapture(start.pointerId)) {
+      target.releasePointerCapture(start.pointerId);
+    }
+    if (!validSwap) {
+      const fullX = axis === 'x' ? (dx > 0 ? start.cellSize : -start.cellSize) : 0;
+      const fullY = axis === 'y' ? (dy > 0 ? start.cellSize : -start.cellSize) : 0;
+      setDragPreview({
+        tileId: start.tileId,
+        x: fullX,
+        y: fullY,
+        companionTileId,
+        companionX: -fullX,
+        companionY: -fullY,
+      });
+      window.requestAnimationFrame(() => {
+        setDragPreview({
+          tileId: start.tileId,
+          x: 0,
+          y: 0,
+          companionTileId,
+          companionX: 0,
+          companionY: 0,
+          returning: true,
+        });
+      });
+      window.setTimeout(() => setDragPreview(null), 320);
+      return true;
+    }
+
+    const animatedIds = new Set(
+      [start.tileId, companionTileId].filter((id): id is string => Boolean(id)),
+    );
+    setSwapAnimationTileIds(animatedIds);
+    if (swapAnimationTimerRef.current !== null) {
+      window.clearTimeout(swapAnimationTimerRef.current);
+    }
+    swapAnimationTimerRef.current = window.setTimeout(() => {
+      swapAnimationTimerRef.current = null;
+      setSwapAnimationTileIds(new Set());
+    }, 460);
+    setDragPreview(null);
+    onSwapCells({ r: start.r, c: start.c }, { r: toR, c: toC });
+    return true;
+  };
+
+  const handleTilePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const start = pointerStartRef.current;
+    if (!start || start.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    const rawX = e.clientX - start.x;
+    const rawY = e.clientY - start.y;
+    const absX = Math.abs(rawX);
+    const absY = Math.abs(rawY);
+    if (!start.axis && Math.max(absX, absY) >= 4) {
+      start.axis = absX > absY ? 'x' : 'y';
+    }
+    const axis = start.axis;
+    const maxTravel = start.cellSize * 0.92;
+    const x = axis === 'x' ? Math.max(-maxTravel, Math.min(maxTravel, rawX)) : 0;
+    const y = axis === 'y' ? Math.max(-maxTravel, Math.min(maxTravel, rawY)) : 0;
+    const direction = axis === 'x' ? (x >= 0 ? 1 : -1) : y >= 0 ? 1 : -1;
+    const toR = start.r + (axis === 'y' ? direction : 0);
+    const toC = start.c + (axis === 'x' ? direction : 0);
+    const companionTileId =
+      toR >= 0 && toR < GRID_SIZE && toC >= 0 && toC < GRID_SIZE
+        ? grid[toR]?.[toC]?.id
+        : undefined;
+    if (
+      firstSwapTutorialMove &&
+      !isTutorialPair({ r: start.r, c: start.c }, { r: toR, c: toC })
+    ) {
+      setDragPreview(null);
+      return;
+    }
+    setDragPreview({
+      tileId: start.tileId,
+      x,
+      y,
+      companionTileId,
+      companionX: companionTileId ? -x : 0,
+      companionY: companionTileId ? -y : 0,
+    });
+
+    const travel = axis === 'x' ? Math.abs(x) : axis === 'y' ? Math.abs(y) : 0;
+    const threshold = Math.max(SWIPE_THRESHOLD_PX, start.cellSize * 0.38);
+    if (travel >= threshold) commitPointerSwap(start, x, y, e.currentTarget);
   };
 
   const handleTilePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     const start = pointerStartRef.current;
     if (!start || start.pointerId !== e.pointerId) return;
-    pointerStartRef.current = null;
-
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
 
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
     const dist = Math.max(absX, absY);
+    const threshold = Math.max(SWIPE_THRESHOLD_PX, start.cellSize * 0.38);
 
-    if (dist >= SWIPE_THRESHOLD_PX) {
-      let toR = start.r;
-      let toC = start.c;
-      if (absX > absY) {
-        toC = start.c + (dx > 0 ? 1 : -1);
-      } else {
-        toR = start.r + (dy > 0 ? 1 : -1);
-      }
-      if (toR >= 0 && toR < GRID_SIZE && toC >= 0 && toC < GRID_SIZE) {
-        onSwapCells({ r: start.r, c: start.c }, { r: toR, c: toC });
-      }
+    if (dist >= threshold && commitPointerSwap(start, dx, dy, e.currentTarget)) {
       return;
     }
 
+    pointerStartRef.current = null;
+    setDragPreview(null);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
     if (dist <= TAP_THRESHOLD_PX) {
       onCellClick(start.r, start.c);
     }
@@ -498,6 +901,7 @@ export function GamePanel({
     const start = pointerStartRef.current;
     if (!start || start.pointerId !== e.pointerId) return;
     pointerStartRef.current = null;
+    setDragPreview(null);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
@@ -506,33 +910,78 @@ export function GamePanel({
   return (
     <div
       ref={panelRootRef}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]"
+      className={cn(
+        'relative flex h-full min-h-0 flex-col overflow-hidden px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]',
+        gridLocked && 'board-visuals-busy',
+      )}
     >
-      <motion.div
-        className="pointer-events-none absolute inset-0"
-        animate={
-          bgShaking
-            ? { x: [0, -5, 6, -4, 3, -2, 0], y: [0, 3, -4, 3, -2, 1, 0] }
-            : { x: 0, y: 0 }
-        }
-        transition={MOTION_TWEEN_MED}
-      >
+      <div className="pointer-events-none absolute inset-0">
         <SkySparkleBackground variant="game" />
-      </motion.div>
+      </div>
 
       <div className="relative z-10 flex shrink-0 items-stretch gap-2 pt-2.5">
         <HudPlaque
           className="min-w-0 flex-1 self-start overflow-visible"
-          label={t.hud.wordSet}
+          label={challengeMode === 'review' ? modeLabel : t.hud.wordSet}
           value={
             <div className="min-w-0">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.85, y: 8 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={MOTION_SPRING_SNAPPY}
-              >
-                <HudStatNumber>{level}</HudStatNumber>
-              </motion.div>
+              <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.85, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={MOTION_SPRING_SNAPPY}
+                >
+                  <HudStatNumber>
+                    {challengeMode === 'review' ? (
+                      <span aria-hidden>🧠</span>
+                    ) : (
+                      t.hud.wordSetCount(clearedSets + 1)
+                    )}
+                  </HudStatNumber>
+                </motion.div>
+                <span
+                  className="mb-0.5 inline-flex items-center gap-1 self-center rounded-full bg-rose-50/90 px-1.5 py-0.5 ring-1 ring-rose-200/70"
+                  aria-label={`${t.hud.stamina} ${t.hud.staminaCount(stamina, STAMINA_MAX)}`}
+                  title={`${t.hud.stamina} ${t.hud.staminaCount(stamina, STAMINA_MAX)}`}
+                >
+                  <span className="inline-flex items-center gap-px text-[13px] leading-none">
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {Array.from({ length: STAMINA_MAX }, (_, i) => {
+                        const filled = i < stamina;
+                        return (
+                          <motion.span
+                            key={`stamina-heart-${i}-${filled ? 'on' : 'off'}`}
+                            layout
+                            className="inline-block origin-center will-change-transform"
+                            initial={{ opacity: 0, scale: 0.35 }}
+                            animate={{
+                              opacity: filled ? 1 : 0.55,
+                              scale: 1,
+                            }}
+                            exit={{ opacity: 0, scale: 0.35 }}
+                            transition={{ duration: 0.28, ease: IOS_EASE }}
+                            aria-hidden
+                          >
+                            {filled ? '❤️' : '♡'}
+                          </motion.span>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </span>
+                  <span className="text-[10px] font-black tabular-nums text-rose-700/90">
+                    {t.hud.staminaCount(stamina, STAMINA_MAX)}
+                  </span>
+                  {staminaBanked > 0 && (
+                    <span
+                      className="rounded-full bg-amber-200 px-1 py-0.5 text-[9px] font-black text-amber-900"
+                      aria-label={`Reserved stamina ${staminaBanked}`}
+                      title={`Reserved stamina ${staminaBanked}`}
+                    >
+                      🎁+{staminaBanked}
+                    </span>
+                  )}
+                </span>
+              </div>
               <div className="mt-1.5 min-w-0 overflow-hidden py-0.5">
                 <motion.div
                   key={`${challengeMode}-${gameItems.map((it) => it.id).join('|')}`}
@@ -575,7 +1024,7 @@ export function GamePanel({
                           </span>
                         )}
                         <span className="mt-0.5 text-[9px] font-bold leading-none text-gray-400">
-                          {hits}/3
+                          {hits}/{hitsNeeded}
                         </span>
                       </motion.button>
                     );
@@ -596,13 +1045,18 @@ export function GamePanel({
           }
         />
 
-        <div className="flex w-[128px] shrink-0 flex-col self-stretch">
+        <div className="flex w-[128px] shrink-0 flex-col self-stretch gap-1.5">
           <motion.button
-            ref={modesButtonsRef}
+            ref={modePickerButtonRef}
             type="button"
-            onClick={() => setModePickerOpen(true)}
+            onClick={() => {
+              setModePickerOpen(true);
+            }}
             whileTap={MOTION_PRESS_TAP}
-            className="inline-flex w-full items-center gap-1 rounded-full border border-white/80 bg-white/75 px-2.5 py-1.5 text-[10px] font-bold text-sky-900 shadow-sm backdrop-blur"
+            className={cn(
+              'inline-flex w-full items-center gap-1 rounded-full border border-white/80 bg-white/75 px-2.5 py-1.5 text-[10px] font-bold text-sky-900 shadow-sm backdrop-blur',
+              modePickerGuidePlaying && 'first-time-guide-target-pulse',
+            )}
             aria-label={t.hud.modePickerAria}
             aria-haspopup="dialog"
             aria-expanded={modePickerOpen}
@@ -611,44 +1065,198 @@ export function GamePanel({
             <span className="min-w-0 flex-1 truncate text-left">{modeLabel}</span>
             <ChevronDown size={12} className="shrink-0 opacity-60" aria-hidden />
           </motion.button>
-          <ScoreHud score={score} pops={scorePops} className="mt-auto w-full" />
+          <GuidedTapHint
+            visible={modePickerGuidePlaying}
+            targetRef={modePickerButtonRef}
+            fingerOffset={{ x: 22, y: 32 }}
+          />
+          {challengeMode === 'review' && onToggleReviewPause ? (
+            <motion.button
+              type="button"
+              onClick={onToggleReviewPause}
+              whileTap={MOTION_PRESS_TAP}
+              className={cn(
+                'inline-flex w-full items-center justify-center gap-1 rounded-full border px-2.5 py-1.5 text-[10px] font-black shadow-sm backdrop-blur',
+                reviewPaused
+                  ? 'border-emerald-300/90 bg-emerald-50 text-emerald-900'
+                  : 'border-white/80 bg-white/75 text-sky-900',
+              )}
+              aria-pressed={reviewPaused}
+              aria-label={reviewPaused ? t.modes.reviewResume : t.modes.reviewPause}
+            >
+              {reviewPaused ? (
+                <Play size={12} className="shrink-0" aria-hidden />
+              ) : (
+                <Pause size={12} className="shrink-0" aria-hidden />
+              )}
+              {reviewPaused ? t.modes.reviewResume : t.modes.reviewPause}
+            </motion.button>
+          ) : null}
+          {moodBoardActive && onCycleMoodBoard ? (
+            <motion.button
+              type="button"
+              onClick={onCycleMoodBoard}
+              disabled={gridLocked}
+              whileTap={gridLocked ? undefined : MOTION_PRESS_TAP}
+              className={cn(
+                'inline-flex w-full items-center justify-center gap-1 rounded-full border border-fuchsia-200/90 bg-fuchsia-50/90 px-2.5 py-1.5 text-[10px] font-black text-fuchsia-800 shadow-sm',
+                gridLocked && 'opacity-50',
+              )}
+              aria-label={t.modes.moodSwitchBoard}
+            >
+              <RefreshCw size={12} className="shrink-0" aria-hidden />
+              {t.modes.moodSwitchBoard}
+            </motion.button>
+          ) : null}
+          {movesLeft !== null ? (
+            <StepsHud steps={movesLeft} className="mt-auto w-full" />
+          ) : (
+            <div className="mt-auto" />
+          )}
         </div>
       </div>
 
+      {pendingForcedReview && challengeMode !== 'review' && onResumeForcedReview ? (
+        <div className="relative z-10 mt-2 flex items-center justify-between gap-2 rounded-2xl border border-amber-300/80 bg-amber-50/95 px-3 py-2 shadow-sm">
+          <span className="text-xs font-black text-amber-900">{t.modes.pendingReviewBanner}</span>
+          <button
+            type="button"
+            onClick={onResumeForcedReview}
+            className="shrink-0 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-black text-white shadow-sm"
+          >
+            {t.modes.pendingReviewCta}
+          </button>
+        </div>
+      ) : null}
+
+      {/* Center the board; overlays are absolute so they won't reflow this slot. */}
       <div
-        className="relative z-10 mt-9 flex min-h-0 flex-1 flex-col items-center justify-center pb-2 pt-1"
-        ref={gridRef}
+        className={cn(
+          'relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center pb-2 pt-1',
+          pendingForcedReview && challengeMode !== 'review' ? 'mt-3' : 'mt-9',
+        )}
       >
         {!canPlay ? (
-          <div className="flex max-w-sm flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-white/70 bg-white/55 px-5 py-10 text-center backdrop-blur-sm">
-            <p className="text-sm font-bold text-sky-950">
-              {challengeMode === 'review' ? t.modes.insufficientReview : t.modes.insufficientPool}
-            </p>
-            <p className="mt-2 text-xs font-medium text-sky-800/80">
-              {challengeMode === 'review'
-                ? t.modes.insufficientReviewHint
-                : t.modes.insufficientPoolHint}
-            </p>
+          <div
+            className={
+              playBlockedReason === 'stamina'
+                ? 'flex max-w-sm flex-col items-center justify-center rounded-[28px] border-2 border-[#4a1c1c] bg-gradient-to-b from-[#0c0a0a] via-[#141010] to-[#080606] px-5 py-10 text-center shadow-[0_16px_40px_rgba(0,0,0,0.45)]'
+                : 'flex max-w-sm flex-col items-center justify-center rounded-[28px] border-2 border-dashed border-white/70 bg-white/55 px-5 py-10 text-center backdrop-blur-sm'
+            }
+          >
+            {playBlockedReason === 'stamina' ? (
+              <>
+                <div className="flex gap-2 text-4xl drop-shadow-[0_0_10px_rgba(180,30,30,0.45)]" aria-hidden>
+                  <span>👻</span>
+                  <span>👾</span>
+                </div>
+                <p className="mt-3 text-sm font-black tracking-wide text-[#f5ecec]">
+                  {t.adventure.deadTitle}
+                </p>
+                <p className="mt-2 text-xs font-semibold leading-snug text-[#c4b4b4]">
+                  {t.adventure.deadSubtitle}
+                </p>
+                <p className="mt-2 text-[11px] font-bold text-[#d2c8c8]">{t.adventure.deadWait}</p>
+                {reviewAvailable && onGoReview ? (
+                  <button
+                    type="button"
+                    onClick={onGoReview}
+                    className="mt-4 w-full rounded-2xl border border-[#6b1515] bg-gradient-to-r from-[#5c0f0f] via-[#8b1a1a] to-[#5c0f0f] px-3 py-3 text-sm font-black text-[#fff5f5]"
+                  >
+                    {t.adventure.deadGoReview}
+                  </button>
+                ) : null}
+              </>
+            ) : challengeMode === 'review' ? (
+              <>
+                <p className="text-sm font-bold text-sky-950">{t.modes.insufficientReview}</p>
+                <p className="mt-2 text-xs font-medium text-sky-800/80">
+                  {t.modes.insufficientReviewHint}
+                </p>
+                {onGoAdventure ? (
+                  <button
+                    type="button"
+                    onClick={onGoAdventure}
+                    className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
+                  >
+                    {t.modes.goAdventureCta}
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-sky-950">{t.modes.insufficientPool}</p>
+                <p className="mt-2 text-xs font-medium text-sky-800/80">
+                  {t.modes.insufficientPoolHint}
+                </p>
+              </>
+            )}
           </div>
         ) : (
-          <div className="relative w-full max-w-[min(100%,min(92vw,480px))] shrink-0" ref={popBoardRef}>
-            {challengeMode === 'fun' && funTargetItem && (
-              <div className="pointer-events-none absolute bottom-full left-0 right-0 z-20 mb-2">
-                <FunTargetBanner
-                  item={funTargetItem}
-                  pulseKey={funTargetKey}
-                  countdownSec={funCountdown}
-                />
+          <div
+            className="relative flex w-full max-w-[min(100%,min(92vw,480px))] shrink-0 flex-col"
+            ref={popBoardRef}
+          >
+            {timedHuntActive && (
+              <div
+                className={cn(
+                  'relative z-20 mb-2 space-y-1.5',
+                  reviewPaused && 'pointer-events-none select-none',
+                )}
+                aria-hidden={reviewPaused}
+              >
+                {reviewPaused ? (
+                  <div className="flex h-[4.5rem] w-full items-center justify-center rounded-2xl border border-amber-200/90 bg-amber-50/95 text-[2rem] leading-none">
+                    <span aria-hidden>🙈</span>
+                  </div>
+                ) : funTargetItem ? (
+                  <div className="pointer-events-none">
+                    <TimedTargetBanner
+                      item={funTargetItem}
+                      pulseKey={funTargetKey}
+                      countdownSec={funCountdown}
+                      countdownMaxSec={funCountdownMaxSec}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-[4.5rem] w-full items-center justify-center rounded-2xl border border-amber-200/90 bg-amber-50/95 text-sm font-bold text-amber-800">
+                    {reviveActive ? t.adventure.reviveTitle : t.modes.reviewMode}
+                  </div>
+                )}
+                {reviveActive && !reviewPaused && (
+                  <div className="flex items-center justify-between gap-2 px-1">
+                    <span className="rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black text-emerald-700 shadow-sm">
+                      {t.adventure.reviveProgress(reviveCorrects, reviveNeeded)}
+                    </span>
+                    <span className="rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-black text-rose-700 shadow-sm">
+                      {t.adventure.reviveStrike(reviveWrongs, reviveWrongLimit)}
+                    </span>
+                    {onReviveExit && (
+                      <button
+                        type="button"
+                        onClick={onReviveExit}
+                        className="rounded-full border border-white/90 bg-white/90 px-2.5 py-1 text-[10px] font-bold text-sky-900 shadow-sm"
+                        aria-label={t.adventure.reviveExitAria}
+                      >
+                        {t.adventure.reviveExit}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div
-              className={cn(
-                'relative aspect-square w-full',
-                refillActive && 'overflow-hidden',
-              )}
+              className="relative z-0 aspect-square w-full overflow-hidden"
               ref={boardInnerRef}
             >
-              <div className="grid h-full w-full grid-cols-7 gap-0.5 touch-none" data-shelf-grid>
+              <div
+                className={cn(
+                  'grid h-full w-full grid-cols-7 gap-0.5 touch-none',
+                  reviewPaused && 'pointer-events-none select-none',
+                )}
+                data-shelf-grid
+                aria-hidden={reviewPaused}
+              >
                 {grid.flatMap((row, r) =>
                   row.map((tile, c) => {
                     const item = itemById.get(tile.itemId);
@@ -656,53 +1264,140 @@ export function GamePanel({
                     const isHint =
                       (hintMove?.a.r === r && hintMove?.a.c === c) ||
                       (hintMove?.b.r === r && hintMove?.b.c === c);
-                    const isClearing = isClearingCell(r, c);
+                    const isTutorialSource =
+                      firstSwapTutorialMove !== null &&
+                      cellEquals({ r, c }, firstSwapTutorialMove.source);
+                    const isTutorialTarget =
+                      firstSwapTutorialMove !== null &&
+                      cellEquals({ r, c }, firstSwapTutorialMove.target);
+                    const cellKey = `${r}:${c}`;
+                    const isClearing = clearingKeySet?.has(cellKey) ?? false;
+                    const clearDelay = isClearing && isLineClearAnim
+                      ? lineClearDelaySec?.get(cellKey)
+                      : undefined;
                     return (
                       <button
-                        key={tile.id}
+                        key={cellKey}
+                        ref={(node) => {
+                          if (isTutorialSource) tutorialSourceButtonRef.current = node;
+                          if (isTutorialTarget) tutorialTargetButtonRef.current = node;
+                        }}
                         type="button"
-                        onPointerDown={(e) => handleTilePointerDown(r, c, e)}
+                        onPointerDown={(e) => handleTilePointerDown(r, c, tile.id, e)}
+                        onPointerMove={handleTilePointerMove}
                         onPointerUp={handleTilePointerUp}
                         onPointerCancel={handleTilePointerCancel}
                         className={cn(
-                          'bubble-tile relative aspect-square w-full min-h-[44px] grid place-items-center rounded-full border border-white/60 bg-white/38 text-[clamp(1.9rem,7.5vw,2.9rem)] shadow-[inset_0_1px_3px_rgba(255,255,255,0.75),0_2px_8px_rgba(56,189,248,0.16)] transition-shadow active:scale-[0.97]',
-                          isSel && 'z-[1] border-sky-300/80 bg-white/30 ring-2 ring-sky-500/65 shadow-[inset_0_1px_4px_rgba(255,255,255,0.75),0_0_0_2px_rgba(14,165,233,0.2),0_4px_12px_rgba(14,165,233,0.22)]',
-                          isHint && 'border-amber-200/90 bg-amber-50/25 ring-2 ring-amber-400/90',
+                          'bubble-tile relative aspect-square w-full min-h-[44px] grid place-items-center rounded-full border border-white/60 bg-white/38 text-[clamp(1.9rem,7.5vw,2.9rem)] shadow-[inset_0_1px_3px_rgba(255,255,255,0.75),0_2px_8px_rgba(56,189,248,0.16)]',
+                          isSel && !reviewPaused && 'z-[1] border-sky-300/80 bg-white/30 ring-2 ring-sky-500/65 shadow-[inset_0_1px_4px_rgba(255,255,255,0.75),0_0_0_2px_rgba(14,165,233,0.2),0_4px_12px_rgba(14,165,233,0.22)]',
+                          isHint && !reviewPaused && 'border-amber-200/90 bg-amber-50/25 ring-2 ring-amber-400/90',
+                          isTutorialSource &&
+                            'z-[2] border-sky-200 bg-sky-50/45 ring-[3px] ring-sky-400/90 shadow-[0_0_18px_rgba(56,189,248,0.58)]',
+                          isTutorialTarget &&
+                            'z-[2] border-amber-200 bg-amber-50/45 ring-[3px] ring-amber-400/90 shadow-[0_0_18px_rgba(251,191,36,0.58)]',
                           isClearing && 'z-10',
+                          isClearing &&
+                            (isLineClearAnim ? 'bubble-tile--clearing' : 'bubble-tile--flip-clear'),
                         )}
-                        aria-label={item?.word ?? t.hud.tileAria}
+                        style={clearDelay ? { animationDelay: clearDelay } : undefined}
+                        aria-label={reviewPaused ? t.modes.reviewPausedTitle : (item?.word ?? t.hud.tileAria)}
                       >
-                        <div
-                          data-tile-id={tile.id}
+                        <motion.div
+                          layoutId={
+                            swapAnimationTileIds.has(tile.id)
+                              ? `board-emoji-${tile.id}`
+                              : undefined
+                          }
                           className={cn(
-                            'bubble-emoji-sprite grid place-items-center',
-                            showShelfCascade && 'opacity-0',
-                            isClearing &&
-                              (isLineClearAnim
-                                ? 'animate-[line-clear-pop_0.62s_ease-out_forwards]'
-                                : 'animate-[match-clear-pop_0.5s_ease-out_forwards]'),
+                            'relative grid h-full w-full place-items-center',
+                            dragPreview?.tileId === tile.id && 'z-20',
                           )}
+                          animate={{
+                            x:
+                              dragPreview?.tileId === tile.id
+                                ? dragPreview.x
+                                : dragPreview?.companionTileId === tile.id
+                                  ? dragPreview.companionX ?? 0
+                                  : 0,
+                            y:
+                              dragPreview?.tileId === tile.id
+                                ? dragPreview.y
+                                : dragPreview?.companionTileId === tile.id
+                                  ? dragPreview.companionY ?? 0
+                                  : 0,
+                            scale: dragPreview?.tileId === tile.id ? 1.08 : 1,
+                          }}
+                          transition={
+                            dragPreview?.returning &&
+                            (dragPreview.tileId === tile.id ||
+                              dragPreview.companionTileId === tile.id)
+                              ? MOTION_SPRING_SNAPPY
+                              : dragPreview?.tileId === tile.id ||
+                                  dragPreview?.companionTileId === tile.id
+                                ? { duration: 0.03 }
+                              : MOTION_SPRING_SNAPPY
+                          }
                         >
-                          {item?.imgSrc ? (
-                            <img
-                              src={item.imgSrc}
-                              alt={item.word}
-                              className="h-[clamp(2.4rem,7.6vw,2.95rem)] w-[clamp(2.4rem,7.6vw,2.95rem)] object-contain drop-shadow-sm"
-                              loading="eager"
-                              decoding="async"
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : (
-                            <span className="drop-shadow-sm">{item?.emoji ?? '·'}</span>
-                          )}
-                        </div>
+                          <div
+                            data-tile-id={tile.id}
+                            className={cn(
+                              'bubble-emoji-sprite grid place-items-center',
+                              hideTileEmojisForIntro && 'opacity-0',
+                              isClearing &&
+                                (isLineClearAnim
+                                  ? 'bubble-emoji-sprite--clearing-line'
+                                  : 'bubble-emoji-sprite--flip-clear'),
+                            )}
+                            style={
+                              clearDelay
+                                ? { animationDelay: clearDelay }
+                                : undefined
+                            }
+                          >
+                            {reviewPaused ? (
+                              <span className="drop-shadow-sm" aria-hidden>
+                                🙈
+                              </span>
+                            ) : item?.imgSrc ? (
+                              <img
+                                src={item.imgSrc}
+                                alt={item.word}
+                                className="h-[clamp(2.4rem,7.6vw,2.95rem)] w-[clamp(2.4rem,7.6vw,2.95rem)] select-none object-contain drop-shadow-sm"
+                                loading="eager"
+                                decoding="async"
+                                draggable={false}
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <span className="select-none drop-shadow-sm">
+                                {item?.emoji ?? '·'}
+                              </span>
+                            )}
+                          </div>
+                        </motion.div>
                       </button>
                     );
                   }),
                 )}
               </div>
 
-              {showShelfCascade && (
+              {reviewPaused ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex justify-center px-4">
+                  {onToggleReviewPause ? (
+                    <motion.button
+                      type="button"
+                      whileTap={MOTION_PRESS_TAP}
+                      onClick={onToggleReviewPause}
+                      className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-500 px-5 py-2.5 text-sm font-black text-white shadow-lg"
+                    >
+                      <Play size={14} aria-hidden />
+                      {t.modes.reviewResume}
+                    </motion.button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {showShelfCascade && !reviewPaused && (
                 <BoardShelfEmojiLayer
                   grid={grid}
                   itemById={itemById}
@@ -710,24 +1405,31 @@ export function GamePanel({
                   onComplete={() => shelfCompleteRef.current()}
                 />
               )}
+
+              <GuidedTapHint
+                visible={Boolean(firstSwapTutorialMove) && !gridLocked && canPlay}
+                sourceRef={tutorialSourceButtonRef}
+                targetRef={tutorialTargetButtonRef}
+                mode="drag"
+              />
+
+              {lineShockwave && !reviewPaused && (
+                <LineShockwave
+                  cells={lineShockwave.cells}
+                  boardRef={boardInnerRef}
+                  burstKey={lineShockwave.key}
+                  origin={lineShockwave.origin}
+                />
+              )}
             </div>
 
             <BoardBottomSparkles />
-
-            {matchClearCells && matchClearCells.length > 0 && (
-              <MatchClearEnergy
-                cells={matchClearCells}
-                boardRef={popBoardRef}
-                burstKey={matchClearKey}
-              />
-            )}
 
             <AnimatePresence>
               {popWord && (
                 <PopWordOverlay
                   key={`${popWord.word}-${popWord.originCell?.r ?? 'x'}-${popWord.originCell?.c ?? 'x'}`}
                   popWord={popWord}
-                  boardRef={popBoardRef}
                   showChinese={showChinese}
                 />
               )}
@@ -741,12 +1443,19 @@ export function GamePanel({
         onClose={() => setModePickerOpen(false)}
         challengeMode={challengeMode}
         onChallengeModeChange={onChallengeModeChange}
+        onOpenSayBlast={onOpenSayBlast}
         challengePools={challengePools}
         selectedCategoryId={selectedCategoryId}
         onCategoryChange={onCategoryChange}
         onShuffleWords={onShuffleWords}
         onRestart={onRestart}
         canPlay={canPlay}
+        reviewUnlocked={reviewUnlocked}
+        categoryUnlocked={categoryUnlocked}
+        pendingForcedReview={pendingForcedReview}
+        guideTarget={featureGuideTarget}
+        guidePlayCount={featureGuidePlayCount}
+        onGuidePlaybackStart={onFeatureGuidePlaybackStart}
       />
 
       {linkGeom && wordLink && (

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { MOTION_SPRING_POP } from '../../lib/motionPresets';
+import { MOTION_SPRING_POP, IOS_EASE } from '../../lib/motionPresets';
 import {
   MOTION_MODAL_CARD,
   MOTION_VIGNETTE,
@@ -8,7 +8,8 @@ import {
 } from '../../lib/motionChoreography';
 import { cn } from '../../lib/utils';
 
-const CONFETTI = ['✨', '⭐', '🌟', '💫', '🎊', '💖', '🩵', '💗'];
+const BURST = ['✨', '⭐', '🌟', '💫', '🎊', '💖', '🩵', '💗'];
+const HERO_SWAP = new Set(['🎉', '🌈', '🎊']);
 
 type CelebrationBurstProps = {
   show: boolean;
@@ -21,6 +22,12 @@ type CelebrationBurstProps = {
   className?: string;
 };
 
+function pickHeroEmoji(preferred?: string): string {
+  const base = preferred && preferred.length > 0 ? preferred : '🎉';
+  if (HERO_SWAP.has(base) && Math.random() < 0.42) return '👍';
+  return base;
+}
+
 export function CelebrationBurst({
   show,
   title = '太棒了！',
@@ -31,14 +38,21 @@ export function CelebrationBurst({
   durationMs = 1800,
   className,
 }: CelebrationBurstProps) {
+  const [heroEmoji, setHeroEmoji] = useState(emoji ?? '🎉');
+
+  useEffect(() => {
+    if (!show) return;
+    setHeroEmoji(pickHeroEmoji(emoji));
+  }, [show, emoji, title, subtitle]);
+
   useEffect(() => {
     if (!show) return;
     const t = window.setTimeout(() => onDone?.(), durationMs);
     return () => window.clearTimeout(t);
   }, [show, durationMs, onDone]);
 
-  const particles = CONFETTI.map((c, i) => {
-    const angle = (i / CONFETTI.length) * Math.PI * 2;
+  const particles = BURST.map((c, i) => {
+    const angle = (i / BURST.length) * Math.PI * 2;
     const radius = 26 + (i % 3) * 12;
     return {
       char: c,
@@ -92,12 +106,12 @@ export function CelebrationBurst({
               className="candy-celebration-emoji-wrap"
               initial={{ scale: 0.45, y: 18, opacity: 0 }}
               animate={{ scale: [0.45, 1.1, 0.96, 1], y: [18, -6, 2, 0], opacity: 1 }}
-              transition={{ duration: 0.48, times: [0, 0.5, 0.78, 1], ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.48, times: [0, 0.5, 0.78, 1], ease: IOS_EASE }}
             >
               {imgSrc ? (
                 <img src={imgSrc} alt="" className="h-14 w-14 object-contain" />
               ) : (
-                <span className="text-4xl leading-none">{emoji ?? '🎉'}</span>
+                <span className="text-4xl leading-none">{heroEmoji}</span>
               )}
             </motion.div>
             <motion.div

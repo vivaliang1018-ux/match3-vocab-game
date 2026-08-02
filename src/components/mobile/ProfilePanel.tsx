@@ -5,53 +5,93 @@ import {
   ChevronRight,
   LogIn,
   Music,
+  Vibrate,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { WordMemory } from '../../lib/ebbinghausMemory';
 import { masteredEmojiCount } from '../../lib/ebbinghausMemory';
-import { privacyPolicyUrl } from '../../lib/privacyPolicyUrl';
+import { assetUrl } from '../../lib/assetUrl';
 import { useAuth } from '../../auth/AuthProvider';
 import { MOTION_PRESS_DEEP, MOTION_SPRING_BOUNCY } from '../../lib/motionPresets';
 import { LOCALE_OPTIONS, useI18n } from '../../i18n';
 import { cn } from '../../lib/utils';
-import { EmojiClearStatsBlock } from './EmojiClearStatsBlock';
+import { ProfileJourneySummary } from './ProfileJourneySummary';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 import { SignInSheet } from './SignInSheet';
 import { AccountAvatar, AccountSettingsSheet } from './AccountSettingsSheet';
+import { LegalDocSheet } from './LegalDocSheet';
+import {
+  isCategoryUnlocked,
+  isReviewUnlocked,
+} from '../../lib/modeUnlocks';
+import {
+  reconcileBadges,
+  savePlayerSummary,
+  type PlayerSummary,
+} from '../../lib/playerSummary';
 
 type ProfilePanelProps = {
-  profileAreaRef?: React.RefObject<HTMLDivElement | null>;
   ttsAvailable: boolean;
   usesThiings: boolean;
   wordMemory: Map<string, WordMemory>;
   allPool: { id: string; word: string }[];
-  totalEmojiPool: number;
+  adventureClears: number;
+  playerSummary: PlayerSummary;
+  onPlayerSummaryChange: (next: PlayerSummary) => void;
   bgmEnabled: boolean;
   onBgmEnabledChange: (enabled: boolean) => void;
   sfxEnabled: boolean;
   onSfxEnabledChange: (enabled: boolean) => void;
+  hapticsEnabled: boolean;
+  onHapticsEnabledChange: (enabled: boolean) => void;
 };
 
 export function ProfilePanel({
-  profileAreaRef,
   ttsAvailable,
   usesThiings,
   wordMemory,
   allPool,
-  totalEmojiPool,
+  adventureClears,
+  playerSummary,
+  onPlayerSummaryChange,
   bgmEnabled,
   onBgmEnabledChange,
   sfxEnabled,
   onSfxEnabledChange,
+  hapticsEnabled,
+  onHapticsEnabledChange,
 }: ProfilePanelProps) {
   const { locale, setLocale, t } = useI18n();
   const { user } = useAuth();
   const [signInOpen, setSignInOpen] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const masteredCount = masteredEmojiCount(wordMemory, allPool);
+
+  // Retroactively unlock badges from existing progress when opening profile.
+  useEffect(() => {
+    const next = reconcileBadges(playerSummary, {
+      adventureClears,
+      masteredCount,
+      reviewUnlocked: isReviewUnlocked(adventureClears),
+      categoryUnlocked: isCategoryUnlocked(adventureClears),
+    });
+    const prevIds = playerSummary.badges
+      .map((b) => b.id)
+      .sort()
+      .join('|');
+    const nextIds = next.badges
+      .map((b) => b.id)
+      .sort()
+      .join('|');
+    if (prevIds !== nextIds) {
+      savePlayerSummary(next);
+      onPlayerSummaryChange(next);
+    }
+  }, [adventureClears, masteredCount, playerSummary, onPlayerSummaryChange]);
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || t.profile.guestName;
   const badge = user ? t.profile.signedInBadge : t.profile.guestBadge;
@@ -140,15 +180,18 @@ export function ProfilePanel({
           </div>
 
           <ProfileSection>
-            <EmojiClearStatsBlock
-              learnedCount={masteredCount}
-              totalEmojiPool={totalEmojiPool}
-              theme="candy"
+            <ProfileJourneySummary
+              summary={playerSummary}
+              adventureClears={adventureClears}
+              masteredCount={masteredCount}
+              reviewUnlocked={isReviewUnlocked(adventureClears)}
+              categoryUnlocked={isCategoryUnlocked(adventureClears)}
+              onPlayerSummaryChange={onPlayerSummaryChange}
             />
           </ProfileSection>
 
           <ProfileSection>
-            <div ref={profileAreaRef} className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <CandyToggle
                 label={t.profile.sfx}
                 enabled={sfxEnabled}
@@ -168,12 +211,24 @@ export function ProfilePanel({
                 offIconMuted
                 onChange={onBgmEnabledChange}
               />
+              <div className="col-span-2">
+                <CandyToggle
+                  label={t.profile.haptics}
+                  enabled={hapticsEnabled}
+                  onLabel={t.profile.toggleOn}
+                  offLabel={t.profile.toggleOff}
+                  onIcon={Vibrate}
+                  offIcon={Vibrate}
+                  offIconMuted
+                  onChange={onHapticsEnabledChange}
+                />
+              </div>
             </div>
           </ProfileSection>
 
           <ProfileSection>
             <div
-              className="flex flex-wrap justify-center gap-2"
+              className="flex flex-nowrap justify-center gap-1"
               role="radiogroup"
               aria-label={t.profile.language}
             >
@@ -201,21 +256,27 @@ export function ProfilePanel({
 
           <section className="profile-candy-about mt-5">
             <div className="profile-candy-about-title">{t.profile.aboutTitle}</div>
-            <p className="mt-2 text-xs font-semibold leading-relaxed text-sky-900/70">
+            <p className="mt-2 whitespace-pre-line text-xs font-semibold leading-relaxed text-sky-900/70">
               {t.profile.description}
             </p>
             <p className="mt-2.5 text-[10px] font-bold text-sky-800/75">
               {t.profile.version}: {t.meta.uiVersion}
             </p>
-            <p className="mt-1.5">
-              <a
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <button
+                type="button"
                 className="text-[10px] font-bold text-pink-600 underline decoration-pink-400/60 underline-offset-2"
-                href={privacyPolicyUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => setLegalDoc('terms')}
+              >
+                {t.profile.termsOfService}
+              </button>
+              <button
+                type="button"
+                className="text-[10px] font-bold text-pink-600 underline decoration-pink-400/60 underline-offset-2"
+                onClick={() => setLegalDoc('privacy')}
               >
                 {t.profile.privacyPolicy}
-              </a>
+              </button>
             </p>
             {usesThiings && (
               <p className="mt-1.5 text-[10px] font-medium text-sky-800/65">
@@ -239,6 +300,12 @@ export function ProfilePanel({
         open={accountOpen}
         onClose={() => setAccountOpen(false)}
         onDeleted={() => setStatusMsg(t.profile.deleteAccountDone)}
+      />
+      <LegalDocSheet
+        open={legalDoc !== null}
+        title={legalDoc === 'terms' ? t.profile.termsOfService : t.profile.privacyPolicy}
+        src={assetUrl(legalDoc === 'terms' ? 'terms.html' : 'privacy.html')}
+        onClose={() => setLegalDoc(null)}
       />
     </div>
   );

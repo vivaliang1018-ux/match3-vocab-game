@@ -5,11 +5,24 @@ type SpeakOptions = {
   sync?: boolean;
 };
 
+type RecordedPlaybackOptions = {
+  /** Limit filename fallbacks for interactions that need an immediate response. */
+  maxUrlAttempts?: number;
+  /** Maximum wait for a recorded clip to begin playing. */
+  playStartTimeoutMs?: number;
+};
+
+type CompletionSpeechOptions = {
+  /**
+   * Prefer the exact recorded filename and fall back to system speech quickly.
+   * Used for tapped quiz answers, where delayed feedback feels broken.
+   */
+  quickStart?: boolean;
+};
+
 const RECORDED_VOICE_BASE = assetUrl('emoji-voice');
 /** Recorded clips are mastered quiet; boost above 1.0 via Web Audio when available. */
-const WORD_PLAYBACK_GAIN = 1.9;
-const BGM_DUCK_MULTIPLIER = 0.14;
-const BGM_DUCK_CAP = 0.022;
+const WORD_PLAYBACK_GAIN = 2.3;
 
 let voiceAudioEl: HTMLAudioElement | null = null;
 let voiceAudioCtx: AudioContext | null = null;
@@ -151,13 +164,21 @@ function buildRecordedWordUrls(word: string): string[] {
   return [...urls];
 }
 
-async function playVoiceElement(a: HTMLAudioElement): Promise<void> {
-  await Promise.race([
-    a.play(),
-    new Promise<void>((_, reject) => {
-      window.setTimeout(() => reject(new Error('voice-play-timeout')), 2500);
-    }),
-  ]);
+async function playVoiceElement(a: HTMLAudioElement, timeoutMs = 2500): Promise<void> {
+  let timeoutId: number | null = null;
+  try {
+    await Promise.race([
+      a.play(),
+      new Promise<void>((_, reject) => {
+        timeoutId = window.setTimeout(
+          () => reject(new Error('voice-play-timeout')),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) window.clearTimeout(timeoutId);
+  }
 }
 
 async function tryPlayAudioUrl(url: string): Promise<boolean> {
@@ -179,7 +200,11 @@ async function tryPlayAudioUrl(url: string): Promise<boolean> {
   }
 }
 
-async function tryPlayAudioUrlAndWait(url: string, isStillCurrent?: () => boolean): Promise<boolean> {
+async function tryPlayAudioUrlAndWait(
+  url: string,
+  isStillCurrent?: () => boolean,
+  playStartTimeoutMs?: number,
+): Promise<boolean> {
   beginBgmDuck();
   try {
     if (isStillCurrent && !isStillCurrent()) return false;
@@ -188,7 +213,7 @@ async function tryPlayAudioUrlAndWait(url: string, isStillCurrent?: () => boolea
     a.pause();
     a.src = url;
     setWordPlaybackLevel(1);
-    await playVoiceElement(a);
+    await playVoiceElement(a, playStartTimeoutMs);
     if (isStillCurrent && !isStillCurrent()) {
       stopVoicePlayback();
       return false;
@@ -238,12 +263,24 @@ export async function playRecordedWord(word: string): Promise<boolean> {
   return false;
 }
 
-export async function playRecordedWordAndWait(word: string, isStillCurrent?: () => boolean): Promise<boolean> {
+export async function playRecordedWordAndWait(
+  word: string,
+  isStillCurrent?: () => boolean,
+  options?: RecordedPlaybackOptions,
+): Promise<boolean> {
   stopVoicePlayback();
   const urls = buildRecordedWordUrls(word);
-  for (const url of urls) {
+  const maxAttempts = Math.max(
+    1,
+    Math.floor(options?.maxUrlAttempts ?? urls.length),
+  );
+  for (const url of urls.slice(0, maxAttempts)) {
     if (isStillCurrent && !isStillCurrent()) return false;
-    const ok = await tryPlayAudioUrlAndWait(url, isStillCurrent);
+    const ok = await tryPlayAudioUrlAndWait(
+      url,
+      isStillCurrent,
+      options?.playStartTimeoutMs,
+    );
     if (ok) return true;
   }
   return false;
@@ -261,7 +298,9 @@ function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice 
 }
 
 export function computeDuckedBgmVolume(bgmVolume: number): number {
-  return Math.min(bgmVolume * BGM_DUCK_MULTIPLIER, BGM_DUCK_CAP);
+  // Keep music level stable while vocabulary audio plays. The speech lifecycle
+  // still uses duck/restore callbacks so this behavior remains easy to reverse.
+  return Math.min(1, Math.max(0, bgmVolume));
 }
 
 export function speak(word: string, options?: SpeakOptions): boolean {
@@ -345,11 +384,10 @@ export function unlockSpeechSynthesis() {
     if (!('speechSynthesis' in window)) return;
     const synth = window.speechSynthesis;
     synth.resume();
-    synth.cancel();
-    const u = new SpeechSynthesisUtterance(' ');
-    u.volume = 0.01;
-    synth.speak(u);
-    synth.cancel();
+    // Loading voices is enough for warm-up. Playing even a near-silent
+    // utterance makes iOS briefly change its audio session and audibly alters
+    // already-playing BGM.
+    synth.getVoices();
   } catch {
     // ignore
   }
@@ -420,9 +458,24 @@ function waitForSpeechSynthesisEnd(maxMs = 8000): Promise<void> {
 }
 
 /** Play a word through to the end — used when quiz must not interrupt pronunciation. */
-export async function speakWordToCompletion(word: string): Promise<boolean> {
+export async function speakWordToCompletion(
+  word: string,
+  options?: CompletionSpeechOptions,
+): Promise<boolean> {
   const gen = speechGeneration;
-  const ok = await playRecordedWordAndWait(word, () => gen === speechGeneration);
+  const ok = await playRecordedWordAndWait(
+    word,
+    () => gen === speechGeneration,
+    options?.quickStart
+      ? {
+          // The first URL is the dataset's exact filename. If it cannot start
+          // promptly in WKWebView, system speech is faster than probing every
+          // spelling/Unicode fallback one by one.
+          maxUrlAttempts: 1,
+          playStartTimeoutMs: 500,
+        }
+      : undefined,
+  );
   if (gen !== speechGeneration) return false;
   if (ok) return true;
   if (!speak(word, { sync: true })) return false;

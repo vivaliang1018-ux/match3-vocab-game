@@ -3,6 +3,9 @@ import { cn } from '../lib/utils';
 
 export type SparkleBackgroundVariant = 'splash' | 'game';
 
+/** Keep the full star field for the short splash, but use a sparse field during gameplay. */
+const GAME_SPARKLE_STARS = SPARKLE_STARS.filter((_, i) => i % 4 === 0);
+
 type SkySparkleBackgroundProps = {
   className?: string;
   timeScale?: number;
@@ -15,6 +18,7 @@ export function SkySparkleBackground({
   variant = 'game',
 }: SkySparkleBackgroundProps) {
   const durScale = Math.max(0.5, timeScale);
+  const stars = variant === 'game' ? GAME_SPARKLE_STARS : SPARKLE_STARS;
 
   return (
     <div
@@ -37,7 +41,7 @@ export function SkySparkleBackground({
       <div className="app-sparkle-glow app-sparkle-glow-pink" aria-hidden />
       <div className="app-sparkle-glow app-sparkle-glow-cream" aria-hidden />
 
-      {SPARKLE_STARS.map((star, i) => (
+      {stars.map((star, i) => (
         <span
           key={i}
           className={cn(

@@ -1,16 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  computeRefillOffsets,
+  computeRefillMotions,
   GRID_COLS,
   GRID_ROWS,
   REFILL_ANTICIPATION_MS,
+  REFILL_COL_STAGGER_MS,
   refillOffsetAtTime,
   refillTravelDurationMs,
   type RefillBurst,
 } from '../../lib/boardRefill';
 
 const REFILL_SPRITE_CLASS = 'bubble-emoji-sprite--refill';
-const REFILL_LAYOUT_RETRIES = 6;
+const REFILL_LAYOUT_RETRIES = 8;
+const REFILL_KEYFRAME_STEPS = 24;
 
 function measureStepY(boardEl: HTMLElement): number {
   const gridEl = boardEl.querySelector<HTMLElement>('[data-shelf-grid]');
@@ -26,9 +28,6 @@ function measureStepY(boardEl: HTMLElement): number {
   if (gridRect.height > 0) return gridRect.height / GRID_ROWS;
   return 0;
 }
-
-/** Baked curve samples — linear easing between keyframes preserves Royal Match feel. */
-const REFILL_KEYFRAME_STEPS = 18;
 
 function buildRefillKeyframes(y0: number, durationMs: number): Keyframe[] {
   const frames: Keyframe[] = [];
@@ -104,27 +103,34 @@ export function useBoardGravityRefill({
     const startBurst = (attempt: number) => {
       if (cancelled) return;
 
+      // Always re-measure — board size can change; stale cache broke spawn height.
       const stepY = measureStepY(board);
-      const offsets = computeRefillOffsets(burst.before, burst.after, burst.clearedKeys, stepY);
+      const motions = computeRefillMotions(burst.before, burst.after, burst.clearedKeys, stepY);
 
-      const sprites: { el: HTMLElement; y0: number; duration: number }[] = [];
-      for (const [tileId, y0] of offsets) {
-        const el = board.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`);
+      const sprites: { el: HTMLElement; y0: number; duration: number; delay: number }[] = [];
+      for (const motion of motions) {
+        const el = board.querySelector<HTMLElement>(`[data-tile-id="${motion.tileId}"]`);
         if (!el) continue;
-        sprites.push({ el, y0, duration: refillTravelDurationMs(y0, stepY) });
+        sprites.push({
+          el,
+          y0: motion.y0,
+          duration: refillTravelDurationMs(motion.y0, stepY),
+          delay: REFILL_ANTICIPATION_MS + motion.col * REFILL_COL_STAGGER_MS,
+        });
       }
 
-      if (sprites.length === 0 && attempt < REFILL_LAYOUT_RETRIES) {
+      if ((motions.length > 0 && sprites.length === 0 && attempt < REFILL_LAYOUT_RETRIES) || stepY < 0.5) {
         retryTimer = window.requestAnimationFrame(() => startBurst(attempt + 1));
         return;
       }
 
-      if (offsets.size === 0 || sprites.length === 0) {
+      if (motions.length === 0 || sprites.length === 0) {
         lastBurstKeyRef.current = burst.key;
         setActiveBoth(false);
         return;
       }
 
+      // Mark consumed only when we actually start — avoids StrictMode skip.
       lastBurstKeyRef.current = burst.key;
       setActiveBoth(true);
 
@@ -136,8 +142,8 @@ export function useBoardGravityRefill({
         sprite.el.style.transform = `translate3d(0, ${sprite.y0}px, 0)`;
         const keyframes = buildRefillKeyframes(sprite.y0, sprite.duration);
         const anim = sprite.el.animate(keyframes, {
-          duration: sprite.duration,
-          delay: REFILL_ANTICIPATION_MS,
+          duration: Math.max(sprite.duration, 1),
+          delay: sprite.delay,
           fill: 'forwards',
           easing: 'linear',
         });
@@ -145,9 +151,7 @@ export function useBoardGravityRefill({
       }
 
       void Promise.all(
-        runningAnimsRef.current.map((anim) =>
-          anim.finished.catch(() => undefined),
-        ),
+        runningAnimsRef.current.map((anim) => anim.finished.catch(() => undefined)),
       ).then(() => {
         if (lastBurstKeyRef.current !== runKey) return;
         resetSprites();
@@ -161,6 +165,10 @@ export function useBoardGravityRefill({
     return () => {
       cancelled = true;
       if (retryTimer !== null) window.cancelAnimationFrame(retryTimer);
+      // If we never started this burst, allow a remount/retry to pick it up.
+      if (lastBurstKeyRef.current !== burst.key) {
+        cancelRunning();
+      }
     };
   }, [boardRef, burst, enabled]);
 

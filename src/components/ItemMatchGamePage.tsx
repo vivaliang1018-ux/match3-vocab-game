@@ -1,15 +1,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { X, Sparkles } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { syncStatusBarForTab } from '../lib/capacitorInit';
 import { useAuth } from '../auth/AuthProvider';
 import {
   hydrateMatch3Memories,
-  isDue,
+  compareWordsForSpacedReview,
+  masteredEmojiCount,
   memoryKeyForWord,
   memoryScopeForUserId,
   recordWordExposure,
+  recordWordRecallFailure,
+  recordWordRecallSuccess,
   type WordMemory,
 } from '../lib/ebbinghausMemory';
 import { hydrateMatch3MemoriesWithCloud, persistWordMemories } from '../lib/memoryCloudSync';
@@ -19,19 +20,12 @@ import { GamePanel } from './mobile/GamePanel';
 import { MobileTabBar } from './mobile/MobileTabBar';
 import { LearnedPanel } from './mobile/LearnedPanel';
 import { ProfilePanel } from './mobile/ProfilePanel';
-import {
-  applyScoreDelta,
-  FUN_COUNTDOWN_SEC,
-  SCORE_EXTRA_MATCH_BONUS,
-  SCORE_FUN_CORRECT,
-  SCORE_FUN_WRONG,
-  SCORE_MATCH3_PER_CLEAR,
-} from '../lib/scoring';
-import type { ScorePop } from './mobile/ScoreHud';
+import { TIMED_TARGET_COUNTDOWN_SEC } from '../lib/scoring';
 import {
   playRecordedWordAndWait,
   registerWordSpeechBgmController,
   speak,
+  speakWordAuto,
   stopAllWordSpeech,
   unlockSpeechSynthesis,
   computeDuckedBgmVolume,
@@ -45,6 +39,19 @@ import {
   unlockGameAudio,
 } from '../lib/gameSfx';
 import {
+  loadHapticsEnabled,
+  saveHapticsEnabled,
+  triggerGameHaptic,
+} from '../lib/gameHaptics';
+import {
+  MOOD_BOARD_CATEGORY_ID,
+  moodBoardItems,
+  moodPaletteForDay,
+  moodPaletteSwatch,
+  nextMoodPalette,
+  type MoodPaletteId,
+} from '../lib/moodBoard';
+import {
   DEFAULT_BGM_VOLUME,
   getBgmUrl,
   loadBgmEnabled,
@@ -52,26 +59,195 @@ import {
 } from '../lib/bgmPresets';
 import { CelebrationBurst } from './mobile/CelebrationBurst';
 import { RoundQuizSheet } from './mobile/RoundQuizSheet';
+import { SayBlastGame } from './mobile/SayBlastGame';
+import { ReviewContinueSheet } from './mobile/ReviewContinueSheet';
+import { AdventureFailSheet } from './mobile/AdventureFailSheet';
+import { DeadMachineSheet } from './mobile/DeadMachineSheet';
+import { LegalConsentModal } from './mobile/LegalConsentModal';
 import { categoryDisplayName, useI18n } from '../i18n';
-import { tabForOnboardingTarget, type AppTab, type OnboardingTarget } from './mobile/types';
+import type { AppTab } from './mobile/types';
 import { WordsPanel } from './mobile/WordsPanel';
 import {
-  ensureFunTargetPlayable,
+  analyzeOpeningBoard,
+  boostScarceUnfinishedWords,
+  createBalancedOpeningGrid,
+  ensureTimedTargetPlayable,
   findBestHintMove,
+  hasSwapMatchForItem,
   pickSmartRefillItemId,
-  seedNearFourMatchOpportunities,
 } from '../lib/gridMatch';
 import {
   loadRoundLearnedIds,
   markRoundLearnedItems,
+  roundLearnedItemIds,
 } from '../lib/roundLearned';
-import type { Cell, ChallengeMode, Tile, WordItem } from '../types/game';
+import type { CelebrationCard } from '../i18n/types';
+import { pickRandom } from '../lib/pickRandom';
+import {
+  ADVENTURE_WORDS_PER_SET,
+  HITS_PER_WORD_DEFAULT,
+  HITS_PER_WORD_REVIEW,
+  LATE_BOARD_ASSIST_MOVES,
+  MATCH_CLEAR_BONUS_MOVES,
+  RESCUE_CONTINUE_MOVES,
+  REVIVE_HITS_PER_WORD,
+  REVIVE_WRONG_LIMIT,
+  adventureTotalSets,
+  hitsNeededForMode,
+  movesForAdventureLevel,
+  reviveCorrectNeeded,
+  shouldForceReviewAfterClear,
+} from '../lib/adventureRules';
+import {
+  grantOrBankStamina,
+  loadStaminaState,
+  saveStaminaState,
+  spendStamina,
+  tickStamina,
+  type StaminaState,
+} from '../lib/stamina';
+import {
+  isCategoryUnlocked,
+  isReviewUnlocked,
+  loadModeUnlocks,
+  saveModeUnlocks,
+  type ModeUnlockState,
+} from '../lib/modeUnlocks';
+import {
+  loadPlayerSummary,
+  recordAdventureClear,
+  recordAdventureFail,
+  recordLearningActivity,
+  savePlayerSummary,
+  type PlayerSummary,
+} from '../lib/playerSummary';
+import {
+  loadAdventureSetHistory,
+  pickForcedReviewItems,
+  pushAdventureClearedSet,
+  type AdventureSetHistory,
+} from '../lib/adventureSetHistory';
+import type { Cell, ChallengeMode, QuizKind, Tile, WordItem } from '../types/game';
 import type { RefillBurst } from '../lib/boardRefill';
+import { allBoardCellKeys } from '../lib/boardRefill';
+import {
+  loadFirstTimeGuideState,
+  recordFeatureGuidePrompt,
+  saveFirstTimeGuideState,
+  type FeatureGuideTarget,
+  type FirstTimeGuideState,
+} from '../lib/firstTimeGuide';
+
+type AdventureBoardSnapshot = {
+  version: 1;
+  userId: string;
+  roundId: string;
+  savedAt: number;
+  grid: Tile[][];
+  gameItems: WordItem[];
+  itemHitCount: Record<string, number>;
+  movesLeft: number;
+  level: number;
+  adventurePlayable: boolean;
+  staminaOwed: boolean;
+  roundFree: boolean;
+  rescueUsed: boolean;
+  attemptLost: boolean;
+};
 
 const GRID = 7;
-const SCORE_POP_MS = 1050;
-const MATCH_CLEAR_MS = 500;
-const LINE_CLEAR_MS = 620;
+const ADVENTURE_SNAPSHOT_VERSION = 1;
+const ADVENTURE_SNAPSHOT_KEY_PREFIX = 'matchingo-adventure-board-v1:';
+
+function normalizedSnapshotUserId(userId: string | null | undefined): string {
+  return userId || 'guest';
+}
+
+function adventureSnapshotStorageKey(userId: string | null | undefined): string {
+  return `${ADVENTURE_SNAPSHOT_KEY_PREFIX}${normalizedSnapshotUserId(userId)}`;
+}
+
+function loadAdventureBoardSnapshot(
+  userId: string | null | undefined,
+): AdventureBoardSnapshot | null {
+  try {
+    const raw = localStorage.getItem(adventureSnapshotStorageKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AdventureBoardSnapshot>;
+    if (
+      parsed.version !== ADVENTURE_SNAPSHOT_VERSION ||
+      parsed.userId !== normalizedSnapshotUserId(userId) ||
+      typeof parsed.roundId !== 'string' ||
+      !Array.isArray(parsed.grid) ||
+      !Array.isArray(parsed.gameItems)
+    ) {
+      return null;
+    }
+    return parsed as AdventureBoardSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function saveAdventureBoardSnapshot(snapshot: AdventureBoardSnapshot): void {
+  try {
+    localStorage.setItem(
+      adventureSnapshotStorageKey(snapshot.userId),
+      JSON.stringify(snapshot),
+    );
+  } catch {
+    // An in-memory snapshot still preserves mode switching for this session.
+  }
+}
+
+function removeAdventureBoardSnapshot(userId: string | null | undefined): void {
+  try {
+    localStorage.removeItem(adventureSnapshotStorageKey(userId));
+  } catch {
+    // Optional crash recovery only.
+  }
+}
+
+function validAdventureBoardSnapshot(
+  snapshot: AdventureBoardSnapshot,
+  userId: string | null | undefined,
+  allItems: readonly WordItem[],
+  learnedIds: ReadonlySet<string>,
+): boolean {
+  if (
+    snapshot.version !== ADVENTURE_SNAPSHOT_VERSION ||
+    snapshot.userId !== normalizedSnapshotUserId(userId) ||
+    snapshot.gameItems.length < ADVENTURE_WORDS_PER_SET ||
+    snapshot.grid.length !== GRID ||
+    snapshot.grid.some((row) => row.length !== GRID)
+  ) {
+    return false;
+  }
+  const knownIds = new Set(allItems.map((item) => item.id));
+  const boardItemIds = new Set(snapshot.gameItems.map((item) => item.id));
+  if (
+    snapshot.gameItems.some(
+      (item) => !knownIds.has(item.id) || learnedIds.has(item.id),
+    )
+  ) {
+    return false;
+  }
+  return snapshot.grid.every((row) =>
+    row.every((tile) => boardItemIds.has(tile.itemId)),
+  );
+}
+/**
+ * Clear FX → gravity handoff.
+ * Start the fall as soon as the flip/sweep is past the readable midpoint
+ * so the board doesn’t idle under the word popup.
+ */
+/**
+ * Start 补棋 as soon as the flip/sweep is past the readable midpoint
+ * (emoji already gone) — don't wait for the whole clear anim to idle.
+ */
+const MATCH_CLEAR_MS = 320;
+const LINE_CLEAR_MS = 240;
+const MAX_CASCADE_WAVES = 8;
 
 function randInt(max: number) {
   return Math.floor(Math.random() * max);
@@ -94,7 +270,7 @@ function pickGameItems(pool: WordItem[], count: number) {
 type PickChallengeOptions = {
   excludeIds?: Set<string>;
   /**
-   * `memory`：复习模式，按艾宾浩斯到期/下次复习时间优先（原逻辑）。
+   * `memory`：复习模式 — 逾期/到期优先，再按下次复习时间、最久未复习（间隔复习）。
    * `random`：随机/分类模式，在词池内洗牌后取前 N，避免总是同一批「记忆排序靠前」的词。
    */
   strategy?: 'memory' | 'random';
@@ -122,14 +298,12 @@ function pickChallengeItems(
   }
   const now = Date.now();
   items.sort((a, b) => {
-    const aMem = memory?.get(memoryKeyForWord(a.word));
-    const bMem = memory?.get(memoryKeyForWord(b.word));
-    const aDue = aMem ? isDue(aMem, now) : false;
-    const bDue = bMem ? isDue(bMem, now) : false;
-    if (aDue !== bDue) return (bDue ? 1 : 0) - (aDue ? 1 : 0);
-    const aNext = aMem?.nextReviewAt ?? Number.MAX_SAFE_INTEGER;
-    const bNext = bMem?.nextReviewAt ?? Number.MAX_SAFE_INTEGER;
-    if (aNext !== bNext) return aNext - bNext;
+    const cmp = compareWordsForSpacedReview(
+      memory?.get(memoryKeyForWord(a.word)),
+      memory?.get(memoryKeyForWord(b.word)),
+      now,
+    );
+    if (cmp !== 0) return cmp;
     const hitDiff = (hitCount[a.id] ?? 0) - (hitCount[b.id] ?? 0);
     if (hitDiff !== 0) return hitDiff;
     return Math.random() - 0.5;
@@ -137,36 +311,40 @@ function pickChallengeItems(
   return items.slice(0, Math.min(count, items.length));
 }
 
-function makeGrid(itemIds: string[]): Tile[][] {
-  if (itemIds.length === 0) {
-    return Array.from({ length: GRID }, () =>
-      Array.from({ length: GRID }, () => ({ id: makeTileId(), itemId: '' })),
-    );
-  }
-  const grid: Tile[][] = Array.from({ length: GRID }, () =>
-    Array.from({ length: GRID }, () => ({ id: makeTileId(), itemId: itemIds[randInt(itemIds.length)] })),
+/** Adventure is a strict unseen-only pool. Learned words never fill a set. */
+function pickAdventureItems(
+  pool: WordItem[],
+  count: number,
+  learnedIds: ReadonlySet<string>,
+  excludeIds?: ReadonlySet<string>,
+): WordItem[] {
+  const unseen = pool.filter((item) => !learnedIds.has(item.id));
+
+  const preferNotExcluded = (items: WordItem[]) => {
+    if (!excludeIds || excludeIds.size === 0) return pickGameItems(items, items.length);
+    return [
+      ...pickGameItems(
+        items.filter((item) => !excludeIds.has(item.id)),
+        items.length,
+      ),
+      ...pickGameItems(
+        items.filter((item) => excludeIds.has(item.id)),
+        items.length,
+      ),
+    ];
+  };
+
+  return preferNotExcluded(unseen).slice(0, Math.min(count, unseen.length));
+}
+
+function makeGrid(itemIds: string[], preferredOpportunityId?: string): Tile[][] {
+  return createBalancedOpeningGrid(
+    itemIds,
+    makeTileId,
+    preferredOpportunityId
+      ? { preferredOpportunityIds: [preferredOpportunityId] }
+      : undefined,
   );
-  // avoid obvious starting matches (best-effort)
-  for (let r = 0; r < GRID; r++) {
-    for (let c = 0; c < GRID; c++) {
-      const left1 = c - 1 >= 0 ? grid[r][c - 1]?.itemId : null;
-      const left2 = c - 2 >= 0 ? grid[r][c - 2]?.itemId : null;
-      const up1 = r - 1 >= 0 ? grid[r - 1][c]?.itemId : null;
-      const up2 = r - 2 >= 0 ? grid[r - 2][c]?.itemId : null;
-      let itemId = grid[r][c].itemId;
-      let guard = 0;
-      while (
-        guard < 12 &&
-        ((left1 && left2 && itemId === left1 && itemId === left2) || (up1 && up2 && itemId === up1 && itemId === up2))
-      ) {
-        itemId = itemIds[randInt(itemIds.length)];
-        guard++;
-      }
-      grid[r][c] = { ...grid[r][c], itemId };
-    }
-  }
-  seedNearFourMatchOpportunities(grid, itemIds, 5);
-  return grid;
 }
 
 type Match = {
@@ -223,25 +401,6 @@ function findMatches(grid: Tile[][]): Match[] {
     grouped.set(k, arr);
   }
   return [...grouped.entries()].map(([itemId, cells]) => ({ itemId, cells }));
-}
-
-function pickItemIdForCell(grid: Tile[][], r: number, c: number, itemIds: string[]): string {
-  if (itemIds.length === 0) return '';
-  let itemId = itemIds[randInt(itemIds.length)];
-  let guard = 0;
-  while (guard < 12) {
-    const left1 = c - 1 >= 0 ? grid[r][c - 1]?.itemId : null;
-    const left2 = c - 2 >= 0 ? grid[r][c - 2]?.itemId : null;
-    const up1 = r - 1 >= 0 ? grid[r - 1][c]?.itemId : null;
-    const up2 = r - 2 >= 0 ? grid[r - 2][c]?.itemId : null;
-    const triple =
-      (left1 && left2 && itemId === left1 && itemId === left2) ||
-      (up1 && up2 && itemId === up1 && itemId === up2);
-    if (!triple) break;
-    itemId = itemIds[randInt(itemIds.length)];
-    guard++;
-  }
-  return itemId;
 }
 
 type LineRun = {
@@ -366,29 +525,6 @@ function findLineClearRuns(grid: Tile[][]): LineRun[] {
   return [...byKey.values()];
 }
 
-function applyLineBonuses(grid: Tile[][], runs: LineRun[], itemIds: string[]): Tile[][] {
-  if (runs.length === 0 || itemIds.length === 0) return grid;
-  const next = grid.map((row) => row.map((t) => ({ ...t })));
-  const refreshRows = new Set<number>();
-  const refreshCols = new Set<number>();
-  for (const run of runs) {
-    if (run.orientation === 'row') refreshRows.add(run.index);
-    else refreshCols.add(run.index);
-  }
-  for (const r of refreshRows) {
-    for (let c = 0; c < GRID; c++) {
-      next[r][c] = { id: makeTileId(), itemId: pickItemIdForCell(next, r, c, itemIds) };
-    }
-  }
-  for (const c of refreshCols) {
-    for (let r = 0; r < GRID; r++) {
-      if (refreshRows.has(r)) continue;
-      next[r][c] = { id: makeTileId(), itemId: pickItemIdForCell(next, r, c, itemIds) };
-    }
-  }
-  return next;
-}
-
 function clearCellsForLongRuns(runs: LineRun[]): Cell[] {
   const out = new Map<string, Cell>();
   for (const run of runs) {
@@ -414,23 +550,49 @@ function swap(grid: Tile[][], a: { r: number; c: number }, b: { r: number; c: nu
   return next;
 }
 
+function sameCell(left: Cell, right: Cell): boolean {
+  return left.r === right.r && left.c === right.c;
+}
+
+function sameCellPair(
+  from: Cell,
+  to: Cell,
+  pair: { source: Cell; target: Cell },
+): boolean {
+  return (
+    (sameCell(from, pair.source) && sameCell(to, pair.target)) ||
+    (sameCell(from, pair.target) && sameCell(to, pair.source))
+  );
+}
+
 function findHintMove(grid: Tile[][]): { a: Cell; b: Cell } | null {
   return findBestHintMove(grid);
 }
 
-function applyMatches(grid: Tile[][], matches: Match[], itemIds: string[]): { grid: Tile[][]; cleared: number } {
-  const toClear = new Set<string>();
-  for (const m of matches) for (const cell of m.cells) toClear.add(`${cell.r}:${cell.c}`);
+/**
+ * Null cleared cells, pack survivors down each column, spawn new tiles at the top.
+ * Same gravity model for normal 3-matches and full row/col line clears.
+ */
+function collapseAndRefill(
+  grid: Tile[][],
+  clearedKeys: Iterable<string>,
+  itemIds: string[],
+  preferItemIds?: readonly string[],
+): { grid: Tile[][]; cleared: number } {
+  const toClear = new Set(clearedKeys);
+  if (toClear.size === 0) return { grid, cleared: 0 };
+
   const next: (Tile | null)[][] = grid.map((row) => row.map((t) => t));
   for (const key of toClear) {
     const [rs, cs] = key.split(':');
     const r = Number(rs);
     const c = Number(cs);
-    next[r][c] = null;
+    if (Number.isFinite(r) && Number.isFinite(c)) next[r][c] = null;
   }
 
-  // drop + refill
-  const out: Tile[][] = Array.from({ length: GRID }, () => Array.from({ length: GRID }, () => ({ id: '', itemId: '' })));
+  const out: Tile[][] = Array.from({ length: GRID }, () =>
+    Array.from({ length: GRID }, () => ({ id: '', itemId: '' })),
+  );
   for (let c = 0; c < GRID; c++) {
     const col: Tile[] = [];
     for (let r = GRID - 1; r >= 0; r--) {
@@ -442,40 +604,77 @@ function applyMatches(grid: Tile[][], matches: Match[], itemIds: string[]): { gr
       const existing = col[idxFromBottom];
       out[r][c] = existing
         ? existing
-        : { id: makeTileId(), itemId: pickSmartRefillItemId(out, r, c, itemIds) };
+        : {
+            id: makeTileId(),
+            itemId: pickSmartRefillItemId(out, r, c, itemIds, preferItemIds),
+          };
     }
   }
 
   return { grid: out, cleared: toClear.size };
 }
 
-const ONBOARDING_SEEN_KEY = 'smellycat-match3-onboarding-seen';
-
-const ONBOARDING_TARGETS: OnboardingTarget[] = [
-  'grid',
-  'modesButtons',
-  'profile',
-  'learned',
-  'emojiIndex',
-];
+const CONSENT_ACCEPTED_KEY = 'smellycat-match3-legal-consent';
 
 function prepareBoardGrid(itemIds: string[], funTargetId?: string): Tile[][] {
-  let grid = makeGrid(itemIds);
-  // Remake if seeding left any 3+ run (best-effort makeGrid can still fail with few types).
-  for (let attempt = 0; attempt < 8 && findMatches(grid).length > 0; attempt++) {
-    grid = makeGrid(itemIds);
+  let grid = makeGrid(itemIds, funTargetId);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const analysis = analyzeOpeningBoard(grid, itemIds);
+    const balanced =
+      itemIds.length !== 6 ||
+      (analysis.minCount >= 6 && analysis.maxCount <= 10 && analysis.maxCount - analysis.minCount <= 4);
+    const targetPlayable = !funTargetId || hasSwapMatchForItem(grid, funTargetId);
+    if (
+      !analysis.hasAutoMatch &&
+      analysis.legalMoveCount > 0 &&
+      analysis.longMoveCount > 0 &&
+      balanced &&
+      targetPlayable
+    ) {
+      return grid;
+    }
+    grid = makeGrid(itemIds, funTargetId);
   }
-  if (funTargetId) ensureFunTargetPlayable(grid, funTargetId, itemIds);
+
+  // The balanced generator already plants the timed target when supplied.
+  // Keep the previous repair only as an unreachable safety net.
+  if (funTargetId) {
+    ensureTimedTargetPlayable(grid, funTargetId, itemIds);
+    if (findMatches(grid).length > 0) {
+      grid = makeGrid(itemIds, funTargetId);
+      ensureTimedTargetPlayable(grid, funTargetId, itemIds);
+    }
+  } else if (!findBestHintMove(grid) && itemIds[0]) {
+    ensureTimedTargetPlayable(grid, itemIds[0], itemIds);
+  }
   return grid;
 }
 
-function pickFunTargetId(
+function pickTimedTargetId(
   items: WordItem[],
   hitCount: Record<string, number>,
   excludeId?: string,
+  /** Revive ignores board hit caps — it has its own correct/wrong counters. */
+  ignoreHitCap = false,
+  /** During revive: prefer words with fewer than hitsPerWord correct target hits. */
+  reviveHits?: Record<string, number>,
+  hitsPerWord = 2,
+  /** Shelf progress needed before a word is "done" (review = 2, else 3). */
+  shelfHitsNeeded = HITS_PER_WORD_DEFAULT,
 ): string {
   if (items.length === 0) return '';
-  let pool = items.filter((it) => (hitCount[it.id] ?? 0) < 3);
+  let pool: WordItem[];
+  if (reviveHits) {
+    pool = items.filter((it) => (reviveHits[it.id] ?? 0) < hitsPerWord);
+    // All revive targets done — caller should end revive; don't keep hunting.
+    if (pool.length === 0) return '';
+  } else if (ignoreHitCap) {
+    pool = [...items];
+  } else {
+    pool = items.filter((it) => (hitCount[it.id] ?? 0) < shelfHitsNeeded);
+    // Shelf complete — no more timed targets (avoids infinite review loop).
+    if (pool.length === 0) return '';
+  }
   if (excludeId && pool.length > 1) {
     const narrowed = pool.filter((it) => it.id !== excludeId);
     if (narrowed.length > 0) pool = narrowed;
@@ -484,38 +683,66 @@ function pickFunTargetId(
   return pool[randInt(pool.length)].id;
 }
 
+function shelfRoundComplete(
+  items: WordItem[],
+  hitCount: Record<string, number>,
+  hitsNeeded: number,
+): boolean {
+  return (
+    items.length > 0 && items.every((it) => (hitCount[it.id] ?? 0) >= hitsNeeded)
+  );
+}
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function readOnboardingSeen(): boolean {
+function readConsentAccepted(): boolean {
   try {
-    return localStorage.getItem(ONBOARDING_SEEN_KEY) === '1';
+    return localStorage.getItem(CONSENT_ACCEPTED_KEY) === '1';
   } catch {
     return false;
   }
 }
 
-function writeOnboardingSeen() {
+function writeConsentAccepted() {
   try {
-    localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+    localStorage.setItem(CONSENT_ACCEPTED_KEY, '1');
   } catch {
     // ignore
   }
 }
 
-type SpotlightRect = { x: number; y: number; w: number; h: number };
-
-function safeRect(el: HTMLElement | null): SpotlightRect | null {
-  if (!el) return null;
-  const r = el.getBoundingClientRect();
-  if (!Number.isFinite(r.left) || !Number.isFinite(r.top) || r.width <= 0 || r.height <= 0) return null;
-  return { x: r.left, y: r.top, w: r.width, h: r.height };
-}
-
 export const ItemMatchGamePage: React.FC = () => {
   const { locale, t } = useI18n();
   const { user } = useAuth();
+  const progressUserId = user?.uid ?? null;
+  const progressUserIdRef = useRef<string | null>(progressUserId);
+  progressUserIdRef.current = progressUserId;
+  const [firstTimeGuide, setFirstTimeGuide] = useState<FirstTimeGuideState>(() =>
+    loadFirstTimeGuideState(progressUserId),
+  );
+  const firstTimeGuideRef = useRef(firstTimeGuide);
+  firstTimeGuideRef.current = firstTimeGuide;
+
+  const updateFirstTimeGuide = React.useCallback(
+    (update: (current: FirstTimeGuideState) => FirstTimeGuideState) => {
+      setFirstTimeGuide((current) => {
+        const next = update(current);
+        if (next === current) return current;
+        firstTimeGuideRef.current = next;
+        saveFirstTimeGuideState(next, progressUserIdRef.current);
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const next = loadFirstTimeGuideState(progressUserId);
+    firstTimeGuideRef.current = next;
+    setFirstTimeGuide(next);
+  }, [progressUserId]);
   const allPool = useMemo<WordItem[]>(() => {
     const emojiItems: WordItem[] = EMOJI_NOUN_CATEGORIES.flatMap((cat) =>
       cat.items.map((it) => ({
@@ -548,6 +775,18 @@ export const ItemMatchGamePage: React.FC = () => {
       })),
     [],
   );
+  const [moodPaletteId, setMoodPaletteId] = useState<MoodPaletteId>(() =>
+    moodPaletteForDay(),
+  );
+  const moodBoardPool = useMemo(
+    () => ({
+      id: MOOD_BOARD_CATEGORY_ID,
+      label: `${moodPaletteSwatch(moodPaletteId)} ${t.modes.moodBoard} · ${t.modes.moodPaletteName(moodPaletteId)}`,
+      subtitle: `${moodPaletteSwatch(moodPaletteId)} ${t.modes.moodBoard} · ${t.modes.moodPaletteName(moodPaletteId)}`,
+      items: moodBoardItems(allPool, moodPaletteId),
+    }),
+    [allPool, moodPaletteId, t],
+  );
   const thiingsPool = useMemo(
     () =>
       THIINGS_100.length
@@ -564,9 +803,14 @@ export const ItemMatchGamePage: React.FC = () => {
         : null,
     [],
   );
-  const challengePools = useMemo(() => (thiingsPool ? [...categoryPools, thiingsPool] : categoryPools), [categoryPools, thiingsPool]);
+  const challengePools = useMemo(
+    () => (thiingsPool ? [...categoryPools, thiingsPool] : categoryPools),
+    [categoryPools, thiingsPool],
+  );
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>('random');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(challengePools[0]?.id ?? 'smileys-emotion');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
+    categoryPools[0]?.id ?? 'smileys-emotion',
+  );
   const activeCategory = useMemo(
     () => challengePools.find((c) => c.id === selectedCategoryId) ?? challengePools[0],
     [challengePools, selectedCategoryId],
@@ -576,7 +820,11 @@ export const ItemMatchGamePage: React.FC = () => {
   const [wordMemory, setWordMemory] = useState<Map<string, WordMemory>>(
     () => hydrateMatch3Memories(user?.uid ?? null).map,
   );
-  const [roundLearnedIds, setRoundLearnedIds] = useState<string[]>(() => loadRoundLearnedIds());
+  const [roundLearnedIds, setRoundLearnedIds] = useState<string[]>(() =>
+    loadRoundLearnedIds(progressUserId),
+  );
+  const roundLearnedIdsRef = useRef(roundLearnedIds);
+  roundLearnedIdsRef.current = roundLearnedIds;
   const wordMemoryRef = useRef<Map<string, WordMemory>>(wordMemory);
   wordMemoryRef.current = wordMemory;
 
@@ -599,36 +847,54 @@ export const ItemMatchGamePage: React.FC = () => {
     };
   }, [user?.uid]);
 
-  /** 曾在随机/分类模式中出现过（有记忆存档）的词，用于复习模式 */
-  const reviewPoolKey = useMemo(() => {
-    const ids: string[] = [];
-    for (const it of allPool) {
-      if (wordMemory.has(memoryKeyForWord(it.word))) ids.push(it.id);
-    }
-    return ids.sort().join('|');
-  }, [allPool, wordMemory]);
-
+  /** Only quiz-completed words shown in Learned are eligible for review. */
+  const learnedItemIds = useMemo(
+    () => roundLearnedItemIds(roundLearnedIds, allPool),
+    [allPool, roundLearnedIds],
+  );
+  const learnedItemIdSet = useMemo(() => new Set(learnedItemIds), [learnedItemIds]);
+  const adventurePool = useMemo(
+    () => allPool.filter((item) => !learnedItemIdSet.has(item.id)),
+    [allPool, learnedItemIdSet],
+  );
   const reviewPool = useMemo(
-    () => allPool.filter((it) => wordMemory.has(memoryKeyForWord(it.word))),
-    [allPool, reviewPoolKey],
+    () => allPool.filter((it) => learnedItemIdSet.has(it.id)),
+    [allPool, learnedItemIdSet],
+  );
+  const sayBlastPool = useMemo(
+    () => reviewPool.filter((item) => Boolean(item.emoji)),
+    [reviewPool],
+  );
+  const reviewPoolKey = useMemo(
+    () => learnedItemIds.slice().sort().join('|'),
+    [learnedItemIds],
   );
 
   const pool = useMemo(() => {
     if (challengeMode === 'review') return reviewPool;
+    if (challengeMode === 'mood') return moodBoardPool.items;
     if (challengeMode === 'category') return activeCategory?.items ?? [];
-    return allPool;
-  }, [challengeMode, reviewPool, activeCategory, allPool]);
+    return adventurePool;
+  }, [challengeMode, reviewPool, moodBoardPool, activeCategory, adventurePool]);
 
   const boardSetupKey = useMemo(() => {
-    if (challengeMode === 'review') return `review:${reviewPoolKey}`;
-    if (challengeMode === 'category') return `category:${selectedCategoryId}`;
-    if (challengeMode === 'fun') return 'fun';
-    return 'random';
-  }, [challengeMode, selectedCategoryId, reviewPoolKey]);
+    if (challengeMode === 'review') return `${progressUserId}:review:${reviewPoolKey}`;
+    if (challengeMode === 'mood')
+      return `${progressUserId}:mood:${moodPaletteId}`;
+    if (challengeMode === 'category')
+      return `${progressUserId}:category:${selectedCategoryId}`;
+    return `${progressUserId}:random`;
+  }, [
+    challengeMode,
+    selectedCategoryId,
+    moodPaletteId,
+    reviewPoolKey,
+    progressUserId,
+  ]);
 
   const [itemHitCount, setItemHitCount] = useState<Record<string, number>>({});
   const [gameItems, setGameItems] = useState<WordItem[]>(() =>
-    pickChallengeItems(pool, 6, {}, hydrateMatch3Memories(null).map, { strategy: 'random' }),
+    pickAdventureItems(pool, ADVENTURE_WORDS_PER_SET, learnedItemIdSet),
   );
   const itemById = useMemo(() => {
     const map = new Map<string, WordItem>();
@@ -639,33 +905,149 @@ export const ItemMatchGamePage: React.FC = () => {
   const itemIds = useMemo(() => gameItems.map((i) => i.id), [gameItems]);
   const [funTargetId, setFunTargetId] = useState('');
   const [funTargetKey, setFunTargetKey] = useState(0);
-  const [funCountdown, setFunCountdown] = useState(FUN_COUNTDOWN_SEC);
-  const funCountdownRef = useRef(FUN_COUNTDOWN_SEC);
-  const funTargetItem = useMemo(() => {
-    if (challengeMode !== 'fun' || !funTargetId) return null;
-    return itemById.get(funTargetId) ?? null;
-  }, [challengeMode, funTargetId, itemById]);
+  const [funCountdown, setFunCountdown] = useState(TIMED_TARGET_COUNTDOWN_SEC);
+  const funTimeoutLockRef = useRef(false);
+  const funCountdownRef = useRef(TIMED_TARGET_COUNTDOWN_SEC);
+  const [reviveActive, setReviveActive] = useState(false);
+  const reviveActiveRef = useRef(false);
+  reviveActiveRef.current = reviveActive;
+  const [reviveAttempt, setReviveAttempt] = useState(0);
+  const reviveAttemptRef = useRef(0);
+  const [reviveWrongs, setReviveWrongs] = useState(0);
+  const [reviveCorrects, setReviveCorrects] = useState(0);
+  const reviveWrongsRef = useRef(0);
+  const reviveCorrectsRef = useRef(0);
+  const [reviveWordHits, setReviveWordHits] = useState<Record<string, number>>({});
+  const reviveWordHitsRef = useRef<Record<string, number>>({});
+  /** After every 3 adventure clears, inject a mandatory review exam. */
+  const [forcedReviewActive, setForcedReviewActive] = useState(false);
+  const forcedReviewActiveRef = useRef(false);
+  forcedReviewActiveRef.current = forcedReviewActive;
+  /** Skip N boardSetupKey effect runs (seeded boards / mode handoffs). */
+  const suppressBoardSetupSkipsRef = useRef(0);
+  const [deadMachineOpen, setDeadMachineOpen] = useState(false);
+  const [reviewContinueOpen, setReviewContinueOpen] = useState(false);
+  const [reviewPaused, setReviewPaused] = useState(false);
+  const [staminaState, setStaminaState] = useState<StaminaState>(() => loadStaminaState());
+  const staminaStateRef = useRef(staminaState);
+  staminaStateRef.current = staminaState;
+  const [modeUnlocks, setModeUnlocks] = useState<ModeUnlockState>(() =>
+    loadModeUnlocks(progressUserId),
+  );
+  const adventureSetHistoryRef = useRef<AdventureSetHistory>(
+    loadAdventureSetHistory(progressUserId),
+  );
+  const [playerSummary, setPlayerSummary] = useState<PlayerSummary>(() => loadPlayerSummary());
+  const playerSummaryRef = useRef(playerSummary);
+  playerSummaryRef.current = playerSummary;
+  const [movesLeft, setMovesLeft] = useState(() => movesForAdventureLevel(1));
+  const movesLeftRef = useRef(movesLeft);
+  movesLeftRef.current = movesLeft;
+  /** Next adventure board start is free (for example, abandoning the final quiz). */
+  const adventureRoundFreeRef = useRef(false);
+  /** Charge 1 stamina on the first matching move of this adventure board. */
+  const adventureStaminaOwedRef = useRef(false);
+  const [adventurePlayable, setAdventurePlayable] = useState(true);
+  const adventureFailedAwaitingRetryRef = useRef(false);
+  const [failSheetOpen, setFailSheetOpen] = useState(false);
+  const [quizKind, setQuizKind] = useState<QuizKind>('connect');
+  const [unlockCelebrate, setUnlockCelebrate] = useState<'review' | 'category' | null>(null);
+  const [reviveFlash, setReviveFlash] = useState<'success' | 'retry' | 'outOfMoves' | null>(null);
 
-  const syncFunTarget = React.useCallback(
-    (items: WordItem[], hitCount: Record<string, number>, excludeId?: string): string => {
-      if (challengeMode !== 'fun') {
-        setFunTargetId('');
-        return '';
-      }
-      const id = pickFunTargetId(items, hitCount, excludeId);
-      setFunTargetId(id);
-      setFunTargetKey((k) => k + 1);
-      return id;
+  useEffect(() => {
+    const nextLearnedIds = loadRoundLearnedIds(progressUserId);
+    roundLearnedIdsRef.current = nextLearnedIds;
+    setRoundLearnedIds(nextLearnedIds);
+    setModeUnlocks(loadModeUnlocks(progressUserId));
+    adventureSetHistoryRef.current = loadAdventureSetHistory(progressUserId);
+    setForcedReviewActive(false);
+    forcedReviewActiveRef.current = false;
+    setReviewPaused(false);
+  }, [progressUserId]);
+
+  const funTargetItem = useMemo(() => {
+    const timedHunt = reviveActive || challengeMode === 'review';
+    if (!timedHunt) return null;
+    if (funTargetId) {
+      const found = itemById.get(funTargetId);
+      if (found) return found;
+    }
+    return gameItems[0] ?? null;
+  }, [reviveActive, challengeMode, funTargetId, itemById, gameItems]);
+
+  const challengeModeRef = useRef(challengeMode);
+  challengeModeRef.current = challengeMode;
+
+  const persistStamina = React.useCallback((next: StaminaState) => {
+    setStaminaState(next);
+    staminaStateRef.current = next;
+    saveStaminaState(next);
+  }, []);
+
+  const applySpendStamina = React.useCallback(
+    (amount = 1): boolean => {
+      const spent = spendStamina(staminaStateRef.current, amount);
+      if (!spent) return false;
+      persistStamina(spent);
+      return true;
     },
-    [challengeMode],
+    [persistStamina],
   );
 
-  const [grid, setGrid] = useState<Tile[][]>(() => makeGrid(itemIds));
+  const applyTimedTargetMiss = React.useCallback((targetId: string | undefined) => {
+    if (!targetId) return;
+    const item = itemById.get(targetId);
+    if (!item?.word) return;
+    setWordMemory((prev) => {
+      const next = new Map(prev);
+      recordWordRecallFailure(next, item.word, item.cn);
+      persistWordMemories(next, memoryScopeRef.current);
+      return next;
+    });
+  }, [itemById]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const next = tickStamina(staminaStateRef.current);
+      if (
+        next.value !== staminaStateRef.current.value ||
+        next.lastRegenAt !== staminaStateRef.current.lastRegenAt ||
+        next.dayKey !== staminaStateRef.current.dayKey
+      ) {
+        persistStamina(next);
+      }
+      if (next.value > 0 && adventureFailedAwaitingRetryRef.current) {
+        setAdventurePlayable(true);
+        setDeadMachineOpen(false);
+        setFailSheetOpen(true);
+      }
+    }, 15_000);
+    return () => window.clearInterval(id);
+  }, [persistStamina]);
+
+  useEffect(() => {
+    if (challengeMode === 'review' && !isReviewUnlocked(modeUnlocks.adventureClears)) {
+      setChallengeMode('random');
+    } else if (
+      challengeMode === 'category' &&
+      !isCategoryUnlocked(modeUnlocks.adventureClears)
+    ) {
+      setChallengeMode('random');
+    }
+  }, [challengeMode, modeUnlocks.adventureClears]);
+
+  const [grid, setGrid] = useState<Tile[][]>(() => prepareBoardGrid(itemIds));
   const [selected, setSelected] = useState<{ r: number; c: number } | null>(null);
-  const [score, setScore] = useState(0);
-  const [scorePops, setScorePops] = useState<ScorePop[]>([]);
-  const scorePopIdRef = useRef(0);
   const [level, setLevel] = useState(1);
+  const [firstSwapTutorialMove, setFirstSwapTutorialMove] = useState<{
+    source: Cell;
+    target: Cell;
+  } | null>(null);
+  const firstSwapTutorialMoveRef = useRef(firstSwapTutorialMove);
+  firstSwapTutorialMoveRef.current = firstSwapTutorialMove;
+  const [firstSwapTutorialResolving, setFirstSwapTutorialResolving] =
+    useState(false);
+  const firstSwapTutorialResolvingRef = useRef(false);
   const [popWord, setPopWord] = useState<{
     word: string;
     cn?: string;
@@ -676,6 +1058,10 @@ export const ItemMatchGamePage: React.FC = () => {
   const [ttsAvailable, setTtsAvailable] = useState(true);
   const [bgmEnabled, setBgmEnabled] = useState<boolean>(() => loadBgmEnabled());
   const [sfxEnabled, setSfxEnabled] = useState<boolean>(() => loadSfxEnabled());
+  const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(() =>
+    loadHapticsEnabled(),
+  );
+  const [sayBlastOpen, setSayBlastOpen] = useState(false);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgmNeedsGestureRef = useRef(false);
   const bgmEnabledRef = useRef(bgmEnabled);
@@ -705,11 +1091,130 @@ export const ItemMatchGamePage: React.FC = () => {
   const pendingRoundRef = useRef<{ hitCount: Record<string, number>; excludeIds: Set<string> } | null>(
     null,
   );
+  const rescueUsedRef = useRef(false);
+  const adventureBoardSnapshotRef = useRef<AdventureBoardSnapshot | null>(null);
+  const snapshotRestoreInFlightRef = useRef(false);
+  const clearAdventureSnapshot = React.useCallback(() => {
+    adventureBoardSnapshotRef.current = null;
+    removeAdventureBoardSnapshot(progressUserIdRef.current);
+  }, []);
+
+  useEffect(() => {
+    snapshotRestoreInFlightRef.current = true;
+    const learned = new Set(roundLearnedIdsRef.current);
+    const saved = loadAdventureBoardSnapshot(progressUserId);
+    if (
+      !saved ||
+      !validAdventureBoardSnapshot(saved, progressUserId, allPool, learned)
+    ) {
+      adventureBoardSnapshotRef.current = null;
+      if (saved) removeAdventureBoardSnapshot(progressUserId);
+      snapshotRestoreInFlightRef.current = false;
+      return;
+    }
+
+    adventureBoardSnapshotRef.current = saved;
+    suppressBoardSetupSkipsRef.current = Math.max(
+      suppressBoardSetupSkipsRef.current,
+      1,
+    );
+    setChallengeMode('random');
+    setAdventurePlayable(saved.adventurePlayable);
+    adventureStaminaOwedRef.current = saved.staminaOwed;
+    adventureRoundFreeRef.current = saved.roundFree;
+    rescueUsedRef.current = saved.rescueUsed;
+    adventureAttemptLostRef.current = saved.attemptLost;
+    movesLeftRef.current = saved.movesLeft;
+    setMovesLeft(saved.movesLeft);
+    setLevel(saved.level);
+    setGameItems([...saved.gameItems]);
+    setItemHitCount({ ...saved.itemHitCount });
+    setGrid(saved.grid.map((row) => row.map((tile) => ({ ...tile }))));
+    setSelected(null);
+    setHintMove(null);
+    setWordLink(null);
+    setPopWord(null);
+    setBoardIntroActive(false);
+    const release = window.setTimeout(() => {
+      snapshotRestoreInFlightRef.current = false;
+    }, 0);
+    return () => window.clearTimeout(release);
+  }, [allPool, progressUserId]);
+  const rescueSnapshotRef = useRef<{
+    grid: Tile[][];
+    hitCount: Record<string, number>;
+  } | null>(null);
+  /** A failed Rescue breaks the Adventure Win Streak even if the +8 continuation clears. */
+  const adventureAttemptLostRef = useRef(false);
+  const rescueQuizPendingRef = useRef(false);
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizItems, setQuizItems] = useState<WordItem[]>([]);
   const quizItemsRef = useRef(quizItems);
   quizItemsRef.current = quizItems;
   const [roundCelebrate, setRoundCelebrate] = useState(false);
+  const [roundCelebrateCard, setRoundCelebrateCard] = useState<CelebrationCard | null>(null);
+
+  useEffect(() => {
+    if (snapshotRestoreInFlightRef.current || challengeMode !== 'random') return;
+    if (
+      quizOpen ||
+      roundCelebrate ||
+      roundSwitchPendingRef.current ||
+      !adventurePlayable ||
+      gameItems.length < ADVENTURE_WORDS_PER_SET
+    ) {
+      if (quizOpen || roundCelebrate || roundSwitchPendingRef.current) {
+        clearAdventureSnapshot();
+      }
+      return;
+    }
+    const learned = new Set(roundLearnedIdsRef.current);
+    if (gameItems.some((item) => learned.has(item.id))) {
+      clearAdventureSnapshot();
+      return;
+    }
+    const previous = adventureBoardSnapshotRef.current;
+    const previousItemKey = previous?.gameItems.map((item) => item.id).sort().join('|');
+    const currentItemKey = gameItems.map((item) => item.id).sort().join('|');
+    const snapshot: AdventureBoardSnapshot = {
+      version: ADVENTURE_SNAPSHOT_VERSION,
+      userId: normalizedSnapshotUserId(progressUserId),
+      roundId:
+        previous && previousItemKey === currentItemKey
+          ? previous.roundId
+          : `adventure-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      savedAt: Date.now(),
+      grid: grid.map((row) => row.map((tile) => ({ ...tile }))),
+      gameItems: [...gameItems],
+      itemHitCount: { ...itemHitCount },
+      movesLeft: movesLeftRef.current,
+      level,
+      adventurePlayable,
+      staminaOwed: adventureStaminaOwedRef.current,
+      roundFree: adventureRoundFreeRef.current,
+      rescueUsed: rescueUsedRef.current,
+      attemptLost: adventureAttemptLostRef.current,
+    };
+    adventureBoardSnapshotRef.current = snapshot;
+    saveAdventureBoardSnapshot(snapshot);
+  }, [
+    adventurePlayable,
+    challengeMode,
+    clearAdventureSnapshot,
+    gameItems,
+    grid,
+    itemHitCount,
+    level,
+    movesLeft,
+    progressUserId,
+    quizOpen,
+    roundCelebrate,
+  ]);
+
+  const openRoundCelebrate = React.useCallback(() => {
+    setRoundCelebrateCard(pickRandom(t.celebration.roundCelebrateCards));
+    setRoundCelebrate(true);
+  }, [t]);
   const [matchShakeKey, setMatchShakeKey] = useState(0);
   const [matchClearCells, setMatchClearCells] = useState<Cell[] | null>(null);
   const [matchClearKey, setMatchClearKey] = useState(0);
@@ -725,52 +1230,87 @@ export const ItemMatchGamePage: React.FC = () => {
   const [hintMove, setHintMove] = useState<{ a: Cell; b: Cell } | null>(null);
   const ttsUnlockRef = useRef(false);
 
-  /** 首次进入显示；关闭后写入 localStorage，仍可用「使用引导」再次打开 */
-  const [onboardingOpen, setOnboardingOpen] = useState(() => !readOnboardingSeen());
-  const [onboardingStep, setOnboardingStep] = useState(0);
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const modesButtonsRef = useRef<HTMLButtonElement | null>(null);
-  const profileAreaRef = useRef<HTMLDivElement | null>(null);
-  const learnedAreaRef = useRef<HTMLDivElement | null>(null);
-  const emojiIndexAreaRef = useRef<HTMLDivElement | null>(null);
-  const [spotRect, setSpotRect] = useState<SpotlightRect | null>(null);
+  /** 首次进入显示服务条款同意；接受后写入 localStorage */
+  const [consentOpen, setConsentOpen] = useState(() => !readConsentAccepted());
   const [activeTab, setActiveTab] = useState<AppTab>('game');
   const [boardIntroActive, setBoardIntroActive] = useState(true);
   const [refillBurst, setRefillBurst] = useState<RefillBurst | null>(null);
   const [refillActive, setRefillActive] = useState(false);
+  const refillActiveRef = useRef(false);
+  const refillDoneResolverRef = useRef<(() => void) | null>(null);
+  const cascadeRunningRef = useRef(false);
+  const [cascadeBusy, setCascadeBusy] = useState(false);
   const refillKeyRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tabScrollTopsRef = useRef<Partial<Record<AppTab, number>>>({});
   const isCandyTab = activeTab !== 'game';
+  const firstSwapTutorialEligible =
+    !consentOpen &&
+    !firstTimeGuide.hasCompletedFirstSwapTutorial &&
+    modeUnlocks.adventureClears === 0 &&
+    challengeMode === 'random' &&
+    level === 1 &&
+    adventurePlayable &&
+    gameItems.length >= ADVENTURE_WORDS_PER_SET;
+  const firstSwapTutorialPendingRef = useRef(firstSwapTutorialEligible);
+  firstSwapTutorialPendingRef.current = firstSwapTutorialEligible;
+
+  const completeFirstSwapTutorial = React.useCallback(() => {
+    updateFirstTimeGuide((current) =>
+      current.hasCompletedFirstSwapTutorial
+        ? current
+        : { ...current, hasCompletedFirstSwapTutorial: true },
+    );
+    firstSwapTutorialResolvingRef.current = false;
+    setFirstSwapTutorialResolving(false);
+    setFirstSwapTutorialMove(null);
+  }, [updateFirstTimeGuide]);
+
+  const recordGuidePlayback = React.useCallback(
+    (target: FeatureGuideTarget) => {
+      updateFirstTimeGuide((current) =>
+        recordFeatureGuidePrompt(current, target),
+      );
+    },
+    [updateFirstTimeGuide],
+  );
+
+  useEffect(() => {
+    if (!firstSwapTutorialEligible) {
+      setFirstSwapTutorialMove(null);
+      return;
+    }
+    if (firstSwapTutorialResolvingRef.current) return;
+    const move = findHintMove(grid);
+    setFirstSwapTutorialMove(
+      move ? { source: move.a, target: move.b } : null,
+    );
+    setHintMove(null);
+    if (hintTimerRef.current) {
+      window.clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+  }, [firstSwapTutorialEligible, grid]);
 
   useEffect(() => {
     void syncStatusBarForTab(activeTab);
   }, [activeTab]);
-
-  const changeScore = React.useCallback((delta: number) => {
-    if (delta === 0) return;
-    scorePopIdRef.current += 1;
-    const id = scorePopIdRef.current;
-    setScorePops((prev) => [...prev, { id, delta }]);
-    setScore((s) => (delta > 0 ? s + delta : applyScoreDelta(s, delta)));
-    window.setTimeout(() => {
-      setScorePops((prev) => prev.filter((p) => p.id !== id));
-    }, SCORE_POP_MS);
-  }, []);
-
-  const resetScore = React.useCallback(() => {
-    setScore(0);
-    setScorePops([]);
-  }, []);
 
   const handleTabChange = React.useCallback(
     (tab: AppTab) => {
       if (scrollContainerRef.current && activeTab !== 'game') {
         tabScrollTopsRef.current[activeTab] = scrollContainerRef.current.scrollTop;
       }
+      if (tab === 'learned') {
+        updateFirstTimeGuide((current) =>
+          current.stage === 'learned'
+            ? { ...current, stage: 'sayAndBlast' }
+            : current,
+        );
+      }
       setActiveTab(tab);
     },
-    [activeTab],
+    [activeTab, updateFirstTimeGuide],
   );
 
   useLayoutEffect(() => {
@@ -781,82 +1321,10 @@ export const ItemMatchGamePage: React.FC = () => {
     }
   }, [activeTab]);
 
-  const dismissOnboarding = React.useCallback(() => {
-    setOnboardingOpen(false);
-    writeOnboardingSeen();
+  const acceptConsent = React.useCallback(() => {
+    setConsentOpen(false);
+    writeConsentAccepted();
   }, []);
-
-  const openOnboarding = React.useCallback(() => {
-    setOnboardingStep(0);
-    setOnboardingOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (!onboardingOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismissOnboarding();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onboardingOpen, dismissOnboarding]);
-
-  useLayoutEffect(() => {
-    if (!onboardingOpen) return;
-    const stepTarget = ONBOARDING_TARGETS[onboardingStep];
-    if (!stepTarget) return;
-
-    const neededTab = tabForOnboardingTarget(stepTarget);
-    if (activeTab !== neededTab) {
-      setActiveTab(neededTab);
-      return;
-    }
-
-    const getEl = (): HTMLElement | null => {
-      if (stepTarget === 'grid') return gridRef.current;
-      if (stepTarget === 'modesButtons') return modesButtonsRef.current;
-      if (stepTarget === 'profile') return profileAreaRef.current;
-      if (stepTarget === 'learned') return learnedAreaRef.current;
-      if (stepTarget === 'emojiIndex') return emojiIndexAreaRef.current;
-      return null;
-    };
-
-    const getScroller = (): HTMLElement | null => {
-      if (stepTarget === 'modesButtons' || stepTarget === 'grid') return null;
-      return scrollContainerRef.current;
-    };
-
-    const el = getEl();
-    const scroller = getScroller();
-
-    const scrollToTarget = () => {
-      if (!el || !scroller) return;
-      const elRect = el.getBoundingClientRect();
-      const scRect = scroller.getBoundingClientRect();
-      const nextTop = scroller.scrollTop + (elRect.top - scRect.top) - 16;
-      scroller.scrollTop = Math.max(0, nextTop);
-    };
-
-    scrollToTarget();
-    requestAnimationFrame(scrollToTarget);
-
-    const update = () => setSpotRect(safeRect(getEl()));
-    update();
-    requestAnimationFrame(update);
-
-    const onResize = () => update();
-    window.addEventListener('resize', onResize);
-
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && el) {
-      ro = new ResizeObserver(onResize);
-      ro.observe(el);
-    }
-
-    return () => {
-      window.removeEventListener('resize', onResize);
-      if (ro) ro.disconnect();
-    };
-  }, [onboardingOpen, onboardingStep, activeTab]);
 
   const handleBgmEnabledChange = (enabled: boolean) => {
     setBgmEnabled(enabled);
@@ -867,15 +1335,85 @@ export const ItemMatchGamePage: React.FC = () => {
     saveSfxEnabled(enabled);
   };
 
+  const handleHapticsEnabledChange = (enabled: boolean) => {
+    setHapticsEnabled(enabled);
+    saveHapticsEnabled(enabled);
+  };
+
   const cancelPendingBoardWork = React.useCallback(() => {
     if (clearTimerRef.current) {
       window.clearTimeout(clearTimerRef.current);
       clearTimerRef.current = null;
     }
+    cascadeRunningRef.current = false;
+    setCascadeBusy(false);
+    if (refillDoneResolverRef.current) {
+      const resolve = refillDoneResolverRef.current;
+      refillDoneResolverRef.current = null;
+      resolve();
+    }
     setMatchClearCells(null);
     stopAllWordSpeech();
     popWordSeqRef.current += 1;
     setPopWord(null);
+  }, []);
+
+  const handleRefillActiveChange = React.useCallback((active: boolean) => {
+    const wasActive = refillActiveRef.current;
+    refillActiveRef.current = active;
+    setRefillActive(active);
+    // Resolve only on active → idle (gravity finished).
+    if (wasActive && !active && refillDoneResolverRef.current) {
+      const resolve = refillDoneResolverRef.current;
+      refillDoneResolverRef.current = null;
+      resolve();
+    }
+  }, []);
+
+  const waitForRefillDone = React.useCallback(() => {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      let sawActive = refillActiveRef.current;
+      let pollTimer: number | null = null;
+      const startedAt = Date.now();
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (pollTimer !== null) window.clearTimeout(pollTimer);
+        if (refillDoneResolverRef.current === finish) {
+          refillDoneResolverRef.current = null;
+        }
+        resolve();
+      };
+
+      refillDoneResolverRef.current = finish;
+
+      const poll = () => {
+        if (settled) return;
+        if (refillActiveRef.current) sawActive = true;
+        if (sawActive && !refillActiveRef.current) {
+          finish();
+          return;
+        }
+        const elapsed = Date.now() - startedAt;
+        // No falling sprites for this burst — don't stall the cascade.
+        if (!sawActive && elapsed > 220) {
+          finish();
+          return;
+        }
+        if (elapsed > 1000) {
+          finish();
+          return;
+        }
+        pollTimer = window.setTimeout(poll, 24);
+      };
+
+      // Let React commit + gravity useLayoutEffect arm first.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(poll);
+      });
+    });
   }, []);
 
   const bumpBoardEpoch = React.useCallback(() => {
@@ -895,131 +1433,1164 @@ export const ItemMatchGamePage: React.FC = () => {
     [],
   );
 
+  /** When no adjacent swap can match, reshuffle tiles (same word set). */
+  const reshuffleDeadlockedBoard = React.useCallback(
+    (current: Tile[][]): Tile[][] => {
+      if (itemIds.length < 2) return current;
+      const timedHunt =
+        reviveActiveRef.current || challengeModeRef.current === 'review';
+      const targetId = timedHunt ? funTargetId || undefined : undefined;
+
+      // Timed hunt: always keep a one-swap path for the current target.
+      if (targetId && !hasSwapMatchForItem(current, targetId)) {
+        const copy = current.map((row) => row.map((t) => ({ ...t })));
+        ensureTimedTargetPlayable(copy, targetId, itemIds);
+        if (hasSwapMatchForItem(copy, targetId) && findMatches(copy).length === 0) {
+          return copy;
+        }
+        const next = prepareBoardGrid(itemIds, targetId);
+        emitRefillBurst(current, next, allBoardCellKeys());
+        setSelected(null);
+        setHintMove(null);
+        return next;
+      }
+
+      if (findHintMove(current)) return current;
+      const next = prepareBoardGrid(itemIds, targetId);
+      emitRefillBurst(current, next, allBoardCellKeys());
+      setSelected(null);
+      setHintMove(null);
+      return next;
+    },
+    [itemIds, funTargetId, emitRefillBurst],
+  );
+
+  const clearReviveState = React.useCallback(() => {
+    setReviveActive(false);
+    reviveActiveRef.current = false;
+    setReviveAttempt(0);
+    reviveAttemptRef.current = 0;
+    setReviveWrongs(0);
+    setReviveCorrects(0);
+    reviveWrongsRef.current = 0;
+    reviveCorrectsRef.current = 0;
+    reviveWordHitsRef.current = {};
+    setReviveWordHits({});
+    if (challengeModeRef.current !== 'review') {
+      setFunTargetId('');
+    }
+  }, []);
+
+  const resetRescueLifecycle = React.useCallback(() => {
+    rescueUsedRef.current = false;
+    rescueSnapshotRef.current = null;
+    adventureAttemptLostRef.current = false;
+    rescueQuizPendingRef.current = false;
+    adventureFailedAwaitingRetryRef.current = false;
+  }, []);
+
+  /** Empty adventure board + dead-machine sheet; clears unpaid board charge. */
+  const lockAdventureDead = React.useCallback(() => {
+    adventureStaminaOwedRef.current = false;
+    adventureRoundFreeRef.current = false;
+    setAdventurePlayable(false);
+    setDeadMachineOpen(true);
+    setGameItems([]);
+    setGrid(makeGrid([]));
+    setItemHitCount({});
+    setSelected(null);
+    setHintMove(null);
+    setQuizOpen(false);
+    pendingRoundRef.current = null;
+    roundSwitchPendingRef.current = false;
+    setRoundCelebrate(false);
+    setFunTargetId('');
+    clearReviveState();
+    resetRescueLifecycle();
+  }, [clearReviveState, resetRescueLifecycle]);
+
+  /** Spend stamina on first move of an adventure board; false → dead-machined. */
+  const chargeAdventureStaminaIfNeeded = React.useCallback((): boolean => {
+    if (challengeModeRef.current !== 'random' || reviveActiveRef.current) return true;
+    if (!adventureStaminaOwedRef.current) return true;
+    if (!applySpendStamina(1)) {
+      lockAdventureDead();
+      return false;
+    }
+    adventureStaminaOwedRef.current = false;
+    return true;
+  }, [applySpendStamina, lockAdventureDead]);
+
+  /** Arm timed target hunt (revive challenge or review mode). */
+  const armTimedTarget = React.useCallback(
+    (
+      items: WordItem[],
+      hitCount: Record<string, number>,
+      excludeId?: string,
+      /** Revive ignores 3-hit caps; review prefers unfinished words. */
+      ignoreHitCap = false,
+    ) => {
+      const ids = items.map((it) => it.id);
+      const shelfHits = hitsNeededForMode(challengeModeRef.current);
+      const id =
+        pickTimedTargetId(
+          items,
+          hitCount,
+          excludeId,
+          ignoreHitCap,
+          ignoreHitCap ? reviveWordHitsRef.current : undefined,
+          REVIVE_HITS_PER_WORD,
+          shelfHits,
+        ) ||
+        items.find((it) => it.id !== excludeId)?.id ||
+        items[0]?.id ||
+        '';
+      funTimeoutLockRef.current = false;
+      funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+      setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+      setFunTargetId(id);
+      setFunTargetKey((k) => k + 1);
+      if (id) {
+        setGrid((prev) => {
+          const copy = prev.map((row) => row.map((t) => ({ ...t })));
+          ensureTimedTargetPlayable(copy, id, ids);
+          return reshuffleDeadlockedBoard(copy);
+        });
+      }
+      return id;
+    },
+    [reshuffleDeadlockedBoard],
+  );
+
+  const retryAdventureBoard = React.useCallback(
+    (items: WordItem[], free: boolean) => {
+      if (challengeMode === 'random') {
+        if (free) {
+          adventureStaminaOwedRef.current = false;
+        } else if (tickStamina(staminaStateRef.current).value <= 0) {
+          lockAdventureDead();
+          return false;
+        } else {
+          adventureStaminaOwedRef.current = true;
+        }
+        setAdventurePlayable(true);
+        setDeadMachineOpen(false);
+      }
+      adventureRoundFreeRef.current = false;
+      bumpBoardEpoch();
+      clearReviveState();
+      resetRescueLifecycle();
+      const nextHitCount: Record<string, number> = {};
+      setItemHitCount(nextHitCount);
+      setGameItems(items);
+      setSelected(null);
+      setPopWord(null);
+      setHintMove(null);
+      setWordLink(null);
+      setFailSheetOpen(false);
+      setRoundCelebrate(false);
+      roundSwitchPendingRef.current = false;
+      pendingRoundRef.current = null;
+      setQuizOpen(false);
+      if (challengeMode === 'random') {
+        const budget = movesForAdventureLevel(level);
+        movesLeftRef.current = budget;
+        setMovesLeft(budget);
+      }
+      setGrid(prepareBoardGrid(items.map((i) => i.id)));
+      setBoardIntroActive(true);
+      return true;
+    },
+    [
+      challengeMode,
+      bumpBoardEpoch,
+      clearReviveState,
+      resetRescueLifecycle,
+      lockAdventureDead,
+      level,
+    ],
+  );
+
+  const recordCurrentAdventureLoss = React.useCallback(() => {
+    adventureAttemptLostRef.current = true;
+    const unlocks = loadModeUnlocks(progressUserIdRef.current);
+    setPlayerSummary(
+      recordAdventureFail(playerSummaryRef.current, {
+        adventureClears: unlocks.adventureClears,
+        masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
+        reviewUnlocked: isReviewUnlocked(unlocks.adventureClears),
+        categoryUnlocked: isCategoryUnlocked(unlocks.adventureClears),
+      }),
+    );
+  }, [allPool]);
+
+  const endAdventureFailed = React.useCallback(() => {
+    clearReviveState();
+    adventureFailedAwaitingRetryRef.current = true;
+    const hasStamina = staminaStateRef.current.value > 0;
+    setAdventurePlayable(hasStamina);
+    if (hasStamina) {
+      setFailSheetOpen(true);
+      setDeadMachineOpen(false);
+    } else {
+      setFailSheetOpen(false);
+      setDeadMachineOpen(true);
+    }
+    recordCurrentAdventureLoss();
+  }, [clearReviveState, recordCurrentAdventureLoss]);
+
+  const failReviveAttempt = React.useCallback(() => {
+    const snapshot = rescueSnapshotRef.current;
+    bumpBoardEpoch();
+    clearReviveState();
+    recordCurrentAdventureLoss();
+    rescueSnapshotRef.current = null;
+    roundSwitchPendingRef.current = false;
+    setFailSheetOpen(false);
+    setDeadMachineOpen(false);
+    setAdventurePlayable(true);
+    setSelected(null);
+    setHintMove(null);
+    setWordLink(null);
+    setMatchClearCells(null);
+    if (snapshot) {
+      const restoredGrid = snapshot.grid.map((row) => row.map((tile) => ({ ...tile })));
+      setGrid(restoredGrid);
+      setItemHitCount({ ...snapshot.hitCount });
+    }
+    movesLeftRef.current = RESCUE_CONTINUE_MOVES;
+    setMovesLeft(RESCUE_CONTINUE_MOVES);
+    setReviveFlash('retry');
+  }, [
+    bumpBoardEpoch,
+    clearReviveState,
+    recordCurrentAdventureLoss,
+  ]);
+
+  const enterRevive = React.useCallback((
+    adventureGrid: Tile[][],
+    adventureHitCount: Record<string, number>,
+  ) => {
+    if (
+      challengeMode !== 'random' ||
+      reviveActiveRef.current ||
+      rescueUsedRef.current
+    ) {
+      return;
+    }
+    rescueUsedRef.current = true;
+    rescueSnapshotRef.current = {
+      grid: adventureGrid.map((row) => row.map((tile) => ({ ...tile }))),
+      hitCount: { ...adventureHitCount },
+    };
+    setReviveFlash('outOfMoves');
+    setReviveActive(true);
+    reviveActiveRef.current = true;
+    reviveAttemptRef.current = 1;
+    setReviveAttempt(1);
+    setReviveWrongs(0);
+    setReviveCorrects(0);
+    reviveWrongsRef.current = 0;
+    reviveCorrectsRef.current = 0;
+    reviveWordHitsRef.current = {};
+    setReviveWordHits({});
+    setHintMove(null);
+    if (hintTimerRef.current) {
+      window.clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+    armTimedTarget(gameItems, adventureHitCount, undefined, true);
+  }, [challengeMode, armTimedTarget, gameItems]);
+
+  // Heal missing revive / review target.
+  useEffect(() => {
+    const timedHunt = reviveActive || challengeMode === 'review';
+    if (!timedHunt) return;
+    if (funTargetId && itemById.has(funTargetId)) return;
+    if (gameItems.length === 0) return;
+    if (roundSwitchPendingRef.current || quizOpen || roundCelebrate) return;
+    if (!reviveActive) {
+      const hitsNeeded = hitsNeededForMode(challengeMode);
+      if (shelfRoundComplete(gameItems, itemHitCount, hitsNeeded)) return;
+    }
+    armTimedTarget(gameItems, itemHitCount, undefined, reviveActive);
+  }, [
+    reviveActive,
+    challengeMode,
+    funTargetId,
+    itemById,
+    gameItems,
+    itemHitCount,
+    armTimedTarget,
+    quizOpen,
+    roundCelebrate,
+  ]);
+
   const handleFunTimeout = React.useCallback(() => {
-    if (challengeMode !== 'fun' || !funTargetId) return;
+    const reviewHunt =
+      challengeModeRef.current === 'review' && !reviveActiveRef.current;
+    if (!reviveActiveRef.current && !reviewHunt) return;
+    if (funTimeoutLockRef.current) return;
+
+    const hitsNeeded = hitsNeededForMode(challengeModeRef.current);
+
+    // Shelf already finished — stop hunting; don't loop forever.
+    if (reviewHunt && shelfRoundComplete(gameItems, itemHitCount, hitsNeeded)) {
+      funTimeoutLockRef.current = false;
+      setFunTargetId('');
+      if (!roundSwitchPendingRef.current) {
+        roundSwitchPendingRef.current = true;
+        const prevIds = new Set(gameItems.map((it) => it.id));
+        pendingRoundRef.current = { hitCount: { ...itemHitCount }, excludeIds: prevIds };
+        setQuizItems([...gameItems]);
+        openRoundCelebrate();
+      }
+      return;
+    }
+
+    funTimeoutLockRef.current = true;
 
     const sfxVolume = resolveSfxVolume(bgmEnabled);
     unlockGameAudio();
     playWrongSfx(sfxVolume);
-    changeScore(SCORE_FUN_WRONG);
 
-    const newTargetId = pickFunTargetId(gameItems, itemHitCount, funTargetId);
-    if (!newTargetId) return;
+    // Timeout on the current target → pull that word back on the forgetting curve.
+    applyTimedTargetMiss(funTargetId);
 
-    setGrid((prev) => {
-      const copy = prev.map((row) => row.map((t) => ({ ...t })));
-      ensureFunTargetPlayable(copy, newTargetId, itemIds);
-      return copy;
-    });
-    setFunTargetId(newTargetId);
-    setFunTargetKey((k) => k + 1);
-  }, [challengeMode, funTargetId, gameItems, itemHitCount, itemIds, bgmEnabled, changeScore]);
+    if (reviveActiveRef.current) {
+      const nextWrong = reviveWrongsRef.current + 1;
+      reviveWrongsRef.current = nextWrong;
+      setReviveWrongs(nextWrong);
+      if (nextWrong >= REVIVE_WRONG_LIMIT) {
+        funTimeoutLockRef.current = false;
+        failReviveAttempt();
+        return;
+      }
+    }
+
+    // Always advance the timer + retarget, even if the word stays the same.
+    // Previously an empty pick left the countdown stuck at 0 forever.
+    const newTargetId = pickTimedTargetId(
+      gameItems,
+      itemHitCount,
+      funTargetId,
+      reviveActiveRef.current,
+      reviveActiveRef.current ? reviveWordHitsRef.current : undefined,
+      REVIVE_HITS_PER_WORD,
+      hitsNeeded,
+    );
+    funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+    setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+    if (newTargetId) {
+      setGrid((prev) => {
+        const copy = prev.map((row) => row.map((t) => ({ ...t })));
+        ensureTimedTargetPlayable(copy, newTargetId, itemIds);
+        return copy;
+      });
+      setFunTargetId(newTargetId);
+      setFunTargetKey((k) => k + 1);
+    } else {
+      // No unfinished words left — end the timed hunt.
+      setFunTargetId('');
+    }
+    funTimeoutLockRef.current = false;
+  }, [
+    funTargetId,
+    gameItems,
+    itemHitCount,
+    itemIds,
+    bgmEnabled,
+    failReviveAttempt,
+    applyTimedTargetMiss,
+    openRoundCelebrate,
+  ]);
+
+  const succeedRevive = React.useCallback(() => {
+    if (roundSwitchPendingRef.current) return;
+    roundSwitchPendingRef.current = true;
+    pendingRoundRef.current = {
+      hitCount: { ...(rescueSnapshotRef.current?.hitCount ?? itemHitCount) },
+      excludeIds: new Set(gameItems.map((item) => item.id)),
+    };
+    rescueSnapshotRef.current = null;
+    rescueQuizPendingRef.current = true;
+    setQuizItems([...gameItems]);
+    clearReviveState();
+    setReviveFlash('success');
+  }, [gameItems, itemHitCount, clearReviveState]);
 
   const startNextRound = React.useCallback(
-    (nextHitCount: Record<string, number>, excludeIds?: Set<string>, advanceLevel = false) => {
-      const nextItems = pickChallengeItems(pool, 6, nextHitCount, wordMemoryRef.current, {
-        strategy: challengeMode === 'review' ? 'memory' : 'random',
-        ...(excludeIds && excludeIds.size > 0 ? { excludeIds } : {}),
-      });
-      if (nextItems.length < 6) return;
-      if (advanceLevel) setLevel((l) => l + 1);
+    (
+      nextHitCount: Record<string, number>,
+      excludeIds?: Set<string>,
+      advanceLevel = false,
+      modeOverride?: ChallengeMode,
+    ) => {
+      const targetMode = modeOverride ?? challengeModeRef.current;
+      const targetPool =
+        targetMode === 'random'
+          ? allPool
+          : targetMode === 'review'
+            ? reviewPool
+            : targetMode === 'mood'
+              ? moodBoardPool.items
+              : activeCategory?.items ?? [];
+
+      if (targetMode === 'random') {
+        const free = adventureRoundFreeRef.current;
+        adventureRoundFreeRef.current = false;
+        if (free) {
+          adventureStaminaOwedRef.current = false;
+        } else if (tickStamina(staminaStateRef.current).value <= 0) {
+          lockAdventureDead();
+          return;
+        } else {
+          // Preview free until the first matching move.
+          adventureStaminaOwedRef.current = true;
+        }
+        setAdventurePlayable(true);
+        setDeadMachineOpen(false);
+      }
+
+      const nextItems =
+        targetMode === 'random'
+          ? pickAdventureItems(
+              targetPool,
+              ADVENTURE_WORDS_PER_SET,
+              new Set(roundLearnedIdsRef.current),
+              excludeIds,
+            )
+          : pickChallengeItems(targetPool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
+              strategy: targetMode === 'review' ? 'memory' : 'random',
+              ...(excludeIds && excludeIds.size > 0 ? { excludeIds } : {}),
+            });
+      if (nextItems.length < ADVENTURE_WORDS_PER_SET) {
+        if (targetMode === 'random') {
+          adventureStaminaOwedRef.current = false;
+          clearAdventureSnapshot();
+          setGameItems([]);
+          setGrid(makeGrid([]));
+          setItemHitCount({});
+        }
+        roundSwitchPendingRef.current = false;
+        return;
+      }
+      const nextLevel = advanceLevel ? level + 1 : level;
+      if (advanceLevel) setLevel(nextLevel);
       bumpBoardEpoch();
       setRoundCelebrate(false);
       setGameItems(nextItems);
+      setItemHitCount({});
       roundSwitchPendingRef.current = false;
       setSelected(null);
       setPopWord(null);
       setHintMove(null);
-      const targetId = syncFunTarget(nextItems, nextHitCount);
-      setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId || undefined));
+      clearReviveState();
+      resetRescueLifecycle();
+      if (targetMode === 'random') {
+        clearAdventureSnapshot();
+        const budget = movesForAdventureLevel(nextLevel);
+        movesLeftRef.current = budget;
+        setMovesLeft(budget);
+      }
+      const targetId =
+        targetMode === 'review'
+          ? pickTimedTargetId(
+              nextItems,
+              {},
+              undefined,
+              false,
+              undefined,
+              2,
+              HITS_PER_WORD_REVIEW,
+            )
+          : undefined;
+      if (targetMode === 'review') {
+        funTimeoutLockRef.current = false;
+        funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+        setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+        setFunTargetId(targetId || '');
+        setFunTargetKey((k) => k + 1);
+      }
+      setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId));
+      setBoardIntroActive(true);
     },
-    [pool, challengeMode, bumpBoardEpoch, syncFunTarget],
+    [
+      activeCategory,
+      allPool,
+      bumpBoardEpoch,
+      clearAdventureSnapshot,
+      lockAdventureDead,
+      level,
+      moodBoardPool.items,
+      reviewPool,
+      clearReviveState,
+      resetRescueLifecycle,
+    ],
   );
 
-  const handleQuizComplete = React.useCallback(() => {
-    stopAllWordSpeech();
-    setQuizOpen(false);
-    setRoundLearnedIds((prev) => markRoundLearnedItems(prev, quizItemsRef.current));
+  const finishQuizAndAdvance = React.useCallback((modeOverride?: ChallengeMode) => {
     const pending = pendingRoundRef.current;
     pendingRoundRef.current = null;
     if (pending) {
-      startNextRound(pending.hitCount, pending.excludeIds, true);
+      startNextRound(pending.hitCount, pending.excludeIds, true, modeOverride);
     } else {
       roundSwitchPendingRef.current = false;
     }
   }, [startNextRound]);
+
+  /** Enter review with an explicit board seed so dead-machine / suppress-setup races can't leave an empty board. */
+  const enterReviewMode = React.useCallback(
+    (
+      asForcedExam: boolean,
+      opts?: { keepPendingRound?: boolean; paused?: boolean; excludeIds?: Set<string> },
+    ) => {
+      setDeadMachineOpen(false);
+      setFailSheetOpen(false);
+      // Leaving adventure without running board-setup.
+      adventureStaminaOwedRef.current = false;
+
+      if (reviewPool.length < ADVENTURE_WORDS_PER_SET) {
+        // Still leave the dead sheet; GamePanel will show the empty-review CTA.
+        setChallengeMode('review');
+        setForcedReviewActive(false);
+        forcedReviewActiveRef.current = false;
+        setAdventurePlayable(true);
+        setGameItems([]);
+        setGrid(makeGrid([]));
+        setItemHitCount({});
+        setFunTargetId('');
+        return;
+      }
+
+      if (asForcedExam || modeUnlocks.pendingForcedReview) {
+        if (!modeUnlocks.pendingForcedReview) {
+          const nextUnlocks: ModeUnlockState = {
+            ...modeUnlocks,
+            pendingForcedReview: true,
+          };
+          saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
+          setModeUnlocks(nextUnlocks);
+        }
+        setForcedReviewActive(true);
+        forcedReviewActiveRef.current = true;
+      } else {
+        setForcedReviewActive(false);
+        forcedReviewActiveRef.current = false;
+      }
+
+      setAdventurePlayable(true);
+      clearReviveState();
+      resetRescueLifecycle();
+      setReviewPaused(opts?.paused ?? false);
+
+      const useForcedPool = asForcedExam || modeUnlocks.pendingForcedReview;
+      const poolById = new Map(allPool.map((it) => [it.id, it] as const));
+      const nextHitCount: Record<string, number> = {};
+      const nextItems = useForcedPool
+        ? pickForcedReviewItems(
+            adventureSetHistoryRef.current,
+            poolById,
+            ADVENTURE_WORDS_PER_SET,
+            reviewPool,
+          )
+        : pickChallengeItems(
+            reviewPool,
+            ADVENTURE_WORDS_PER_SET,
+            nextHitCount,
+            wordMemoryRef.current,
+            {
+              strategy: 'memory',
+              ...(opts?.excludeIds && opts.excludeIds.size > 0
+                ? { excludeIds: opts.excludeIds }
+                : {}),
+            },
+          );
+      if (nextItems.length < ADVENTURE_WORDS_PER_SET) {
+        setChallengeMode('review');
+        setForcedReviewActive(false);
+        forcedReviewActiveRef.current = false;
+        setGameItems([]);
+        setGrid(makeGrid([]));
+        setItemHitCount({});
+        setFunTargetId('');
+        return;
+      }
+      const targetId = pickTimedTargetId(
+        nextItems,
+        nextHitCount,
+        undefined,
+        false,
+        undefined,
+        2,
+        HITS_PER_WORD_REVIEW,
+      );
+      bumpBoardEpoch();
+      setSelected(null);
+      setItemHitCount(nextHitCount);
+      setGameItems(nextItems);
+      setHintMove(null);
+      setWordLink(null);
+      setQuizOpen(false);
+      // Always unlock the new review board. keepPendingRound only preserves
+      // adventure resume data — leaving roundSwitchPending true locks swaps + timer.
+      roundSwitchPendingRef.current = false;
+      if (!opts?.keepPendingRound) {
+        pendingRoundRef.current = null;
+      }
+      setRoundCelebrate(false);
+      funTimeoutLockRef.current = false;
+      funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+      setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+      setFunTargetId(targetId || '');
+      setFunTargetKey((k) => k + 1);
+      setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId || undefined));
+      setBoardIntroActive(true);
+
+      // Mode + reviewPoolKey (memory write) can each retrigger board setup —
+      // skip both so the forced mix isn't replaced by “just-finished set” memory order.
+      suppressBoardSetupSkipsRef.current = Math.max(
+        suppressBoardSetupSkipsRef.current,
+        useForcedPool ? 2 : 1,
+      );
+      setChallengeMode('review');
+    },
+    [
+      reviewPool,
+      allPool,
+      modeUnlocks,
+      clearReviveState,
+      resetRescueLifecycle,
+      bumpBoardEpoch,
+    ],
+  );
+
+  const beginForcedReview = React.useCallback(() => {
+    if (reviewPool.length < ADVENTURE_WORDS_PER_SET) {
+      finishQuizAndAdvance();
+      return;
+    }
+    // Keep pendingRoundRef so adventure can resume after the review exam + quiz.
+    enterReviewMode(true, { keepPendingRound: true });
+  }, [reviewPool.length, finishQuizAndAdvance, enterReviewMode]);
+
+  const clearPendingForcedReview = React.useCallback(() => {
+    if (!modeUnlocks.pendingForcedReview && !forcedReviewActiveRef.current) return;
+    const nextUnlocks: ModeUnlockState = {
+      ...modeUnlocks,
+      pendingForcedReview: false,
+    };
+    saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
+    setModeUnlocks(nextUnlocks);
+    setForcedReviewActive(false);
+    forcedReviewActiveRef.current = false;
+  }, [modeUnlocks]);
+
+  const resumeForcedReview = React.useCallback(() => {
+    enterReviewMode(true);
+  }, [enterReviewMode]);
+
+  const handleChallengeModeChange = React.useCallback(
+    (mode: ChallengeMode) => {
+      if (mode === 'mood') {
+        updateFirstTimeGuide((current) =>
+          current.stage === 'moodBoard'
+            ? { ...current, stage: 'completed' }
+            : current,
+        );
+      }
+      const preserveAdventureBoard = () => {
+        if (
+          challengeModeRef.current !== 'random' ||
+          reviveActiveRef.current ||
+          !adventurePlayable ||
+          gameItems.length < ADVENTURE_WORDS_PER_SET
+        ) {
+          return;
+        }
+        const previous = adventureBoardSnapshotRef.current;
+        const snapshot: AdventureBoardSnapshot = {
+          version: ADVENTURE_SNAPSHOT_VERSION,
+          userId: normalizedSnapshotUserId(progressUserIdRef.current),
+          roundId:
+            previous?.roundId ??
+            `adventure-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          savedAt: Date.now(),
+          grid: grid.map((row) => row.map((tile) => ({ ...tile }))),
+          gameItems: [...gameItems],
+          itemHitCount: { ...itemHitCount },
+          movesLeft: movesLeftRef.current,
+          level,
+          adventurePlayable,
+          staminaOwed: adventureStaminaOwedRef.current,
+          roundFree: adventureRoundFreeRef.current,
+          rescueUsed: rescueUsedRef.current,
+          attemptLost: adventureAttemptLostRef.current,
+        };
+        adventureBoardSnapshotRef.current = snapshot;
+        saveAdventureBoardSnapshot(snapshot);
+      };
+
+      if (mode === 'review') {
+        preserveAdventureBoard();
+        enterReviewMode(Boolean(modeUnlocks.pendingForcedReview));
+        return;
+      }
+      if (forcedReviewActiveRef.current) {
+        // Left mid-exam — keep pendingForcedReview hung until a review quiz is finished.
+        setForcedReviewActive(false);
+        forcedReviewActiveRef.current = false;
+      }
+      if (mode !== 'random') {
+        preserveAdventureBoard();
+        adventureStaminaOwedRef.current = false;
+        setChallengeMode(mode);
+        return;
+      }
+      const savedAdventure = adventureBoardSnapshotRef.current;
+      if (
+        savedAdventure &&
+        validAdventureBoardSnapshot(
+          savedAdventure,
+          progressUserIdRef.current,
+          allPool,
+          new Set(roundLearnedIdsRef.current),
+        )
+      ) {
+        bumpBoardEpoch();
+        suppressBoardSetupSkipsRef.current = Math.max(
+          suppressBoardSetupSkipsRef.current,
+          1,
+        );
+        setChallengeMode('random');
+        setDeadMachineOpen(false);
+        setFailSheetOpen(false);
+        setReviewPaused(false);
+        setAdventurePlayable(savedAdventure.adventurePlayable);
+        adventureStaminaOwedRef.current = savedAdventure.staminaOwed;
+        adventureRoundFreeRef.current = savedAdventure.roundFree;
+        rescueUsedRef.current = savedAdventure.rescueUsed;
+        adventureAttemptLostRef.current = savedAdventure.attemptLost;
+        movesLeftRef.current = savedAdventure.movesLeft;
+        setMovesLeft(savedAdventure.movesLeft);
+        setLevel(savedAdventure.level);
+        setGameItems([...savedAdventure.gameItems]);
+        setItemHitCount({ ...savedAdventure.itemHitCount });
+        setGrid(
+          savedAdventure.grid.map((row) =>
+            row.map((tile) => ({ ...tile })),
+          ),
+        );
+        setSelected(null);
+        setHintMove(null);
+        setWordLink(null);
+        setPopWord(null);
+        setFunTargetId('');
+        setBoardIntroActive(false);
+        roundSwitchPendingRef.current = false;
+        return;
+      }
+      if (savedAdventure) clearAdventureSnapshot();
+      // Adventure: no stamina → dead machine, never open a free board.
+      if (tickStamina(staminaStateRef.current).value <= 0) {
+        setChallengeMode('random');
+        lockAdventureDead();
+        return;
+      }
+      setChallengeMode('random');
+    },
+    [
+      adventurePlayable,
+      bumpBoardEpoch,
+      enterReviewMode,
+      gameItems,
+      grid,
+      itemHitCount,
+      level,
+      allPool,
+      clearAdventureSnapshot,
+      lockAdventureDead,
+      modeUnlocks.pendingForcedReview,
+      updateFirstTimeGuide,
+    ],
+  );
+
+  const handleQuizComplete = React.useCallback(() => {
+    stopAllWordSpeech();
+    triggerGameHaptic('majorSuccess');
+    setQuizOpen(false);
+    const quizItemsSnapshot = quizItemsRef.current;
+    const nextLearned = markRoundLearnedItems(
+      roundLearnedIds,
+      quizItemsSnapshot,
+      progressUserIdRef.current,
+    );
+    roundLearnedIdsRef.current = nextLearned;
+    setRoundLearnedIds(nextLearned);
+
+    // Quiz success advances the forgetting curve (board matches only count as exposure).
+    setWordMemory((prev) => {
+      const next = new Map(prev);
+      for (const it of quizItemsSnapshot) {
+        recordWordRecallSuccess(next, it.word, it.cn);
+      }
+      persistWordMemories(next, memoryScopeRef.current);
+      wordMemoryRef.current = next;
+      return next;
+    });
+
+    if (forcedReviewActiveRef.current || challengeMode === 'review') {
+      setPlayerSummary(
+        recordLearningActivity(playerSummaryRef.current, {
+          adventureClears: modeUnlocks.adventureClears,
+          masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
+          reviewUnlocked: isReviewUnlocked(modeUnlocks.adventureClears),
+          categoryUnlocked: isCategoryUnlocked(modeUnlocks.adventureClears),
+        }),
+      );
+      if (forcedReviewActiveRef.current) {
+        clearPendingForcedReview();
+      } else if (modeUnlocks.pendingForcedReview) {
+        clearPendingForcedReview();
+      }
+      // Stay in review — let the player choose continue vs adventure.
+      suppressBoardSetupSkipsRef.current = Math.max(suppressBoardSetupSkipsRef.current, 1);
+      setChallengeMode('review');
+      setForcedReviewActive(false);
+      forcedReviewActiveRef.current = false;
+      setReviewContinueOpen(true);
+      return;
+    }
+
+    if (challengeMode === 'random') {
+      adventureSetHistoryRef.current = pushAdventureClearedSet(
+        adventureSetHistoryRef.current,
+        quizItemsSnapshot.map((it) => it.id),
+        progressUserIdRef.current,
+      );
+
+      const prevUnlocks = modeUnlocks;
+      const adventureClears = prevUnlocks.adventureClears + 1;
+      let nextUnlocks: ModeUnlockState = { ...prevUnlocks, adventureClears };
+      saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
+      setModeUnlocks(nextUnlocks);
+      if (prevUnlocks.adventureClears === 0 && adventureClears === 1) {
+        updateFirstTimeGuide((current) =>
+          current.stage === 'none'
+            ? { ...current, stage: 'learned' }
+            : current,
+        );
+      }
+
+      const summaryContext = {
+        adventureClears,
+        masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
+        reviewUnlocked: isReviewUnlocked(adventureClears),
+        categoryUnlocked: isCategoryUnlocked(adventureClears),
+      };
+      setPlayerSummary(
+        adventureAttemptLostRef.current
+          ? recordLearningActivity(playerSummaryRef.current, summaryContext)
+          : recordAdventureClear(playerSummaryRef.current, summaryContext),
+      );
+
+      if (!prevUnlocks.reviewUnlockSeen && isReviewUnlocked(adventureClears)) {
+        nextUnlocks = { ...nextUnlocks, reviewUnlockSeen: true };
+        saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
+        setModeUnlocks(nextUnlocks);
+        setUnlockCelebrate('review');
+        return;
+      }
+      if (!prevUnlocks.categoryUnlockSeen && isCategoryUnlocked(adventureClears)) {
+        nextUnlocks = { ...nextUnlocks, categoryUnlockSeen: true };
+        saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
+        setModeUnlocks(nextUnlocks);
+        setUnlockCelebrate('category');
+        return;
+      }
+
+      if (
+        shouldForceReviewAfterClear(adventureClears) &&
+        isReviewUnlocked(adventureClears) &&
+        reviewPool.length >= ADVENTURE_WORDS_PER_SET
+      ) {
+        beginForcedReview();
+        return;
+      }
+    }
+
+    if (challengeMode === 'category' || challengeMode === 'mood') {
+      setPlayerSummary(
+        recordLearningActivity(playerSummaryRef.current, {
+          adventureClears: modeUnlocks.adventureClears,
+          masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
+          reviewUnlocked: isReviewUnlocked(modeUnlocks.adventureClears),
+          categoryUnlocked: isCategoryUnlocked(modeUnlocks.adventureClears),
+        }),
+      );
+    }
+
+    finishQuizAndAdvance();
+  }, [
+    roundLearnedIds,
+    challengeMode,
+    modeUnlocks,
+    finishQuizAndAdvance,
+    beginForcedReview,
+    clearPendingForcedReview,
+    reviewPool.length,
+    allPool,
+    updateFirstTimeGuide,
+  ]);
+
+  const handleReviewContinueReview = React.useCallback(() => {
+    setReviewContinueOpen(false);
+    // Skip the set just finished — pull older / more overdue words next.
+    enterReviewMode(false, {
+      keepPendingRound: true,
+      excludeIds: new Set(gameItems.map((it) => it.id)),
+    });
+  }, [enterReviewMode, gameItems]);
+
+  const handleReviewContinueAdventure = React.useCallback(() => {
+    setReviewContinueOpen(false);
+    const savedAdventure = adventureBoardSnapshotRef.current;
+    if (
+      savedAdventure &&
+      validAdventureBoardSnapshot(
+        savedAdventure,
+        progressUserIdRef.current,
+        allPool,
+        new Set(roundLearnedIdsRef.current),
+      )
+    ) {
+      pendingRoundRef.current = null;
+      handleChallengeModeChange('random');
+      return;
+    }
+    if (savedAdventure) clearAdventureSnapshot();
+    if (tickStamina(staminaStateRef.current).value <= 0) {
+      setChallengeMode('random');
+      lockAdventureDead();
+      return;
+    }
+    pendingRoundRef.current = null;
+    suppressBoardSetupSkipsRef.current = Math.max(suppressBoardSetupSkipsRef.current, 1);
+    setChallengeMode('random');
+    // No adventure pending — start a fresh free-to-attempt board (still spends stamina).
+    startNextRound({}, undefined, false, 'random');
+  }, [
+    allPool,
+    clearAdventureSnapshot,
+    handleChallengeModeChange,
+    startNextRound,
+    lockAdventureDead,
+  ]);
+
+  const handleReviewContinueRest = React.useCallback(() => {
+    setReviewContinueOpen(false);
+    setFunTargetId('');
+    roundSwitchPendingRef.current = false;
+    // Stay on review board, paused — come back later via 继续挑战.
+    setReviewPaused(true);
+  }, []);
+
+  const handleQuizAbandon = React.useCallback(() => {
+    stopAllWordSpeech();
+    setQuizOpen(false);
+    pendingRoundRef.current = null;
+    roundSwitchPendingRef.current = false;
+    setRoundCelebrate(false);
+    // Restart the same set for free — does not count as learned / clear.
+    if (gameItems.length >= ADVENTURE_WORDS_PER_SET) {
+      adventureRoundFreeRef.current = true;
+      retryAdventureBoard([...gameItems], true);
+    }
+  }, [gameItems, retryAdventureBoard]);
 
   const handleRoundCelebrateDone = React.useCallback(() => {
     stopAllWordSpeech();
     popWordSeqRef.current += 1;
     setPopWord(null);
     setRoundCelebrate(false);
+    // Bias toward pick (~65%) so the second quiz type shows more often.
+    setQuizKind(Math.random() < 0.35 ? 'connect' : 'pick');
     setQuizOpen(true);
   }, []);
 
-  const reset = () => {
-    bumpBoardEpoch();
-    if (pool.length < 6) {
-      setSelected(null);
-      resetScore();
-      setLevel(1);
-      setItemHitCount({});
-      setGameItems([]);
-      setGrid(makeGrid([]));
-      setFunTargetId('');
-      setHintMove(null);
-      setWordLink(null);
+  const handleUnlockCelebrateDone = React.useCallback(() => {
+    const kind = unlockCelebrate;
+    setUnlockCelebrate(null);
+    if (
+      kind === 'review' &&
+      !modeUnlocks.categoryUnlockSeen &&
+      isCategoryUnlocked(modeUnlocks.adventureClears)
+    ) {
+      const marked = { ...modeUnlocks, categoryUnlockSeen: true };
+      saveModeUnlocks(marked, progressUserIdRef.current);
+      setModeUnlocks(marked);
+      setUnlockCelebrate('category');
       return;
     }
-    const nextHitCount: Record<string, number> = {};
-    const nextItems = pickChallengeItems(pool, 6, nextHitCount, wordMemoryRef.current, {
-      strategy: challengeMode === 'review' ? 'memory' : 'random',
-    });
+    if (
+      shouldForceReviewAfterClear(modeUnlocks.adventureClears) &&
+      isReviewUnlocked(modeUnlocks.adventureClears) &&
+      reviewPool.length >= ADVENTURE_WORDS_PER_SET
+    ) {
+      beginForcedReview();
+      return;
+    }
+    finishQuizAndAdvance();
+  }, [unlockCelebrate, modeUnlocks, finishQuizAndAdvance, beginForcedReview, reviewPool.length]);
+
+  const reset = () => {
+    // Free same-set board reshuffle — does not spend stamina or change the word set.
+    if (gameItems.length < ADVENTURE_WORDS_PER_SET || reviveActiveRef.current) return;
+    bumpBoardEpoch();
+    clearReviveState();
+    setFailSheetOpen(false);
+    setDeadMachineOpen(false);
     setSelected(null);
-    resetScore();
-    setLevel(1);
-    setItemHitCount(nextHitCount);
-    setGameItems(nextItems);
-    const targetId = syncFunTarget(nextItems, nextHitCount);
-    setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId || undefined));
     setHintMove(null);
     setWordLink(null);
     setQuizOpen(false);
     pendingRoundRef.current = null;
     roundSwitchPendingRef.current = false;
     setRoundCelebrate(false);
+    const targetId =
+      challengeMode === 'review'
+        ? pickTimedTargetId(
+            gameItems,
+            itemHitCount,
+            undefined,
+            false,
+            undefined,
+            2,
+            HITS_PER_WORD_REVIEW,
+          )
+        : reviveActive
+          ? funTargetId || undefined
+          : undefined;
+    if (challengeMode === 'review' && targetId) {
+      funTimeoutLockRef.current = false;
+      funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+      setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+      setFunTargetId(targetId);
+      setFunTargetKey((k) => k + 1);
+    }
+    setGrid(prepareBoardGrid(gameItems.map((i) => i.id), targetId));
+    setBoardIntroActive(true);
   };
 
   useEffect(() => {
+    if (suppressBoardSetupSkipsRef.current > 0) {
+      suppressBoardSetupSkipsRef.current -= 1;
+      return;
+    }
+    if (consentOpen) {
+      return;
+    }
     bumpBoardEpoch();
+    clearReviveState();
+    resetRescueLifecycle();
+    setFailSheetOpen(false);
+    setDeadMachineOpen(false);
+    adventureRoundFreeRef.current = false;
     if (pool.length < 6) {
       setSelected(null);
-      resetScore();
       setLevel(1);
       setItemHitCount({});
       setGameItems([]);
       setGrid(makeGrid([]));
-      setFunTargetId('');
       setHintMove(null);
       setQuizOpen(false);
       pendingRoundRef.current = null;
       roundSwitchPendingRef.current = false;
       setRoundCelebrate(false);
+      setAdventurePlayable(challengeMode !== 'random');
+      setFunTargetId('');
       return;
     }
+    if (challengeMode === 'random') {
+      if (tickStamina(staminaStateRef.current).value <= 0) {
+        lockAdventureDead();
+        return;
+      }
+      adventureStaminaOwedRef.current = true;
+    } else {
+      adventureStaminaOwedRef.current = false;
+    }
     const nextHitCount: Record<string, number> = {};
-    const nextItems = pickChallengeItems(pool, 6, nextHitCount, wordMemoryRef.current, {
-      strategy: challengeMode === 'review' ? 'memory' : 'random',
-    });
+    const useForcedPool =
+      challengeMode === 'review' &&
+      (forcedReviewActiveRef.current ||
+        loadModeUnlocks(progressUserIdRef.current).pendingForcedReview);
+    const poolById = new Map(allPool.map((it) => [it.id, it] as const));
+    const nextItems = useForcedPool
+      ? pickForcedReviewItems(
+          adventureSetHistoryRef.current,
+          poolById,
+          ADVENTURE_WORDS_PER_SET,
+          pool,
+        )
+      : challengeMode === 'random'
+        ? pickAdventureItems(
+            pool,
+            ADVENTURE_WORDS_PER_SET,
+            new Set(roundLearnedIdsRef.current),
+          )
+        : pickChallengeItems(pool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
+            strategy: challengeMode === 'review' ? 'memory' : 'random',
+          });
     setSelected(null);
-    resetScore();
-    setLevel(1);
+    const clears =
+      challengeMode === 'random'
+        ? loadModeUnlocks(progressUserIdRef.current).adventureClears
+        : 0;
+    const cap = Math.max(1, adventureTotalSets(allPool.length));
+    setLevel(challengeMode === 'random' ? Math.min(clears + 1, cap) : 1);
     setItemHitCount(nextHitCount);
     setGameItems(nextItems);
-    const targetId = syncFunTarget(nextItems, nextHitCount);
-    setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId || undefined));
+    setAdventurePlayable(true);
+    if (challengeMode === 'random') {
+      const budget = movesForAdventureLevel(1);
+      movesLeftRef.current = budget;
+      setMovesLeft(budget);
+    }
+    const targetId =
+      challengeMode === 'review'
+        ? pickTimedTargetId(
+            nextItems,
+            nextHitCount,
+            undefined,
+            false,
+            undefined,
+            2,
+            HITS_PER_WORD_REVIEW,
+          )
+        : undefined;
+    if (challengeMode === 'review') {
+      funTimeoutLockRef.current = false;
+      funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+      setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+      setFunTargetId(targetId || '');
+      setFunTargetKey((k) => k + 1);
+    } else if (challengeMode !== 'random') {
+      setFunTargetId('');
+    }
+    setGrid(prepareBoardGrid(nextItems.map((i) => i.id), targetId));
     setHintMove(null);
-  }, [boardSetupKey, pool.length, challengeMode, resetScore, bumpBoardEpoch, syncFunTarget]);
+    setBoardIntroActive(true);
+  }, [
+    boardSetupKey,
+    pool.length,
+    challengeMode,
+    allPool,
+    bumpBoardEpoch,
+    clearReviveState,
+    resetRescueLifecycle,
+    lockAdventureDead,
+  ]);
 
   useEffect(() => {
     setTtsAvailable('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined');
@@ -1120,26 +2691,53 @@ export const ItemMatchGamePage: React.FC = () => {
     };
   }, [bgmEnabled]);
 
+  useEffect(() => {
+    if (challengeMode !== 'review') setReviewPaused(false);
+  }, [challengeMode]);
+
+  // Timed-hunt countdown pauses for board FX only — word popup is an independent front track.
+  const timedHuntActive =
+    reviveActive || challengeMode === 'review';
   const funTimerPaused =
-    challengeMode !== 'fun' ||
+    !timedHuntActive ||
     !funTargetId ||
     pool.length < 6 ||
     quizOpen ||
     roundCelebrate ||
     matchClearCells !== null ||
     refillActive ||
-    popWord !== null;
+    cascadeBusy ||
+    boardIntroActive ||
+    failSheetOpen ||
+    reviveFlash !== null ||
+    (challengeMode === 'review' && reviewPaused);
 
   useEffect(() => {
-    funCountdownRef.current = FUN_COUNTDOWN_SEC;
-    setFunCountdown(FUN_COUNTDOWN_SEC);
-  }, [funTargetKey, challengeMode]);
+    funCountdownRef.current = TIMED_TARGET_COUNTDOWN_SEC;
+    setFunCountdown(TIMED_TARGET_COUNTDOWN_SEC);
+  }, [funTargetKey, timedHuntActive]);
+
+  // Timed hunt: speak the prompt when a new target appears (not again on successful match).
+  useEffect(() => {
+    if (!timedHuntActive || !funTargetId) return;
+    if (challengeMode === 'review' && reviewPaused) return;
+    const item = itemById.get(funTargetId);
+    if (!item?.word) return;
+    stopAllWordSpeech();
+    void speakWordAuto(item.word);
+    // Only re-announce when the target round changes — not on pause/resume.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- funTargetKey is the intentional trigger
+  }, [funTargetKey]);
 
   useEffect(() => {
     if (funTimerPaused) return;
 
     const id = window.setInterval(() => {
-      if (funCountdownRef.current <= 0) return;
+      if (funCountdownRef.current <= 0) {
+        // Safety net: never stay parked on 0 if timeout handler missed a beat.
+        handleFunTimeout();
+        return;
+      }
       const next = funCountdownRef.current - 1;
       funCountdownRef.current = next;
       setFunCountdown(next);
@@ -1156,14 +2754,14 @@ export const ItemMatchGamePage: React.FC = () => {
       if (hintTimerRef.current) window.clearTimeout(hintTimerRef.current);
       hintTimerRef.current = null;
       setHintMove(null);
-      if (challengeMode === 'fun') return;
+      if (firstSwapTutorialPendingRef.current) return;
+      if (reviveActiveRef.current || challengeModeRef.current === 'review') return;
 
       hintTimerRef.current = window.setTimeout(() => {
-        const move = findHintMove(nextGrid ?? grid);
-        setHintMove(move);
+        setHintMove(findHintMove(nextGrid ?? grid));
       }, 8000);
     },
-    [grid, challengeMode],
+    [grid],
   );
 
   useEffect(() => {
@@ -1177,50 +2775,152 @@ export const ItemMatchGamePage: React.FC = () => {
     return () => {
       if (hintTimerRef.current) window.clearTimeout(hintTimerRef.current);
     };
-  }, [grid, restartHintTimer]);
+  }, [grid, restartHintTimer, firstTimeGuide.hasCompletedFirstSwapTutorial]);
 
   const applyResolvedMatch = (
     resolved: { grid: Tile[][]; clearedItemIds: string[] },
     targetItemId: string,
   ) => {
-    setGrid(resolved.grid);
+    const reviewHunt =
+      challengeMode === 'review' && !reviveActiveRef.current;
+    const hitsNeeded = hitsNeededForMode(challengeMode);
+    const countThisHit =
+      !!targetItemId &&
+      !reviveActiveRef.current &&
+      (!reviewHunt || targetItemId === funTargetId);
+
+    const projectedHits = { ...itemHitCount };
+    if (countThisHit && targetItemId) {
+      const prevCount = projectedHits[targetItemId] ?? 0;
+      if (prevCount < hitsNeeded) projectedHits[targetItemId] = prevCount + 1;
+    }
+    const roundWillComplete =
+      !reviveActiveRef.current &&
+      gameItems.length > 0 &&
+      gameItems.every((it) => (projectedHits[it.id] ?? 0) >= hitsNeeded);
+
+    let nextGrid = resolved.grid;
+    if (!roundWillComplete) {
+      // Late moves: keep unfinished words plentiful enough to still match.
+      if (
+        challengeMode === 'random' &&
+        !reviveActiveRef.current &&
+        movesLeftRef.current <= LATE_BOARD_ASSIST_MOVES
+      ) {
+        const unfinishedIds = gameItems
+          .filter((it) => (projectedHits[it.id] ?? 0) < hitsNeeded)
+          .map((it) => it.id);
+        if (unfinishedIds.length > 0) {
+          const copy = nextGrid.map((row) => row.map((t) => ({ ...t })));
+          if (boostScarceUnfinishedWords(copy, unfinishedIds, itemIds, 4)) {
+            nextGrid = copy;
+          }
+        }
+      }
+      nextGrid = reshuffleDeadlockedBoard(nextGrid);
+    }
+
+    setGrid(nextGrid);
     setMatchClearCells(null);
-    restartHintTimer(resolved.grid);
+    restartHintTimer(nextGrid);
     setItemHitCount((prev) => {
       const next = { ...prev };
-      let targetScored = false;
-      for (const id of resolved.clearedItemIds) {
-        const prevCount = next[id] ?? 0;
-        if (!targetScored && id === targetItemId && prevCount < 3) {
-          if (challengeMode !== 'fun') {
-            changeScore(SCORE_MATCH3_PER_CLEAR);
-          }
-          targetScored = true;
+
+      // Shelf progress: only the player-initiated clear that triggered the word
+      // popup + speech counts (+1). Cascade / passive clears do not.
+      // Review timed hunt: only the current target word counts.
+      if (countThisHit && targetItemId) {
+        const prevCount = next[targetItemId] ?? 0;
+        if (prevCount < hitsNeeded) {
+          next[targetItemId] = prevCount + 1;
         }
-        next[id] = prevCount + 1;
       }
 
-      if (
-        challengeMode === 'fun' &&
-        funTargetId &&
-        targetItemId === funTargetId &&
-        (next[targetItemId] ?? 0) >= 1
-      ) {
-        const newTargetId = pickFunTargetId(gameItems, next, funTargetId);
+      if (reviveActiveRef.current && funTargetId && targetItemId === funTargetId) {
+        const wordHits = {
+          ...reviveWordHitsRef.current,
+          [funTargetId]: (reviveWordHitsRef.current[funTargetId] ?? 0) + 1,
+        };
+        reviveWordHitsRef.current = wordHits;
+        setReviveWordHits(wordHits);
+        const corrects = Object.values(wordHits).reduce((sum, n) => sum + n, 0);
+        reviveCorrectsRef.current = corrects;
+        setReviveCorrects(corrects);
+        const needed = reviveCorrectNeeded(gameItems.length || ADVENTURE_WORDS_PER_SET);
+        if (corrects >= needed) {
+          succeedRevive();
+          return next;
+        }
+        const newTargetId = pickTimedTargetId(
+          gameItems,
+          next,
+          funTargetId,
+          true,
+          wordHits,
+          REVIVE_HITS_PER_WORD,
+        );
         if (newTargetId) {
           setFunTargetId(newTargetId);
           setFunTargetKey((k) => k + 1);
           setGrid((prevGrid) => {
             const copy = prevGrid.map((row) => row.map((t) => ({ ...t })));
-            ensureFunTargetPlayable(copy, newTargetId, itemIds);
-            return copy;
+            ensureTimedTargetPlayable(copy, newTargetId, itemIds);
+            return reshuffleDeadlockedBoard(copy);
           });
+        } else {
+          setFunTargetId('');
         }
+        return next;
       }
 
-      const currentRoundDone =
-        gameItems.length > 0 && gameItems.every((it) => (next[it.id] ?? 0) >= 3);
+      if (reviveActiveRef.current) {
+        return next;
+      }
+
+      if (reviewHunt && funTargetId) {
+        const currentRoundDone = shelfRoundComplete(gameItems, next, hitsNeeded);
+        if (currentRoundDone) {
+          // Stop timed hunt immediately so timeout / heal can't re-arm a loop.
+          setFunTargetId('');
+          if (roundSwitchPendingRef.current) return next;
+          roundSwitchPendingRef.current = true;
+          const prevIds = new Set(gameItems.map((it) => it.id));
+          const snapshot = [...gameItems];
+          popDoneRef.current.finally(() => {
+            pendingRoundRef.current = { hitCount: next, excludeIds: prevIds };
+            setQuizItems(snapshot);
+            openRoundCelebrate();
+          });
+          return next;
+        }
+
+        // Correct or wrong: always roll a new timed target among unfinished words.
+        const newTargetId = pickTimedTargetId(
+          gameItems,
+          next,
+          funTargetId,
+          false,
+          undefined,
+          2,
+          hitsNeeded,
+        );
+        if (newTargetId) {
+          setFunTargetId(newTargetId);
+          setFunTargetKey((k) => k + 1);
+          setGrid((prevGrid) => {
+            const copy = prevGrid.map((row) => row.map((t) => ({ ...t })));
+            ensureTimedTargetPlayable(copy, newTargetId, itemIds);
+            return reshuffleDeadlockedBoard(copy);
+          });
+        } else {
+          setFunTargetId('');
+        }
+        return next;
+      }
+
+      const currentRoundDone = shelfRoundComplete(gameItems, next, hitsNeeded);
       if (currentRoundDone) {
+        if (challengeMode === 'review') setFunTargetId('');
         if (roundSwitchPendingRef.current) return next;
         roundSwitchPendingRef.current = true;
         const prevIds = new Set(gameItems.map((it) => it.id));
@@ -1228,8 +2928,21 @@ export const ItemMatchGamePage: React.FC = () => {
         popDoneRef.current.finally(() => {
           pendingRoundRef.current = { hitCount: next, excludeIds: prevIds };
           setQuizItems(snapshot);
-          setRoundCelebrate(true);
+          openRoundCelebrate();
         });
+        return next;
+      }
+
+      if (
+        challengeMode === 'random' &&
+        movesLeftRef.current <= 0 &&
+        !reviveActiveRef.current
+      ) {
+        if (rescueUsedRef.current) {
+          endAdventureFailed();
+        } else {
+          enterRevive(nextGrid, next);
+        }
       }
       return next;
     });
@@ -1281,32 +2994,65 @@ export const ItemMatchGamePage: React.FC = () => {
     })();
   };
 
-  const resolveMatches = (g: Tile[][]) => {
-    let next = g;
-    let loop = 0;
-    const clearedItemIds: string[] = [];
-    while (loop < 6) {
-      const lineClearRuns = findLineClearRuns(next);
-      if (lineClearRuns.length > 0) {
-        for (const run of lineClearRuns) clearedItemIds.push(run.itemId);
-        next = applyLineBonuses(next, lineClearRuns, itemIds);
-      }
-      const matches = findMatches(next);
-      if (matches.length === 0) {
-        if (lineClearRuns.length === 0) break;
-      } else {
-        for (const m of matches) clearedItemIds.push(m.itemId);
-        const applied = applyMatches(next, matches, itemIds);
-        next = applied.grid;
-      }
-      if (lineClearRuns.length === 0 && matches.length === 0) break;
-      loop++;
+  /** Next clear wave on a stable board (line clears first, then 3+ matches). */
+  const collectClearWave = (g: Tile[][]): {
+    cells: Cell[];
+    itemIds: string[];
+    isLine: boolean;
+  } | null => {
+    const lineClearRuns = findLineClearRuns(g);
+    if (lineClearRuns.length > 0) {
+      return {
+        cells: clearCellsForLongRuns(lineClearRuns),
+        itemIds: lineClearRuns.map((run) => run.itemId),
+        isLine: true,
+      };
     }
-    return { grid: next, clearedItemIds };
+    const matches = findMatches(g);
+    if (matches.length === 0) return null;
+    const cells = new Map<string, Cell>();
+    const itemIds: string[] = [];
+    for (const m of matches) {
+      itemIds.push(m.itemId);
+      for (const cell of m.cells) cells.set(`${cell.r}:${cell.c}`, cell);
+    }
+    return { cells: [...cells.values()], itemIds, isLine: false };
   };
 
   const attemptSwap = (movedA: Cell, movedB: Cell) => {
-    if (pool.length < 6 || quizOpen || roundCelebrate || matchClearCells !== null || refillActive) return;
+    if (
+      pool.length < 6 ||
+      quizOpen ||
+      roundCelebrate ||
+      roundSwitchPendingRef.current ||
+      matchClearCells !== null ||
+      refillActive ||
+      cascadeBusy ||
+      cascadeRunningRef.current ||
+      failSheetOpen ||
+      (challengeMode === 'random' && !adventurePlayable) ||
+      (challengeMode === 'review' && reviewPaused)
+    ) {
+      return;
+    }
+    const tutorialPair = firstSwapTutorialMoveRef.current;
+    const isFirstSwapTutorialSwap =
+      firstSwapTutorialPendingRef.current &&
+      tutorialPair !== null &&
+      sameCellPair(movedA, movedB, tutorialPair);
+    if (
+      firstSwapTutorialPendingRef.current &&
+      (firstSwapTutorialResolvingRef.current || !isFirstSwapTutorialSwap)
+    ) {
+      return;
+    }
+    if (
+      challengeMode === 'random' &&
+      !reviveActiveRef.current &&
+      movesLeftRef.current <= 0
+    ) {
+      return;
+    }
     restartHintTimer(grid);
     setHintMove(null);
 
@@ -1337,89 +3083,209 @@ export const ItemMatchGamePage: React.FC = () => {
     const directItem = itemById.get(targetItemId);
     const lineClearRuns = runsTouchingCells(findLineClearRuns(swapped), directMatch.cells);
 
-    const hitFunTarget =
-      challengeMode === 'fun' && !!funTargetId && targetItemId === funTargetId;
+    if (!chargeAdventureStaminaIfNeeded()) {
+      setSelected(null);
+      return;
+    }
+
+    if (isFirstSwapTutorialSwap) {
+      firstSwapTutorialResolvingRef.current = true;
+      setFirstSwapTutorialResolving(true);
+      setFirstSwapTutorialMove(null);
+    }
+
+    if (challengeMode === 'random' && !reviveActiveRef.current) {
+      // 3-match: −1. Straight 4: no spend. Straight 5+ / cross / T / L: +1.
+      // Only inspect runs created at the two swapped cells, so disconnected
+      // same-emoji matches cannot accidentally earn the stronger reward.
+      const swappedCells = [movedA, movedB];
+      const playerLongRuns = runsTouchingCells(findLongLineRuns(swapped), swappedCells);
+      const playerCrossRuns = runsTouchingCells(findCrossLineRuns(swapped), swappedCells);
+      const hasFivePlus = playerLongRuns.some((run) => run.cells.length >= 5);
+      const hasFour = playerLongRuns.some((run) => run.cells.length === 4);
+      const earnsBonus = hasFivePlus || playerCrossRuns.length > 0;
+      // The taught swap always demonstrates the base one-move cost, even when
+      // the balanced opener happened to offer a stronger 4+ clear.
+      const moveDelta = isFirstSwapTutorialSwap
+        ? -1
+        : earnsBonus
+          ? MATCH_CLEAR_BONUS_MOVES
+          : hasFour
+            ? 0
+            : -1;
+      const nextMoves = movesLeftRef.current + moveDelta;
+      movesLeftRef.current = nextMoves;
+      setMovesLeft(nextMoves);
+    }
+
     const funWrongMatch =
-      challengeMode === 'fun' && !!funTargetId && targetItemId !== funTargetId;
+      (reviveActiveRef.current || challengeMode === 'review') &&
+      !!funTargetId &&
+      targetItemId !== funTargetId;
     const sfxVolume = resolveSfxVolume(bgmEnabled);
 
     unlockGameAudio();
+    // One strong response only for player-created 4+ / row / cross / T / L clears.
+    if (lineClearRuns.length > 0) {
+      triggerGameHaptic('specialClear');
+    }
     if (funWrongMatch) {
       playWrongSfx(sfxVolume);
-      changeScore(SCORE_FUN_WRONG);
+      applyTimedTargetMiss(funTargetId);
+      if (reviveActiveRef.current) {
+        const nextWrong = reviveWrongsRef.current + 1;
+        reviveWrongsRef.current = nextWrong;
+        setReviveWrongs(nextWrong);
+        if (nextWrong >= REVIVE_WRONG_LIMIT) {
+          // Still play out the clear FX; fail after cascade via flag.
+          // Fail immediately so player can't keep matching.
+          failReviveAttempt();
+          setSelected(null);
+          return;
+        }
+      }
     } else {
       playMatchClearSfx(sfxVolume, lineClearRuns.length > 0 ? 'line' : 'match');
-      if (hitFunTarget) {
-        changeScore(SCORE_FUN_CORRECT);
-      }
-      if (lineClearRuns.length > 0) {
-        changeScore(SCORE_EXTRA_MATCH_BONUS);
-      }
     }
 
-    let linkOrigin: Cell | undefined;
-    if (directItem) {
-      const originCell =
-        directMatch.cells.find((cell) => cell.r === movedA.r && cell.c === movedA.c) ??
-        directMatch.cells.find((cell) => cell.r === movedB.r && cell.c === movedB.c) ??
-        directMatch.cells[Math.floor(directMatch.cells.length / 2)];
-      linkOrigin = originCell;
+    const linkOrigin =
+      directItem
+        ? (directMatch.cells.find((cell) => cell.r === movedA.r && cell.c === movedA.c) ??
+          directMatch.cells.find((cell) => cell.r === movedB.r && cell.c === movedB.c) ??
+          directMatch.cells[Math.floor(directMatch.cells.length / 2)])
+        : undefined;
+
+    const firstCells =
+      lineClearRuns.length > 0 ? clearCellsForLongRuns(lineClearRuns) : directMatch.cells;
+    const firstItemIds =
+      lineClearRuns.length > 0
+        ? lineClearRuns.map((run) => run.itemId)
+        : [directMatch.itemId];
+    const firstIsLine = lineClearRuns.length > 0;
+
+    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+    const epoch = boardEpochRef.current;
+
+    // ── Track A: board clear → gravity → cascade (never waits on the word popup).
+    setSelected(null);
+    setGrid(swapped);
+    setMatchClearCells(firstCells);
+    setMatchClearKey((k) => k + 1);
+    setMatchShakeKey((k) => k + 1);
+
+    const clearedItemIds: string[] = [];
+    cascadeRunningRef.current = true;
+    setCascadeBusy(true);
+
+    void (async () => {
+      let current = swapped.map((row) => row.map((t) => ({ ...t })));
+      let wave = { cells: firstCells, itemIds: firstItemIds, isLine: firstIsLine };
+
+      try {
+        for (let loop = 0; loop < MAX_CASCADE_WAVES; loop++) {
+          if (epoch !== boardEpochRef.current || !cascadeRunningRef.current) return;
+
+          if (loop > 0) {
+            const nextWave = collectClearWave(current);
+            if (!nextWave) break;
+            wave = nextWave;
+            // Cascade FX only — scoring already applied on the player swap.
+            triggerGameHaptic('cascadeWave');
+            playMatchClearSfx(sfxVolume, wave.isLine ? 'line' : 'match');
+            setMatchClearCells(wave.cells);
+            setMatchClearKey((k) => k + 1);
+          }
+
+          clearedItemIds.push(...wave.itemIds);
+
+          const clearMs = wave.isLine ? LINE_CLEAR_MS : MATCH_CLEAR_MS;
+          await delay(clearMs);
+          if (epoch !== boardEpochRef.current || !cascadeRunningRef.current) return;
+
+          const clearedKeys = new Set(wave.cells.map((cell) => `${cell.r}:${cell.c}`));
+          const preferUnfinished =
+            challengeMode === 'random' &&
+            !reviveActiveRef.current &&
+            movesLeftRef.current <= LATE_BOARD_ASSIST_MOVES
+              ? gameItems
+                  .filter((it) => (itemHitCount[it.id] ?? 0) < HITS_PER_WORD_DEFAULT)
+                  .map((it) => it.id)
+              : undefined;
+          const after = collapseAndRefill(
+            current,
+            clearedKeys,
+            itemIds,
+            preferUnfinished && preferUnfinished.length > 0
+              ? preferUnfinished
+              : undefined,
+          ).grid;
+          const beforeSnap = current.map((row) => row.map((t) => ({ ...t })));
+          const afterSnap = after.map((row) => row.map((t) => ({ ...t })));
+
+          setMatchClearCells(null);
+          emitRefillBurst(beforeSnap, afterSnap, clearedKeys);
+          setGrid(afterSnap);
+          current = afterSnap;
+
+          await waitForRefillDone();
+          if (epoch !== boardEpochRef.current || !cascadeRunningRef.current) return;
+        }
+
+        applyResolvedMatch({ grid: current, clearedItemIds }, targetItemId);
+        if (isFirstSwapTutorialSwap) completeFirstSwapTutorial();
+      } finally {
+        cascadeRunningRef.current = false;
+        setCascadeBusy(false);
+        if (
+          isFirstSwapTutorialSwap &&
+          !firstTimeGuideRef.current.hasCompletedFirstSwapTutorial
+        ) {
+          firstSwapTutorialResolvingRef.current = false;
+          setFirstSwapTutorialResolving(false);
+        }
+      }
+    })();
+
+    // ── Track B: word popup + speech (front layer; independent of board timing).
+    // Timed hunt: prompt already spoken when the target appeared — skip match popup speech.
+    const timedHuntPrompt =
+      (reviveActiveRef.current || challengeMode === 'review') && !!funTargetId;
+    if (directItem && linkOrigin && !funWrongMatch && !timedHuntPrompt) {
       showWord({
         word: directItem.word,
         cn: directItem.cn,
         emoji: directItem.emoji,
         imgSrc: directItem.imgSrc,
-        originCell,
-      });
-    }
-
-    setSelected(null);
-    setGrid(swapped);
-    setMatchClearCells(
-      lineClearRuns.length > 0 ? clearCellsForLongRuns(lineClearRuns) : directMatch.cells,
-    );
-    setMatchClearKey((k) => k + 1);
-    setMatchShakeKey((k) => k + 1);
-    if (linkOrigin && directItem) {
-      wordLinkSeqRef.current += 1;
-      setWordLink({
-        itemId: targetItemId,
         originCell: linkOrigin,
-        burstKey: wordLinkSeqRef.current,
       });
+      window.setTimeout(() => {
+        if (epoch !== boardEpochRef.current) return;
+        wordLinkSeqRef.current += 1;
+        setWordLink({
+          itemId: targetItemId,
+          originCell: linkOrigin,
+          burstKey: wordLinkSeqRef.current,
+        });
+      }, 280);
     }
-
-    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
-    const clearMs = lineClearRuns.length > 0 ? LINE_CLEAR_MS : MATCH_CLEAR_MS;
-    const epoch = boardEpochRef.current;
-    clearTimerRef.current = window.setTimeout(() => {
-      clearTimerRef.current = null;
-      if (epoch !== boardEpochRef.current) return;
-      const resolved = resolveMatches(swapped);
-      const clearedKeys = new Set(
-        (lineClearRuns.length > 0 ? clearCellsForLongRuns(lineClearRuns) : directMatch.cells).map(
-          (cell) => `${cell.r}:${cell.c}`,
-        ),
-      );
-      emitRefillBurst(
-        swapped.map((row) => row.map((t) => ({ ...t }))),
-        resolved.grid.map((row) => row.map((t) => ({ ...t }))),
-        clearedKeys,
-      );
-      applyResolvedMatch(resolved, targetItemId);
-    }, clearMs);
   };
-
-  const handleQuizScoreChange = React.useCallback(
-    (delta: number) => {
-      changeScore(delta);
-    },
-    [changeScore],
-  );
 
   const clickCell = (r: number, c: number) => {
     if (pool.length < 6) return;
+    if (firstSwapTutorialPendingRef.current) {
+      const tutorialPair = firstSwapTutorialMoveRef.current;
+      const clicked = { r, c };
+      if (
+        firstSwapTutorialResolvingRef.current ||
+        !tutorialPair ||
+        (!sameCell(clicked, tutorialPair.source) &&
+          !sameCell(clicked, tutorialPair.target))
+      ) {
+        return;
+      }
+    }
     if (!selected) {
+      triggerGameHaptic('tileSelection');
       setSelected({ r, c });
       return;
     }
@@ -1431,6 +3297,7 @@ export const ItemMatchGamePage: React.FC = () => {
     const dc = Math.abs(selected.c - c);
     const isAdjacent = (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
     if (!isAdjacent) {
+      triggerGameHaptic('tileSelection');
       setSelected({ r, c });
       return;
     }
@@ -1439,32 +3306,163 @@ export const ItemMatchGamePage: React.FC = () => {
 
   const swapCells = (from: Cell, to: Cell) => {
     if (pool.length < 6) return;
+    if (firstSwapTutorialPendingRef.current) {
+      const tutorialPair = firstSwapTutorialMoveRef.current;
+      if (
+        firstSwapTutorialResolvingRef.current ||
+        !tutorialPair ||
+        !sameCellPair(from, to, tutorialPair)
+      ) {
+        return;
+      }
+    }
     setSelected(null);
     attemptSwap(from, to);
   };
 
   const usesThiings = allPool.some((it) => typeof it.imgSrc === 'string' && it.imgSrc.length > 0);
-  const canPlay = pool.length >= 6;
+  const reviewUnlocked = isReviewUnlocked(modeUnlocks.adventureClears);
+  const categoryUnlocked = isCategoryUnlocked(modeUnlocks.adventureClears);
+  const playBlockedReason =
+    challengeMode === 'random' && !adventurePlayable
+      ? ('stamina' as const)
+      : pool.length < 6
+        ? ('pool' as const)
+        : null;
+  const canPlay = playBlockedReason === null && gameItems.length >= 6;
   const totalEmojiPool = useMemo(
     () => allPool.filter((it) => Boolean(it.emoji)).length,
     [allPool],
   );
 
-  const modeLabel =
-    challengeMode === 'review'
+  const modeLabel = reviveActive
+    ? t.adventure.reviveTitle
+    : forcedReviewActive || (challengeMode === 'review' && modeUnlocks.pendingForcedReview)
+      ? t.modes.forcedReviewTitle
+      : challengeMode === 'review'
       ? t.modes.reviewMode
+      : challengeMode === 'mood'
+        ? `${moodPaletteSwatch(moodPaletteId)} ${t.modes.moodBoard} · ${t.modes.moodPaletteName(moodPaletteId)}`
       : challengeMode === 'category'
         ? activeCategory
           ? activeCategory.id === 'thiings'
             ? t.modes.thiingsLabel
             : categoryDisplayName(activeCategory, locale)
           : t.modes.categoryFallback
-        : challengeMode === 'fun'
-          ? t.modes.funChallenge
-          : t.modes.randomChallenge;
+        : t.modes.randomChallenge;
 
-  const onboardingStepCopy = t.onboarding.steps[onboardingStep];
-  const onboardingTotal = t.onboarding.steps.length;
+  const handlePlayerSummaryChange = React.useCallback((next: PlayerSummary) => {
+    savePlayerSummary(next);
+    setPlayerSummary(next);
+  }, []);
+
+  const handleReviveExit = React.useCallback(() => {
+    if (!reviveActiveRef.current) return;
+    failReviveAttempt();
+  }, [failReviveAttempt]);
+
+  const handleFailRetry = React.useCallback(() => {
+    setFailSheetOpen(false);
+    setDeadMachineOpen(false);
+    adventureRoundFreeRef.current = false;
+    retryAdventureBoard(
+      gameItems.length >= 6
+        ? [...gameItems]
+        : pickAdventureItems(
+            pool,
+            ADVENTURE_WORDS_PER_SET,
+            new Set(roundLearnedIdsRef.current),
+          ),
+      false,
+    );
+  }, [gameItems, pool, retryAdventureBoard]);
+
+  const handleGoReview = React.useCallback(() => {
+    setDeadMachineOpen(false);
+    setActiveTab('game');
+    enterReviewMode(Boolean(modeUnlocks.pendingForcedReview));
+  }, [enterReviewMode, modeUnlocks.pendingForcedReview]);
+
+  /** No stamina — rest: just dismiss the sheet (stay on empty adventure board). */
+  const handleDeadMachineRest = React.useCallback(() => {
+    setDeadMachineOpen(false);
+  }, []);
+
+  const handleGoAdventure = React.useCallback(() => {
+    handleChallengeModeChange('random');
+  }, [handleChallengeModeChange]);
+
+  const cycleMoodBoard = React.useCallback(() => {
+    setMoodPaletteId((current) => nextMoodPalette(current));
+  }, []);
+
+  const openSayBlast = React.useCallback(() => {
+    updateFirstTimeGuide((current) =>
+      current.stage === 'sayAndBlast'
+        ? { ...current, stage: 'awaitingSayAndBlastCompletion' }
+        : current,
+    );
+    stopAllWordSpeech();
+    bgmAudioRef.current?.pause();
+    setSayBlastOpen(true);
+  }, [updateFirstTimeGuide]);
+
+  const handleValidSayBlastExperience = React.useCallback(() => {
+    updateFirstTimeGuide((current) =>
+      current.stage === 'awaitingSayAndBlastCompletion'
+        ? { ...current, stage: 'moodBoard' }
+        : current,
+    );
+  }, [updateFirstTimeGuide]);
+
+  const exitSayBlast = React.useCallback(() => {
+    setSayBlastOpen(false);
+    window.setTimeout(() => {
+      const audio = bgmAudioRef.current;
+      if (!audio || !bgmEnabledRef.current) return;
+      void audio.play().then(
+        () => {
+          bgmNeedsGestureRef.current = false;
+        },
+        () => {
+          bgmNeedsGestureRef.current = true;
+        },
+      );
+    }, 280);
+  }, []);
+
+  const rewardSayBlastStamina = React.useCallback((): 'granted' | 'banked' => {
+    const reward = grantOrBankStamina(staminaStateRef.current, 1);
+    persistStamina(reward.state);
+    return reward.outcome;
+  }, [persistStamina]);
+
+  const learnedGuideEligible =
+    firstTimeGuide.stage === 'learned' &&
+    activeTab === 'game' &&
+    !consentOpen &&
+    !boardIntroActive &&
+    !quizOpen &&
+    !roundCelebrate &&
+    unlockCelebrate === null &&
+    !sayBlastOpen &&
+    !failSheetOpen &&
+    !deadMachineOpen &&
+    !reviewContinueOpen &&
+    reviveFlash === null &&
+    !firstSwapTutorialEligible &&
+    !firstSwapTutorialResolving;
+  const modeFeatureGuideTarget =
+    activeTab === 'game' &&
+    !consentOpen &&
+    !sayBlastOpen &&
+    !quizOpen &&
+    !roundCelebrate &&
+    unlockCelebrate === null &&
+    (firstTimeGuide.stage === 'sayAndBlast' ||
+      firstTimeGuide.stage === 'moodBoard')
+      ? firstTimeGuide.stage
+      : null;
 
   return (
     <div
@@ -1498,25 +3496,49 @@ export const ItemMatchGamePage: React.FC = () => {
           activeTab === 'game'
             ? 'overflow-hidden p-0'
             : 'overflow-x-hidden overflow-y-auto overscroll-y-contain px-0 pb-4 pt-0 [-webkit-overflow-scrolling:touch]',
-          onboardingOpen && 'overflow-hidden',
+          consentOpen && 'overflow-hidden',
         )}
       >
         {activeTab === 'game' && (
           <GamePanel
-            gridRef={gridRef}
-            modesButtonsRef={modesButtonsRef}
             onRestart={reset}
-            score={score}
-            scorePops={scorePops}
-            level={level}
+            clearedSets={modeUnlocks.adventureClears}
             gameItems={gameItems}
             itemHitCount={itemHitCount}
             challengeMode={challengeMode}
             modeLabel={modeLabel}
+            reviveActive={reviveActive}
+            timedHuntActive={reviveActive || challengeMode === 'review'}
             funTargetItem={funTargetItem}
             funTargetKey={funTargetKey}
             funCountdown={funCountdown}
+            funCountdownMaxSec={TIMED_TARGET_COUNTDOWN_SEC}
+            reviveWrongs={reviveWrongs}
+            reviveWrongLimit={REVIVE_WRONG_LIMIT}
+            reviveCorrects={reviveCorrects}
+            reviveCorrectNeeded={reviveCorrectNeeded(
+              gameItems.length || ADVENTURE_WORDS_PER_SET,
+            )}
+            onReviveExit={handleReviveExit}
+            movesLeft={
+              challengeMode === 'random' && !reviveActive ? movesLeft : null
+            }
+            stamina={staminaState.value}
+            staminaBanked={staminaState.bankedRewards}
             canPlay={canPlay}
+            playBlockedReason={playBlockedReason === 'stamina' ? 'stamina' : null}
+            onGoReview={handleGoReview}
+            onGoAdventure={handleGoAdventure}
+            reviewAvailable={
+              reviewUnlocked && reviewPool.length >= ADVENTURE_WORDS_PER_SET
+            }
+            pendingForcedReview={modeUnlocks.pendingForcedReview}
+            onResumeForcedReview={resumeForcedReview}
+            reviewPaused={reviewPaused}
+            onToggleReviewPause={() => setReviewPaused((p) => !p)}
+            moodBoardActive={challengeMode === 'mood'}
+            onCycleMoodBoard={cycleMoodBoard}
+            hitsNeeded={hitsNeededForMode(challengeMode)}
             grid={grid}
             itemById={itemById}
             selected={selected}
@@ -1525,176 +3547,210 @@ export const ItemMatchGamePage: React.FC = () => {
             matchShakeKey={matchShakeKey}
             matchClearCells={matchClearCells}
             matchClearKey={matchClearKey}
-            gridLocked={matchClearCells !== null || boardIntroActive || refillActive}
+            gridLocked={
+              matchClearCells !== null ||
+              boardIntroActive ||
+              refillActive ||
+              cascadeBusy ||
+              reviveFlash !== null ||
+              reviewPaused ||
+              (firstSwapTutorialEligible &&
+                (firstSwapTutorialResolving || !firstSwapTutorialMove))
+            }
             boardIntroActive={boardIntroActive}
             onBoardIntroComplete={() => setBoardIntroActive(false)}
             refillBurst={refillBurst}
-            onRefillActiveChange={setRefillActive}
+            onRefillActiveChange={handleRefillActiveChange}
             wordLink={wordLink}
             onWordLinkDone={() => setWordLink(null)}
             onCellClick={clickCell}
             onSwapCells={swapCells}
-            onChallengeModeChange={setChallengeMode}
+            onChallengeModeChange={handleChallengeModeChange}
+            onOpenSayBlast={openSayBlast}
             challengePools={challengePools}
             selectedCategoryId={selectedCategoryId}
             onCategoryChange={setSelectedCategoryId}
-            onShuffleWords={() => startNextRound(itemHitCount, new Set(gameItems.map((it) => it.id)))}
+            onShuffleWords={() =>
+              startNextRound(itemHitCount, new Set(gameItems.map((it) => it.id)))
+            }
+            reviewUnlocked={reviewUnlocked}
+            categoryUnlocked={categoryUnlocked}
+            firstSwapTutorialMove={
+              firstSwapTutorialEligible && !firstSwapTutorialResolving
+                ? firstSwapTutorialMove
+                : null
+            }
+            featureGuideTarget={modeFeatureGuideTarget}
+            featureGuideModePickerPlayCount={
+              modeFeatureGuideTarget === 'sayAndBlast'
+                ? firstTimeGuide.promptCounts.sayAndBlastModePicker
+                : modeFeatureGuideTarget === 'moodBoard'
+                  ? firstTimeGuide.promptCounts.moodBoardModePicker
+                  : 0
+            }
+            featureGuidePlayCount={
+              modeFeatureGuideTarget
+                ? firstTimeGuide.promptCounts[modeFeatureGuideTarget]
+                : 0
+            }
+            onFeatureGuidePlaybackStart={recordGuidePlayback}
           />
         )}
         {activeTab === 'learned' && (
           <LearnedPanel
-            learnedAreaRef={learnedAreaRef}
             roundLearnedIds={roundLearnedIds}
             totalEmojiPool={totalEmojiPool}
             itemById={itemById}
             allPool={allPool}
+            canGoReview={reviewUnlocked && reviewPool.length >= ADVENTURE_WORDS_PER_SET}
+            onGoReview={handleGoReview}
           />
         )}
-        {activeTab === 'words' && <WordsPanel emojiIndexAreaRef={emojiIndexAreaRef} />}
+        {activeTab === 'words' && <WordsPanel />}
         {activeTab === 'profile' && (
           <ProfilePanel
-            profileAreaRef={profileAreaRef}
             ttsAvailable={ttsAvailable}
             usesThiings={usesThiings}
             wordMemory={wordMemory}
             allPool={allPool}
-            totalEmojiPool={totalEmojiPool}
+            adventureClears={modeUnlocks.adventureClears}
+            playerSummary={playerSummary}
+            onPlayerSummaryChange={handlePlayerSummaryChange}
             bgmEnabled={bgmEnabled}
             onBgmEnabledChange={handleBgmEnabledChange}
             sfxEnabled={sfxEnabled}
             onSfxEnabledChange={handleSfxEnabledChange}
+            hapticsEnabled={hapticsEnabled}
+            onHapticsEnabledChange={handleHapticsEnabledChange}
           />
         )}
       </main>
 
-      <MobileTabBar active={activeTab} onChange={handleTabChange} />
+      <MobileTabBar
+        active={activeTab}
+        onChange={handleTabChange}
+        learnedGuide={
+          learnedGuideEligible
+            ? {
+                playCount: firstTimeGuide.promptCounts.learned,
+                onPlaybackStart: () => recordGuidePlayback('learned'),
+              }
+            : null
+        }
+      />
+
+      {sayBlastOpen && (
+        <SayBlastGame
+          learnedItems={sayBlastPool}
+          onExit={exitSayBlast}
+          onRewardStamina={rewardSayBlastStamina}
+          onValidExperience={handleValidSayBlastExperience}
+        />
+      )}
 
       <CelebrationBurst
         show={roundCelebrate}
-        title={t.celebration.roundComplete}
-        subtitle={t.celebration.roundQuiz}
+        title={roundCelebrateCard?.title}
+        subtitle={roundCelebrateCard?.subtitle}
         emoji="🎉"
+        durationMs={1800}
         onDone={handleRoundCelebrateDone}
+      />
+
+      <CelebrationBurst
+        show={unlockCelebrate === 'review'}
+        title={t.celebration.unlockReviewTitle}
+        subtitle={t.celebration.unlockReviewSubtitle}
+        emoji="⭐"
+        durationMs={2200}
+        onDone={handleUnlockCelebrateDone}
+      />
+
+      <CelebrationBurst
+        show={unlockCelebrate === 'category'}
+        title={t.celebration.unlockCategoryTitle}
+        subtitle={t.celebration.unlockCategorySubtitle}
+        emoji="🧩"
+        durationMs={2200}
+        onDone={handleUnlockCelebrateDone}
+      />
+
+      <CelebrationBurst
+        show={reviveFlash === 'outOfMoves'}
+        title={t.adventure.outOfMovesTitle}
+        subtitle={t.adventure.outOfMovesSubtitle}
+        emoji="⏱️"
+        durationMs={1400}
+        className="candy-celebration-overlay-no-dim"
+        onDone={() => setReviveFlash(null)}
+      />
+
+      <CelebrationBurst
+        show={reviveFlash === 'retry'}
+        title={t.adventure.reviveRetryTitle}
+        subtitle={t.adventure.reviveRetrySubtitle}
+        emoji="✨"
+        durationMs={1400}
+        className="candy-celebration-overlay-no-dim"
+        onDone={() => {
+          setReviveFlash(null);
+        }}
+      />
+
+      <CelebrationBurst
+        show={reviveFlash === 'success'}
+        title={t.adventure.reviveSuccessTitle}
+        subtitle={t.adventure.reviveSuccessSubtitle}
+        emoji="💖"
+        durationMs={900}
+        className="candy-celebration-overlay-no-dim"
+        onDone={() => {
+          setReviveFlash(null);
+          if (!rescueQuizPendingRef.current) return;
+          rescueQuizPendingRef.current = false;
+          setQuizKind(Math.random() < 0.35 ? 'connect' : 'pick');
+          setQuizOpen(true);
+        }}
       />
 
       <RoundQuizSheet
         open={quizOpen}
         items={quizItems}
-        score={score}
-        scorePops={scorePops}
+        distractorPool={allPool}
+        celebrateKind={
+          challengeMode === 'review' || forcedReviewActive ? 'review' : 'learned'
+        }
+        quizKind={quizKind}
+        congratsGained={quizItems.length}
         onComplete={handleQuizComplete}
-        onScoreChange={handleQuizScoreChange}
+        onAbandon={handleQuizAbandon}
       />
 
-      <AnimatePresence>
-        {onboardingOpen && !boardIntroActive && (
-          <motion.div
-            key="match3-onboarding-spotlight"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[120] pointer-events-auto"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t.onboarding.dialogAria}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) dismissOnboarding();
-            }}
-          >
-            <div className="absolute inset-0 bg-black/55" />
-            {spotRect && (
-              <motion.div
-                key={`spot-${onboardingStep}`}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.18 }}
-                className="absolute rounded-[28px] ring-4 ring-amber-300/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
-                style={{
-                  left: Math.max(8, spotRect.x - 10),
-                  top: Math.max(8, spotRect.y - 10),
-                  width: Math.max(40, spotRect.w + 20),
-                  height: Math.max(40, spotRect.h + 20),
-                }}
-              />
-            )}
+      <ReviewContinueSheet
+        open={reviewContinueOpen}
+        canContinueReview={reviewPool.length >= ADVENTURE_WORDS_PER_SET}
+        canGoAdventure={staminaState.value > 0}
+        onContinueReview={handleReviewContinueReview}
+        onGoAdventure={handleReviewContinueAdventure}
+        onRest={handleReviewContinueRest}
+      />
 
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="absolute left-1/2 top-[calc(100%-16px)] w-[min(92vw,520px)] -translate-x-1/2 -translate-y-full rounded-[24px] border border-violet-100 bg-white p-5 shadow-2xl shadow-violet-900/25 sm:p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="absolute right-3 top-3 rounded-full p-2 text-violet-700 transition-colors hover:bg-violet-50 hover:text-violet-950"
-                onClick={dismissOnboarding}
-                aria-label={t.onboarding.closeAria}
-              >
-                <X size={18} aria-hidden />
-              </button>
+      <AdventureFailSheet
+        open={failSheetOpen}
+        canRetry={staminaState.value > 0}
+        onRetry={handleFailRetry}
+        onClose={() => setFailSheetOpen(false)}
+      />
 
-              <div className="flex items-center gap-2 pr-10">
-                <Sparkles className="shrink-0 text-violet-600" size={18} aria-hidden />
-                <span className="text-[11px] font-bold uppercase tracking-widest text-violet-600">
-                  {t.onboarding.title(onboardingStep + 1, onboardingTotal)}
-                </span>
-              </div>
-              <div className="mt-2 text-lg font-black text-violet-950">{onboardingStepCopy?.title}</div>
-              <div className="mt-2 text-sm font-medium leading-relaxed text-violet-800/90">
-                {onboardingStepCopy?.body}
-              </div>
+      <DeadMachineSheet
+        open={deadMachineOpen}
+        canGoReview={reviewUnlocked && reviewPool.length >= ADVENTURE_WORDS_PER_SET}
+        onGoReview={handleGoReview}
+        onClose={handleDeadMachineRest}
+      />
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOnboardingStep((s) => Math.max(0, s - 1))}
-                  disabled={onboardingStep === 0}
-                  className={cn(
-                    'min-h-[44px] rounded-full border px-5 py-2 text-sm font-bold transition-colors',
-                    onboardingStep === 0
-                      ? 'cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300'
-                      : 'border-violet-200 bg-white text-violet-800 hover:bg-violet-50',
-                  )}
-                >
-                  {t.common.prev}
-                </button>
+      <LegalConsentModal open={consentOpen} onAccept={acceptConsent} />
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={dismissOnboarding}
-                    className="min-h-[44px] rounded-full border border-violet-200 bg-white px-5 py-2 text-sm font-bold text-violet-800 transition-colors hover:bg-violet-50"
-                  >
-                    {t.common.skip}
-                  </button>
-                  {onboardingStep < onboardingTotal - 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setOnboardingStep((s) => Math.min(onboardingTotal - 1, s + 1))}
-                      className="min-h-[44px] rounded-full border border-violet-600 bg-violet-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-violet-900/15 transition-colors hover:bg-violet-700"
-                    >
-                      {t.common.next}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={dismissOnboarding}
-                      className="min-h-[44px] rounded-full border border-violet-600 bg-violet-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-violet-900/15 transition-colors hover:bg-violet-700"
-                    >
-                      {t.common.done}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };
-

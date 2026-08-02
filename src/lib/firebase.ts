@@ -14,6 +14,7 @@ import {
   signInWithCredential,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   updateProfile,
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -225,6 +226,14 @@ export async function signUpWithEmail(email: string, password: string): Promise<
     password,
   );
   return result.user;
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  const next = email.trim();
+  if (!next || !next.includes('@')) {
+    throw Object.assign(new Error('invalid_email'), { code: 'auth/invalid-email' });
+  }
+  await sendPasswordResetEmail(getFirebaseAuth(), next);
 }
 
 export async function updateUserDisplayName(displayName: string): Promise<User> {

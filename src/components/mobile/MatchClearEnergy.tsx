@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from 'react';
+import { useLayoutEffect, useState, type CSSProperties, type RefObject } from 'react';
 import { cellBoundsPx, cellCenterPx, gridCellMetrics } from '../../lib/gridLayout';
 import type { Cell } from '../../types/game';
 
@@ -86,7 +86,7 @@ type EnergyGeom = MatchGeom | LineGeom;
 
 type MatchClearEnergyProps = {
   cells: Cell[];
-  boardRef: React.RefObject<HTMLDivElement | null>;
+  boardRef: RefObject<HTMLDivElement | null>;
   burstKey: number;
 };
 
@@ -251,77 +251,131 @@ function MatchClearMatchEffect({ geom, burstKey }: { geom: MatchGeom; burstKey: 
   );
 }
 
-function HorizontalBeam({ w, h, row, uid }: { w: number; h: number; row: number; uid: number }) {
+const SWEEP_MS = 0.42;
+
+/** Candy Crush–style: 3 parallel bands race left→right across a row. */
+function HorizontalTripleSweep({
+  w,
+  h,
+  row,
+  uid,
+}: {
+  w: number;
+  h: number;
+  row: number;
+  uid: number;
+}) {
   const bounds = cellBoundsPx(w, h, { r: row, c: 0 });
   const cy = bounds.y + bounds.h / 2;
-  const beamH = bounds.h * 0.72;
-  const outerH = beamH * 2.1;
+  const packetW = Math.max(58, w * 0.24);
+  const bandH = Math.max(5, bounds.h * 0.15);
+  const gap = bounds.h * 0.14;
+  const bands = [-gap, 0, gap];
 
   return (
-    <g style={{ transformOrigin: `${w / 2}px ${cy}px`, animation: 'line-beam-h 0.62s ease-out forwards' }}>
+    <g
+      className="line-triple-sweep-h"
+      style={
+        {
+          '--sweep-x': `${w}px`,
+          animation: `line-triple-sweep-h ${SWEEP_MS}s cubic-bezier(0.22, 0.7, 0.2, 1) forwards`,
+        } as CSSProperties
+      }
+    >
       <rect
-        x={0}
-        y={cy - outerH / 2}
-        width={w}
-        height={outerH}
-        rx={outerH / 2}
-        fill={`url(#line-outer-h-${uid})`}
-        opacity={0.85}
+        x={-packetW * 0.12}
+        y={cy - bounds.h * 0.42}
+        width={packetW * 1.12}
+        height={bounds.h * 0.84}
+        rx={bounds.h * 0.22}
+        fill={`url(#sweep-wash-h-${uid})`}
+        opacity={0.95}
       />
-      <rect
-        x={bounds.x * 0.02}
-        y={cy - beamH / 2}
-        width={w * 0.96}
-        height={beamH}
-        rx={beamH / 2}
-        fill={`url(#line-mid-h-${uid})`}
-      />
-      <rect
-        x={w * 0.06}
-        y={cy - beamH * 0.14}
-        width={w * 0.88}
-        height={beamH * 0.28}
-        rx={beamH * 0.14}
+      {bands.map((offset, i) => (
+        <rect
+          key={i}
+          x={0}
+          y={cy + offset - bandH / 2}
+          width={packetW}
+          height={bandH}
+          rx={bandH / 2}
+          fill={`url(#sweep-band-h-${uid})`}
+          opacity={i === 1 ? 1 : 0.88}
+          filter={i === 1 ? `url(#sweep-glow-${uid})` : undefined}
+        />
+      ))}
+      <ellipse
+        cx={packetW * 0.9}
+        cy={cy}
+        rx={bandH * 1.05}
+        ry={bounds.h * 0.3}
         fill="white"
         opacity={0.95}
+        filter={`url(#sweep-glow-${uid})`}
       />
     </g>
   );
 }
 
-function VerticalBeam({ w, h, col, uid }: { w: number; h: number; col: number; uid: number }) {
+/** Candy Crush–style: 3 parallel bands race top→bottom down a column. */
+function VerticalTripleSweep({
+  w,
+  h,
+  col,
+  uid,
+}: {
+  w: number;
+  h: number;
+  col: number;
+  uid: number;
+}) {
   const bounds = cellBoundsPx(w, h, { r: 0, c: col });
   const cx = bounds.x + bounds.w / 2;
-  const beamW = bounds.w * 0.72;
-  const outerW = beamW * 2.1;
+  const packetH = Math.max(58, h * 0.24);
+  const bandW = Math.max(5, bounds.w * 0.15);
+  const gap = bounds.w * 0.14;
+  const bands = [-gap, 0, gap];
 
   return (
-    <g style={{ transformOrigin: `${cx}px ${h / 2}px`, animation: 'line-beam-v 0.62s ease-out forwards' }}>
+    <g
+      className="line-triple-sweep-v"
+      style={
+        {
+          '--sweep-y': `${h}px`,
+          animation: `line-triple-sweep-v ${SWEEP_MS}s cubic-bezier(0.22, 0.7, 0.2, 1) forwards`,
+        } as CSSProperties
+      }
+    >
       <rect
-        x={cx - outerW / 2}
-        y={0}
-        width={outerW}
-        height={h}
-        rx={outerW / 2}
-        fill={`url(#line-outer-v-${uid})`}
-        opacity={0.85}
+        x={cx - bounds.w * 0.42}
+        y={-packetH * 0.12}
+        width={bounds.w * 0.84}
+        height={packetH * 1.12}
+        rx={bounds.w * 0.22}
+        fill={`url(#sweep-wash-v-${uid})`}
+        opacity={0.95}
       />
-      <rect
-        x={cx - beamW / 2}
-        y={bounds.y * 0.02}
-        width={beamW}
-        height={h * 0.96}
-        rx={beamW / 2}
-        fill={`url(#line-mid-v-${uid})`}
-      />
-      <rect
-        x={cx - beamW * 0.14}
-        y={h * 0.06}
-        width={beamW * 0.28}
-        height={h * 0.88}
-        rx={beamW * 0.14}
+      {bands.map((offset, i) => (
+        <rect
+          key={i}
+          x={cx + offset - bandW / 2}
+          y={0}
+          width={bandW}
+          height={packetH}
+          rx={bandW / 2}
+          fill={`url(#sweep-band-v-${uid})`}
+          opacity={i === 1 ? 1 : 0.88}
+          filter={i === 1 ? `url(#sweep-glow-${uid})` : undefined}
+        />
+      ))}
+      <ellipse
+        cx={cx}
+        cy={packetH * 0.9}
+        rx={bounds.w * 0.3}
+        ry={bandW * 1.05}
         fill="white"
         opacity={0.95}
+        filter={`url(#sweep-glow-${uid})`}
       />
     </g>
   );
@@ -333,96 +387,61 @@ function MatchClearLineEffect({ geom, burstKey }: { geom: LineGeom; burstKey: nu
   return (
     <>
       <defs>
-        <clipPath id={`line-clip-${uid}`}>
-          {geom.clipRects.map((r, i) => (
-            <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} rx={r.rx} />
-          ))}
-        </clipPath>
-        <linearGradient id={`line-outer-h-${uid}`} x1="0%" y1="50%" x2="100%" y2="50%">
-          <stop offset="0%" stopColor="rgba(255,180,40,0)" />
-          <stop offset="20%" stopColor="rgba(255,200,50,0.55)" />
-          <stop offset="50%" stopColor="rgba(255,230,100,0.95)" />
-          <stop offset="80%" stopColor="rgba(255,200,50,0.55)" />
+        <linearGradient id={`sweep-band-h-${uid}`} x1="0%" y1="50%" x2="100%" y2="50%">
+          <stop offset="0%" stopColor="rgba(255,200,60,0)" />
+          <stop offset="25%" stopColor="rgba(255,220,90,0.75)" />
+          <stop offset="55%" stopColor="rgba(255,255,255,1)" />
+          <stop offset="78%" stopColor="rgba(255,230,120,0.95)" />
           <stop offset="100%" stopColor="rgba(255,180,40,0)" />
         </linearGradient>
-        <linearGradient id={`line-mid-h-${uid}`} x1="0%" y1="50%" x2="100%" y2="50%">
-          <stop offset="0%" stopColor="rgba(255,210,60,0.3)" />
-          <stop offset="50%" stopColor="rgba(255,245,160,1)" />
-          <stop offset="100%" stopColor="rgba(255,210,60,0.3)" />
+        <linearGradient id={`sweep-wash-h-${uid}`} x1="0%" y1="50%" x2="100%" y2="50%">
+          <stop offset="0%" stopColor="rgba(255,210,80,0)" />
+          <stop offset="40%" stopColor="rgba(255,230,120,0.45)" />
+          <stop offset="70%" stopColor="rgba(255,250,200,0.55)" />
+          <stop offset="100%" stopColor="rgba(255,200,60,0)" />
         </linearGradient>
-        <linearGradient id={`line-outer-v-${uid}`} x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="rgba(255,180,40,0)" />
-          <stop offset="20%" stopColor="rgba(255,200,50,0.55)" />
-          <stop offset="50%" stopColor="rgba(255,230,100,0.95)" />
-          <stop offset="80%" stopColor="rgba(255,200,50,0.55)" />
+        <linearGradient id={`sweep-band-v-${uid}`} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,200,60,0)" />
+          <stop offset="25%" stopColor="rgba(255,220,90,0.75)" />
+          <stop offset="55%" stopColor="rgba(255,255,255,1)" />
+          <stop offset="78%" stopColor="rgba(255,230,120,0.95)" />
           <stop offset="100%" stopColor="rgba(255,180,40,0)" />
         </linearGradient>
-        <linearGradient id={`line-mid-v-${uid}`} x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="rgba(255,210,60,0.3)" />
-          <stop offset="50%" stopColor="rgba(255,245,160,1)" />
-          <stop offset="100%" stopColor="rgba(255,210,60,0.3)" />
+        <linearGradient id={`sweep-wash-v-${uid}`} x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="rgba(255,210,80,0)" />
+          <stop offset="40%" stopColor="rgba(255,230,120,0.45)" />
+          <stop offset="70%" stopColor="rgba(255,250,200,0.55)" />
+          <stop offset="100%" stopColor="rgba(255,200,60,0)" />
         </linearGradient>
+        <filter id={`sweep-glow-${uid}`} x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
         <radialGradient id={`cross-flash-${uid}`}>
           <stop offset="0%" stopColor="rgba(255,255,255,1)" />
           <stop offset="40%" stopColor="rgba(255,240,140,0.9)" />
           <stop offset="100%" stopColor="rgba(255,200,50,0)" />
         </radialGradient>
-        <filter id={`line-blur-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="5" />
-        </filter>
       </defs>
 
-      <g
-        clipPath={`url(#line-clip-${uid})`}
-        style={{ animation: 'line-energy-fade 0.62s ease-out forwards' }}
-      >
-        {geom.rows.map((row) => (
-          <HorizontalBeam key={`r-${row}`} w={geom.w} h={geom.h} row={row} uid={uid} />
-        ))}
-        {geom.cols.map((col) => (
-          <VerticalBeam key={`c-${col}`} w={geom.w} h={geom.h} col={col} uid={uid} />
-        ))}
-        {geom.cross && (
-          <circle
-            cx={geom.cross.x}
-            cy={geom.cross.y}
-            r={geom.cellW * 0.55}
-            fill={`url(#cross-flash-${uid})`}
-            filter={`url(#line-blur-${uid})`}
-            style={{ animation: 'cross-flash 0.62s ease-out forwards' }}
-          />
-        )}
-        {geom.sparks.map((s, i) => (
-          <circle
-            key={`spark-${i}`}
-            cx={s.x}
-            cy={s.y}
-            r={s.size}
-            fill="white"
-            style={{
-              animation: `sparkle-twinkle 0.55s ease-out ${s.delay}s forwards`,
-              filter: 'drop-shadow(0 0 3px rgba(255,240,120,1))',
-            }}
-          />
-        ))}
-      </g>
-      {geom.clipRects.map((r, i) => (
-        <rect
-          key={`line-frame-${i}`}
-          x={r.x + 1}
-          y={r.y + 1}
-          width={r.w - 2}
-          height={r.h - 2}
-          rx={r.rx}
-          fill="none"
-          stroke="rgba(255,235,120,1)"
-          strokeWidth={2.5}
-          style={{
-            animation: 'line-frame-pulse 0.62s ease-out forwards',
-            filter: 'drop-shadow(0 0 6px rgba(255,210,60,0.95))',
-          }}
-        />
+      {geom.rows.map((row) => (
+        <HorizontalTripleSweep key={`r-${row}`} w={geom.w} h={geom.h} row={row} uid={uid} />
       ))}
+      {geom.cols.map((col) => (
+        <VerticalTripleSweep key={`c-${col}`} w={geom.w} h={geom.h} col={col} uid={uid} />
+      ))}
+      {geom.cross && (
+        <circle
+          cx={geom.cross.x}
+          cy={geom.cross.y}
+          r={geom.cellW * 0.55}
+          fill={`url(#cross-flash-${uid})`}
+          style={{ animation: `cross-flash ${SWEEP_MS}s ease-out forwards` }}
+        />
+      )}
     </>
   );
 }

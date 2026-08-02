@@ -37,7 +37,7 @@ export default function App() {
 }
 
 const GAME_PAGE_PRELOAD = import('./components/ItemMatchGamePage');
-const MIN_SPLASH_MS = 1300;
+const MIN_SPLASH_MS = 1600;
 /** Keep in sync with `.splash-exit` duration in index.css */
 const SPLASH_EXIT_MS = 360;
 

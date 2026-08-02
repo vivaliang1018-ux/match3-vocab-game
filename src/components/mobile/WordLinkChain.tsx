@@ -52,10 +52,10 @@ export function WordLinkChain({
   };
   const pathD = `M ${from.x} ${from.y} Q ${ctrl.x} ${ctrl.y} ${to.x} ${to.y}`;
 
-  const stars = Array.from({ length: 14 }, (_, i) => {
-    const t = 0.08 + (i / 13) * 0.84;
+  const stars = Array.from({ length: 5 }, (_, i) => {
+    const t = 0.15 + (i / 4) * 0.7;
     const p = quadPoint(t, from, ctrl, to);
-    return { ...p, delay: i * 0.028, size: 5 + (i % 3) * 2, rot: (i * 27) % 360 };
+    return { ...p, delay: i * 0.04, size: 6 + (i % 2) * 2, rot: (i * 36) % 360 };
   });
 
   useEffect(() => {
@@ -66,28 +66,18 @@ export function WordLinkChain({
   return (
     <div key={burstKey} className="pointer-events-none absolute inset-0 z-[35] overflow-hidden">
       <svg className="absolute inset-0 h-full w-full" aria-hidden>
-        <defs>
-          <filter id={`link-glow-${burstKey}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
         <path
           d={pathD}
           fill="none"
-          stroke="rgba(255,255,255,0.55)"
-          strokeWidth={3}
+          stroke="rgba(255,255,255,0.65)"
+          strokeWidth={2.5}
           strokeLinecap="round"
-          filter={`url(#link-glow-${burstKey})`}
           style={{ animation: 'word-link-trail 0.75s var(--ease-ios) forwards' }}
         />
         <path
           d={pathD}
           fill="none"
-          stroke="rgba(255,245,200,0.85)"
+          stroke="rgba(255,245,200,0.9)"
           strokeWidth={1.2}
           strokeLinecap="round"
           strokeDasharray="4 7"
@@ -98,17 +88,16 @@ export function WordLinkChain({
       {stars.map((s, i) => (
         <motion.div
           key={i}
-          className="absolute left-0 top-0 will-change-transform"
+          className="absolute left-0 top-0"
           style={{ transform: `translate3d(${s.x}px, ${s.y}px, 0) translate(-50%, -50%) rotate(${s.rot}deg)` }}
-          initial={{ opacity: 0, scale: 0, rotate: s.rot - 40 }}
+          initial={{ opacity: 0, scale: 0 }}
           animate={{
-            opacity: [0, 1, 0.8, 0],
-            scale: [0, 1.3, 0.95, 0],
-            rotate: [s.rot - 40, s.rot + 20, s.rot],
+            opacity: [0, 1, 0],
+            scale: [0, 1.15, 0],
           }}
-          transition={{ duration: 0.58, delay: s.delay, ease: IOS_EASE }}
+          transition={{ duration: 0.48, delay: s.delay, ease: IOS_EASE }}
         >
-          <StarShape size={s.size} className="drop-shadow-[0_0_4px_rgba(255,255,255,0.95)]" />
+          <StarShape size={s.size} />
         </motion.div>
       ))}
 

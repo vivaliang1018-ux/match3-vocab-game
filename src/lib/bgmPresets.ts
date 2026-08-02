@@ -1,7 +1,7 @@
 import { assetUrl } from './assetUrl';
 
 export const BGM_ENABLED_KEY = 'smellycat-match3-bgm-enabled';
-export const DEFAULT_BGM_VOLUME = 0.12;
+export const DEFAULT_BGM_VOLUME = 0.08;
 
 const BGM_FILE = 'bgm/mutou-tangyun.mp3';
 

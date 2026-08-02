@@ -20,6 +20,7 @@ import {
   signInWithGoogle,
   signOutUser,
   signUpWithEmail,
+  sendPasswordReset,
   updateUserDisplayName,
   userHasPasswordProvider,
 } from '../lib/firebase';
@@ -36,6 +37,7 @@ type AuthContextValue = {
   signInApple: () => Promise<string | null>;
   signInEmail: (email: string, password: string) => Promise<string | null>;
   signUpEmail: (email: string, password: string) => Promise<string | null>;
+  sendPasswordReset: (email: string) => Promise<string | null>;
   updateDisplayName: (displayName: string) => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<string | null>;
   changeEmail: (currentPassword: string, newEmail: string) => Promise<string | null>;
@@ -132,6 +134,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUpEmail: (email, password) =>
         runAuth(async () => {
           await signUpWithEmail(email, password);
+        }),
+      sendPasswordReset: (email) =>
+        runAuth(async () => {
+          await sendPasswordReset(email);
         }),
       updateDisplayName: async (displayName) => {
         if (!configured) {

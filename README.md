@@ -1,4 +1,4 @@
-# Match-3 Vocab Game
+# Matchingo
 
 Emoji / image match-3 vocabulary game with Ebbinghaus-style spaced repetition.
 

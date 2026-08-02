@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.match3vocab.game',
-  appName: '物品消消乐',
+  appId: 'com.matchingo.game',
+  appName: 'Matchingo',
   webDir: 'dist',
   plugins: {
     StatusBar: {
