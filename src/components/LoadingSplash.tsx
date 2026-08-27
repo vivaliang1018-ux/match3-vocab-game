@@ -163,12 +163,12 @@ export function LoadingSplash({
           >
             <picture>
               <source
-                srcSet={`${assetUrl('splash-logo.webp')}?v=20260827a`}
+                srcSet={`${assetUrl('splash-logo.webp')}?v=20260827b`}
                 type="image/webp"
               />
               <img
                 ref={logoRef}
-                src={`${assetUrl('splash-logo.png')}?v=20260827a`}
+                src={`${assetUrl('splash-logo.png')}?v=20260827b`}
                 alt="Matchingo"
                 className="splash-logo-image mx-auto w-[min(44vw,205px)] max-w-full"
                 draggable={false}

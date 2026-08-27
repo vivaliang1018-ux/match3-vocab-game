@@ -20,9 +20,9 @@
                                 <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                             </imageView>
                             <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="LaunchLogo" translatesAutoresizingMaskIntoConstraints="NO" id="mtL-go-001">
-                                <rect key="frame" x="116" y="303" width="143" height="44"/>
+                                <rect key="frame" x="116" y="299" width="143" height="52"/>
                                 <constraints>
-                                    <constraint firstAttribute="width" secondItem="mtL-go-001" secondAttribute="height" multiplier="1959:803" id="mtL-go-ratio"/>
+                                    <constraint firstAttribute="width" secondItem="mtL-go-001" secondAttribute="height" multiplier="2079:756" id="mtL-go-ratio"/>
                                     <constraint firstAttribute="width" relation="lessThanOrEqual" constant="205" id="mtL-go-max"/>
                                 </constraints>
                             </imageView>
@@ -56,6 +56,6 @@
     </scenes>
     <resources>
         <image name="LaunchSky" width="1170" height="2532"/>
-        <image name="LaunchLogo" width="1959" height="803"/>
+        <image name="LaunchLogo" width="2079" height="756"/>
     </resources>
 </document>
