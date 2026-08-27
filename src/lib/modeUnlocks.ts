@@ -28,11 +28,8 @@ const DEFAULT_UNLOCKS: ModeUnlockState = {
   pendingForcedReview: false,
 };
 
-export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
-  claimGuestProgress(STORAGE_KEY, userUid);
+function parseModeUnlocks(raw: string): ModeUnlockState {
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
-    if (!raw) return { ...DEFAULT_UNLOCKS };
     const parsed = JSON.parse(raw) as Partial<ModeUnlockState>;
     return {
       adventureClears:
@@ -41,6 +38,26 @@ export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
       categoryUnlockSeen: Boolean(parsed.categoryUnlockSeen),
       pendingForcedReview: Boolean(parsed.pendingForcedReview),
     };
+  } catch {
+    return { ...DEFAULT_UNLOCKS };
+  }
+}
+
+export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
+  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+    const account = parseModeUnlocks(accountRaw);
+    const guest = parseModeUnlocks(guestRaw);
+    return JSON.stringify({
+      adventureClears: Math.max(account.adventureClears, guest.adventureClears),
+      reviewUnlockSeen: account.reviewUnlockSeen || guest.reviewUnlockSeen,
+      categoryUnlockSeen: account.categoryUnlockSeen || guest.categoryUnlockSeen,
+      pendingForcedReview: account.pendingForcedReview || guest.pendingForcedReview,
+    });
+  });
+  try {
+    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    if (!raw) return { ...DEFAULT_UNLOCKS };
+    return parseModeUnlocks(raw);
   } catch {
     return { ...DEFAULT_UNLOCKS };
   }

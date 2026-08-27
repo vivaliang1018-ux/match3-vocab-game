@@ -20,7 +20,7 @@ export async function hideNativeSplash(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
     const { SplashScreen } = await import('@capacitor/splash-screen');
-    await SplashScreen.hide({ fadeOutDuration: 200 });
+    await SplashScreen.hide({ fadeOutDuration: 0 });
   } catch {
     // Ignore when the plugin is unavailable.
   }

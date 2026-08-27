@@ -13,9 +13,12 @@ export type GameHapticEvent =
   | 'specialClear'
   | 'sayBlastExplosion'
   | 'cascadeWave'
+  | 'deadMachine'
   | 'majorSuccess'
   | 'achievementOpen'
   | 'newBadgeOpen'
+  | 'badgeMysteryOpen'
+  | 'badgeClaimStart'
   | 'quizWordSelection'
   | 'quizCorrect'
   | 'quizWrong';
@@ -71,6 +74,8 @@ export function triggerGameHaptic(event: GameHapticEvent): void {
           await Haptics.selectionEnd();
           break;
         case 'quizCorrect':
+        case 'deadMachine':
+        case 'badgeMysteryOpen':
           await Haptics.impact({ style: ImpactStyle.Light });
           break;
         case 'specialClear':
@@ -80,6 +85,7 @@ export function triggerGameHaptic(event: GameHapticEvent): void {
           await Haptics.vibrate({ duration: 180 });
           break;
         case 'quizWrong':
+        case 'badgeClaimStart':
           await Haptics.impact({ style: ImpactStyle.Medium });
           break;
         case 'achievementOpen':

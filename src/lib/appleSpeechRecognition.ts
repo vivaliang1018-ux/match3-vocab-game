@@ -9,6 +9,7 @@ export type SpeechPermissionState = 'prompt' | 'granted' | 'denied';
 export type AppleSpeechPermissions = {
   speechRecognition: SpeechPermissionState;
   microphone: SpeechPermissionState;
+  onDeviceRecognitionSupported: boolean;
 };
 
 export type AppleSpeechSegment = {
@@ -75,9 +76,24 @@ export function isAppleSpeechRecognitionAvailable(): boolean {
 
 export async function requestAppleSpeechPermissions(): Promise<AppleSpeechPermissions> {
   if (!isAppleSpeechRecognitionAvailable()) {
-    return { speechRecognition: 'denied', microphone: 'denied' };
+    return {
+      speechRecognition: 'denied',
+      microphone: 'denied',
+      onDeviceRecognitionSupported: false,
+    };
   }
   return AppleSpeechRecognition.requestPermissions();
+}
+
+export async function checkAppleSpeechPermissions(): Promise<AppleSpeechPermissions> {
+  if (!isAppleSpeechRecognitionAvailable()) {
+    return {
+      speechRecognition: 'denied',
+      microphone: 'denied',
+      onDeviceRecognitionSupported: false,
+    };
+  }
+  return AppleSpeechRecognition.checkPermissions();
 }
 
 export async function startAppleSpeechRecognition(

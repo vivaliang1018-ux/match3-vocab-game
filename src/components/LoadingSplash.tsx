@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { assetUrl } from '../lib/assetUrl';
 import { SkySparkleBackground } from './SkySparkleBackground';
 
-export const LOADING_SPLASH_BUILD = '2026-07-15-logo';
+export const LOADING_SPLASH_BUILD = '2026-08-27-matchingo-logo';
 
-/** Candy logo archived under public/branding/archived/; live asset is public/splash-logo.* */
+/** Previous logo concepts live under docs/branding/archived/; the active Matchingo asset is splash-logo.* */
 export type SplashVariant = 'logo' | 'tiles' | 'wave';
 
 const MATCHINGO_LETTERS = [
@@ -28,7 +28,9 @@ export type LoadingSplashProps = {
   timeScale?: number;
   embedded?: boolean;
   exiting?: boolean;
-  /** Default: candy logo. `tiles` / `wave` are alternate schemes. */
+  /** Start from the native launch screen's settled logo instead of replaying the entrance. */
+  seamlessEntry?: boolean;
+  /** Default: Matchingo logo. `tiles` / `wave` are alternate schemes. */
   variant?: SplashVariant;
 };
 
@@ -39,13 +41,22 @@ export function LoadingSplash({
   timeScale = 1,
   embedded = false,
   exiting = false,
+  seamlessEntry = false,
   variant = 'logo',
 }: LoadingSplashProps) {
   const durScale = Math.max(0.5, timeScale);
+  const logoRef = useRef<HTMLImageElement>(null);
 
   useEffect(() => {
-    onReady?.();
-  }, [onReady]);
+    if (variant !== 'logo') onReady?.();
+  }, [onReady, variant]);
+
+  // Cached/preloaded logos may already be complete before onLoad attaches.
+  useEffect(() => {
+    if (variant !== 'logo' || !onReady) return;
+    const img = logoRef.current;
+    if (img?.complete && img.naturalWidth > 0) onReady();
+  }, [onReady, variant]);
 
   useEffect(() => {
     if (!onDone) return;
@@ -147,27 +158,34 @@ export function LoadingSplash({
             </div>
           </div>
         ) : (
-          <div className="splash-logo relative z-20 px-4 text-center">
+          <div
+            className={`splash-logo relative z-20 px-4 text-center${seamlessEntry ? ' splash-logo--seamless' : ''}`}
+          >
             <picture>
               <source
-                srcSet={`${assetUrl('splash-logo.webp')}?v=20260715e`}
+                srcSet={`${assetUrl('splash-logo.webp')}?v=20260827a`}
                 type="image/webp"
               />
               <img
-                src={`${assetUrl('splash-logo.png')}?v=20260715e`}
+                ref={logoRef}
+                src={`${assetUrl('splash-logo.png')}?v=20260827a`}
                 alt="Matchingo"
-                className="splash-logo-image mx-auto w-[min(80vw,360px)] max-w-full"
+                className="splash-logo-image mx-auto w-[min(44vw,205px)] max-w-full"
                 draggable={false}
-                decoding="async"
+                decoding="sync"
                 fetchPriority="high"
                 loading="eager"
+                onLoad={onReady}
+                onError={onReady}
               />
             </picture>
           </div>
         )}
       </div>
 
-      <div className="splash-progress-wrap absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-0 right-0 flex justify-center">
+      <div
+        className={`splash-progress-wrap absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-0 right-0 flex justify-center${seamlessEntry ? ' splash-progress-wrap--seamless' : ''}`}
+      >
         <div className="h-1 w-24 overflow-hidden rounded-full bg-white/30">
           <div className="splash-progress-bar h-full rounded-full bg-white/90" />
         </div>

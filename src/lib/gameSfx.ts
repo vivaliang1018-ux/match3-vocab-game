@@ -10,6 +10,7 @@ let wrongAudio: HTMLAudioElement | null = null;
 let sayBlastExplosionAudio: HTMLAudioElement | null = null;
 let countdownAudioContext: AudioContext | null = null;
 let sfxUnlocked = false;
+let sfxUnlocking = false;
 
 function getBoomAudio(): HTMLAudioElement {
   if (!boomAudio) {
@@ -49,42 +50,44 @@ function getCountdownAudioContext(): AudioContext | null {
   }
 }
 
-function warmUnlock(a: HTMLAudioElement): Promise<void> {
-  const prevMuted = a.muted;
-  const prevVolume = a.volume;
-  a.muted = true;
-  a.volume = 0;
-  return a
-    .play()
-    .then(() => {
-      a.pause();
-      a.currentTime = 0;
-      a.muted = prevMuted;
-      a.volume = prevVolume;
-    })
-    .catch(() => {
-      a.muted = prevMuted;
-      a.volume = prevVolume;
-    });
+function finishSilentAudioUnlock(context: AudioContext | null): void {
+  // Preload the real assets, but never play them as an unlock probe. iOS can
+  // leak the first few milliseconds even when a media element is muted.
+  getBoomAudio();
+  getWrongAudio();
+  getSayBlastExplosionAudio();
+
+  if (context) {
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = 0;
+    source.buffer = context.createBuffer(1, 1, context.sampleRate);
+    source.connect(gain);
+    gain.connect(context.destination);
+    source.start();
+  }
+  sfxUnlocked = true;
+  sfxUnlocking = false;
 }
 
 /** Call on user gesture — required for iOS / Capacitor. */
 export function unlockGameAudio(): void {
   const countdownContext = getCountdownAudioContext();
+  if (sfxUnlocked || sfxUnlocking) return;
+  sfxUnlocking = true;
   if (countdownContext?.state === 'suspended') {
-    void countdownContext.resume().catch(() => undefined);
+    void countdownContext.resume().then(
+      () => finishSilentAudioUnlock(countdownContext),
+      () => {
+        sfxUnlocking = false;
+      },
+    );
+    return;
   }
-  if (sfxUnlocked) return;
-
   try {
-    void Promise.all([
-      warmUnlock(getBoomAudio()),
-      warmUnlock(getSayBlastExplosionAudio()),
-    ]).then(() => {
-      sfxUnlocked = true;
-    });
+    finishSilentAudioUnlock(countdownContext);
   } catch {
-    // ignore
+    sfxUnlocking = false;
   }
 }
 

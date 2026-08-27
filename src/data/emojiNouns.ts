@@ -1803,12 +1803,6 @@ export const EMOJI_NOUN_CATEGORIES: EmojiNounCategory[] = [
         "cn": "打手球的人"
       },
       {
-        "id": "juggling",
-        "emoji": "🤹‍♀️",
-        "word": "Juggling",
-        "cn": "杂耍的人"
-      },
-      {
         "id": "in-lotus-position",
         "emoji": "🧘‍♀️",
         "word": "In Lotus Position",
@@ -6008,8 +6002,8 @@ export const EMOJI_NOUN_CATEGORIES: EmojiNounCategory[] = [
       {
         "id": "card-index",
         "emoji": "🗂️",
-        "word": "Card Index",
-        "cn": "索引卡"
+        "word": "Card Index Dividers",
+        "cn": "卡片索引分隔板"
       },
       {
         "id": "calendar",
@@ -6099,7 +6093,7 @@ export const EMOJI_NOUN_CATEGORIES: EmojiNounCategory[] = [
         "id": "diya-lamp",
         "emoji": "🪔",
         "word": "Diya Lamp",
-        "cn": "蜡烛"
+        "cn": "（印度）迪亚油灯"
       },
       {
         "id": "toothbrush",

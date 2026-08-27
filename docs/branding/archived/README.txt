@@ -1,4 +1,4 @@
-Matchingo candy logo — archived 2026-07-15
+Previous candy logo concept — archived 2026-07-15
 
 Kept for later (image splash scheme A). Known issue: right edge of
 smiley pink border had a thin protrusion that needed rounding.

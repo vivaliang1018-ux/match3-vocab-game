@@ -1,8 +1,9 @@
 const STORAGE_KEY = 'match3-stamina-v1';
 
-export const STAMINA_DAILY_BASE = 3;
-export const STAMINA_MAX = 3;
-export const STAMINA_REGEN_MS = 2 * 60 * 60 * 1000;
+export const STAMINA_DAILY_BASE = 5;
+export const STAMINA_MAX = 5;
+export const STAMINA_REGEN_MS = 60 * 60 * 1000;
+export const SAY_BLAST_DAILY_REWARD_MAX = 3;
 
 export type StaminaState = {
   value: number;
@@ -12,6 +13,8 @@ export type StaminaState = {
   lastRegenAt: number;
   /** Local calendar day key `YYYY-MM-DD` for daily top-up. */
   dayKey: string;
+  /** Bonus stamina earned from Say & Blast during `dayKey`. */
+  sayBlastRewardsToday: number;
 };
 
 function dayKeyFrom(ms: number): string {
@@ -32,6 +35,7 @@ export function defaultStaminaState(now = Date.now()): StaminaState {
     bankedRewards: 0,
     lastRegenAt: now,
     dayKey: dayKeyFrom(now),
+    sayBlastRewardsToday: 0,
   };
 }
 
@@ -48,6 +52,10 @@ export function loadStaminaState(now = Date.now()): StaminaState {
           : 0,
       lastRegenAt: typeof parsed.lastRegenAt === 'number' ? parsed.lastRegenAt : now,
       dayKey: typeof parsed.dayKey === 'string' ? parsed.dayKey : dayKeyFrom(now),
+      sayBlastRewardsToday:
+        typeof parsed.sayBlastRewardsToday === 'number'
+          ? Math.max(0, Math.floor(parsed.sayBlastRewardsToday))
+          : 0,
     };
     return tickStamina(base, now);
   } catch {
@@ -63,9 +71,9 @@ export function saveStaminaState(state: StaminaState): void {
   }
 }
 
-/** Apply hourly regen + daily top-up to base 3 when below. */
+/** Apply hourly regen + daily top-up to base when below max. */
 export function tickStamina(state: StaminaState, now = Date.now()): StaminaState {
-  let { value, bankedRewards, lastRegenAt, dayKey } = state;
+  let { value, bankedRewards, lastRegenAt, dayKey, sayBlastRewardsToday } = state;
   bankedRewards = Number.isFinite(bankedRewards)
     ? Math.max(0, Math.floor(bankedRewards))
     : 0;
@@ -73,6 +81,7 @@ export function tickStamina(state: StaminaState, now = Date.now()): StaminaState
 
   if (dayKey !== today) {
     dayKey = today;
+    sayBlastRewardsToday = 0;
     if (value < STAMINA_DAILY_BASE) value = STAMINA_DAILY_BASE;
     lastRegenAt = now;
   }
@@ -98,6 +107,7 @@ export function tickStamina(state: StaminaState, now = Date.now()): StaminaState
     bankedRewards: Math.max(0, Math.floor(bankedRewards)),
     lastRegenAt,
     dayKey,
+    sayBlastRewardsToday: Math.max(0, Math.floor(sayBlastRewardsToday)),
   };
 }
 
@@ -137,6 +147,24 @@ export function grantOrBankStamina(
       bankedRewards: ticked.bankedRewards + banked,
     },
     outcome: banked > 0 ? 'banked' : 'granted',
+  };
+}
+
+export function grantSayBlastStamina(
+  state: StaminaState,
+  now = Date.now(),
+): { state: StaminaState; outcome: 'granted' | 'banked' | 'daily-limit' } {
+  const ticked = tickStamina(state, now);
+  if (ticked.sayBlastRewardsToday >= SAY_BLAST_DAILY_REWARD_MAX) {
+    return { state: ticked, outcome: 'daily-limit' };
+  }
+  const reward = grantOrBankStamina(ticked, 1, now);
+  return {
+    state: {
+      ...reward.state,
+      sayBlastRewardsToday: ticked.sayBlastRewardsToday + 1,
+    },
+    outcome: reward.outcome,
   };
 }
 

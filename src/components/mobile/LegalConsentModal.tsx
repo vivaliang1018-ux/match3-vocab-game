@@ -54,7 +54,7 @@ export function LegalConsentModal({ open, onAccept }: LegalConsentModalProps) {
 
             <div className="legal-consent-logo-wrap" aria-hidden>
               <img
-                src={assetUrl('splash-logo.webp')}
+                src={assetUrl('splash-logo.png')}
                 alt=""
                 className="legal-consent-logo"
                 width={88}

@@ -69,7 +69,7 @@ export const es: Messages = {
           day_nail: `Llega a ${next} días seguidos y sé Inquilino del calendario.`,
           combo_king: `Haz una racha de ${next} sets para Combo a prueba de tumbos.`,
           dex_collector: `Domina ${next} emojis y gana Locura del dex.`,
-          review_brain: 'Completa tu primer set para desbloquear Fundidor de memoria.',
+          review_brain: `Completa ${next} repasos para desbloquear Fundidor de memoria.`,
           category_fan: 'Avanza en Aventura para desbloquear Explorador de temas.',
         } as const
       )[id],
@@ -80,7 +80,7 @@ export const es: Messages = {
           day_nail: `Racha diaria máxima: ${value}. ¡Eres Inquilino del calendario!`,
           combo_king: `Racha de ${value} sets — ¡Combo a prueba de tumbos!`,
           dex_collector: `${value} emojis dominados — ¡Locura del dex!`,
-          review_brain: 'Repaso desbloqueado — ¡Fundidor de memoria en línea!',
+          review_brain: `${value} repasos completados — ¡Fundidor de memoria desbloqueado!`,
           category_fan: 'Categorías desbloqueadas — ¡Explorador de temas, adelante!',
         } as const
       )[id],
@@ -98,7 +98,8 @@ export const es: Messages = {
     emojisCleared: 'Emojis completados',
     emojiProgress: 'Progreso de finalización',
     emojiProgressDetail: (cleared: number, total: number) => `${cleared} / ${total} tipos`,
-    language: 'Idioma',
+    language: 'Idioma del menú',
+    languageHint: 'Solo menús · Los nombres y el audio de los emojis siguen en inglés',
     preferencesTitle: 'Preferencias',
     toggleOn: 'ON',
     toggleOff: 'OFF',
@@ -156,7 +157,7 @@ export const es: Messages = {
     accountEmailVerifySent: 'Correo de verificación enviado. Confirma el enlace.',
     accountPasswordChanged: 'Contraseña actualizada',
     accountPasswordMismatch: 'Las contraseñas nuevas no coinciden',
-    accountSecurityOnlyPassword: 'Cuentas Apple / Google se gestionan en esos servicios',
+    accountSecurityOnlyPassword: 'Las cuentas de Apple y Google se gestionan desde esos servicios',
     accountWrongPassword: 'La contraseña actual es incorrecta',
     accountInvalidEmail: 'Introduce un correo válido',
     accountSameEmail: 'El nuevo correo es igual al actual',
@@ -180,7 +181,7 @@ export const es: Messages = {
     switchToSignUp: 'Registrarse',
     switchToSignIn: 'Iniciar sesión',
     forgotPassword: '¿Olvidaste la contraseña?',
-    resetPasswordSent: 'Correo de restablecimiento enviado. Revisa bandeja (y spam).',
+    resetPasswordSent: 'Correo de restablecimiento enviado. Revisa la bandeja de entrada y la carpeta de spam.',
     resetPasswordNeedEmail: 'Escribe primero el correo de la cuenta',
     successSignIn: 'Sesión iniciada',
     successSignUp: 'Cuenta creada — ya estás dentro',
@@ -202,6 +203,11 @@ export const es: Messages = {
     bgm: 'Música',
     mute: 'Silencio',
     restart: 'Reiniciar tablero',
+    home: 'Inicio',
+    homeConfirmTitle: '¿Volver al inicio?',
+    homeConfirmBody: 'El tablero actual se abandonará. La próxima partida comenzará con un tablero nuevo.',
+    homeConfirmStay: 'Seguir jugando',
+    homeConfirmLeave: 'Volver al inicio',
   },
   modes: {
     pickerTitle: 'Elegir modo',
@@ -227,7 +233,7 @@ export const es: Messages = {
     moodBoard: 'Tablero de ánimo',
     moodSwitchBoard: 'Cambiar color',
     sayBlast: 'Say & Blast',
-    sayBlastDesc: 'Di palabras aprendidas para derribar emoji',
+    sayBlastDesc: 'Di las palabras aprendidas para derribar emojis',
     moodPaletteName: (id) =>
       (
         {
@@ -267,7 +273,7 @@ export const es: Messages = {
     reviewContinueAdventure: 'Aventura — palabras nuevas',
     reviewContinueNoStamina: 'Sin energía — Aventura bloqueada por ahora',
     reviewContinueRest: 'Descansar un poco',
-    noStaminaHint: 'Recuperas 1 cada 2 horas, o espera a mañana. También puedes repasar gratis.',
+    noStaminaHint: 'Recuperas 1 cada hora, o espera a mañana. También puedes repasar gratis.',
   },
   hud: {
     wordSet: 'Set',
@@ -297,9 +303,9 @@ export const es: Messages = {
     outOfMovesTitle: 'Sin movimientos',
     outOfMovesSubtitle: 'Entra a Revivir: 6 palabras × 2 aciertos',
     retrySameSet: 'Reintentar este set',
-    deadTitle: 'Sistema caído 💀',
-    deadSubtitle: 'Sin energía — el tablero se ha vuelto loco. Espera a recuperar, o repasa gratis.',
-    deadWait: 'Energía +1 cada 2 horas — vuelve más tarde',
+    deadTitle: 'Máquina recargando ⚡️',
+    deadSubtitle: 'El siguiente set necesita 1 de energía. Los otros modos siguen disponibles.',
+    deadWait: 'Energía +1 cada hora — vuelve más tarde',
     deadGoReview: 'Repasar gratis ⭐',
     waitStamina: 'Esperar energía',
   },
@@ -307,13 +313,13 @@ export const es: Messages = {
     dialogAria: 'Términos del servicio',
     title: 'Términos del servicio',
     intro:
-      'Antes de jugar, un aviso legal: para ofrecerte una buena experiencia, Matchingo recoge cierta información personal. Puedes consultar o eliminar tus datos al final de la pestaña Yo.',
-    agreeBefore: 'Al pulsar “OK”, aceptas nuestros ',
+      'Puedes jugar como invitado con el progreso guardado en este dispositivo. Si inicias sesión, los datos de tu cuenta y tu progreso se envían a Firebase para sincronizarlos entre dispositivos.',
+    agreeBefore: 'Antes de continuar, consulta nuestros ',
     termsLink: 'Términos del servicio',
     agreeAnd: ' y la ',
     privacyLink: 'Política de privacidad',
     agreeAfter: '.',
-    accept: 'OK',
+    accept: 'Continuar',
   },
   celebration: {
     roundCelebrateCards: [
@@ -344,7 +350,7 @@ export const es: Messages = {
       {
         title: '¿Lo limpiaste?! Ok, me conquistaste',
         subtitle: 'Emojis en fila rindiéndose — el quiz es el tribunal de verdad',
-        primaryCta: '¡A por el quiz! Juíciame ⚖️',
+        primaryCta: '¡A por el quiz! Júzgame ⚖️',
         secondaryCta: 'Un respiro… y al juicio 😮‍💨',
       },
       {
@@ -354,14 +360,14 @@ export const es: Messages = {
         secondaryCta: 'Solo pasaba por aquí 👀',
       },
       {
-        title: 'Cleared. Vale. Tienes nivel',
+        title: 'Completado. Vale. Tienes nivel',
         subtitle: 'Emojis: …creo que estamos fritos. El quiz aún no ha abierto juicio 🤯',
         primaryCta: '¡A juicio! ⚖️',
         secondaryCta: 'Sácalme con fianza 5 seg ☕',
       },
       {
-        title: 'Set entero down. ¿Viniste a coleccionarnos?',
-        subtitle: 'Emojis salvajes eliminados. Siguiente parada: el quiz mira si eres legit',
+        title: 'Set completo. ¿Viniste a coleccionarnos?',
+        subtitle: 'Emojis salvajes eliminados. Siguiente parada: el quiz comprobará si vas en serio',
         primaryCta: '¡Hora de inspección! 🎯',
         secondaryCta: 'Fingiré que estoy tranquilo 😌',
       },
@@ -415,7 +421,7 @@ export const es: Messages = {
         secondaryCta: 'Cierro turno — huyo 🏃',
       },
       {
-        title: `Date la copa de "aprendí ${n} emojis" 🏆`,
+        title: `Date la copa de «${n} emojis aprendidos» 🏆`,
         subtitle: 'Da miedo. Esto no es estudiar — es caza de emojis en directo',
         primaryCta: 'Siguiente caza 🎯',
         secondaryCta: 'Discurso de agradecimiento: chao 👋',
@@ -466,6 +472,7 @@ export const es: Messages = {
     reviewTag: '· Repaso',
     peekCn: 'Ver significado',
     peekCnAria: 'Ver significado',
+    listenAgain: 'Escuchar de nuevo',
     prevQuestion: 'Anterior',
     nextQuestion: 'Siguiente',
     tryAgain: 'Inténtalo de nuevo',
@@ -508,8 +515,8 @@ export const es: Messages = {
   words: {
     title: 'Todos los emojis',
     stats: (categories: number, total: number) =>
-      `${categories} categorías · ${total} emojis`,
-    searchPlaceholder: 'Buscar en inglés o emoji',
+      `${categories} ${categories === 1 ? 'categoría' : 'categorías'} · ${total} ${total === 1 ? 'emoji' : 'emojis'}`,
+    searchPlaceholder: 'Buscar en inglés o por emoji',
     noResults: 'No hay emojis coincidentes',
     categoryCount: (subtitle: string, n: number) => `${subtitle} · ${n}`,
   },

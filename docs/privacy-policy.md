@@ -1,8 +1,8 @@
 # Privacy Policy / 隐私政策
 
-**Last updated / 最后更新:** August 25, 2026
+**Last updated / 最后更新:** August 27, 2026
 
-**App / 应用名称:** Matchlingo
+**App / 应用名称:** Matchingo
 **Bundle ID:** `com.matchingo.game`  
 **Contact / 联系方式:** vivaliang1018@gmail.com
 
@@ -15,7 +15,7 @@
 
 ### Overview
 
-Matchlingo is a vocabulary match-3 game. You can play as a guest without an account. Optional sign-in (Apple, Google, or email/password via Firebase Authentication) lets you sync learning progress across devices using Cloud Firestore. We do not sell your personal information and do not use third-party advertising trackers.
+Matchingo is a vocabulary match-3 game. You can play as a guest without an account. Optional sign-in (Apple, Google, or email/password via Firebase Authentication) lets you sync learning progress across devices using Cloud Firestore. We do not sell your personal information and do not use third-party advertising trackers.
 
 ### Information we process
 
@@ -30,16 +30,16 @@ Matchlingo is a vocabulary match-3 game. You can play as a guest without an acco
 
 We use **Google Firebase** (Authentication and Cloud Firestore), **Sign in with Apple**, and **Google Sign-In**. Google Sign-In’s SDK privacy manifest declares coarse location, device ID, usage and other authentication data for app functionality and provider analytics; Firebase Auth declares non-linked diagnostic data for analytics. Providers must protect information consistently with this policy and applicable law. See [Firebase privacy](https://firebase.google.com/support/privacy) and the [Google Privacy Policy](https://policies.google.com/privacy).
 
-### What Matchlingo does not directly collect
+### What Matchingo does not directly collect
 
-- Matchlingo does not request precise Location Services, Contacts, or Photos library access. Google Sign-In may process coarse location and related technical data as described above.
-- Microphone recordings are not uploaded to Matchlingo or the developer’s servers
+- Matchingo does not request precise Location Services, Contacts, or Photos library access. Google Sign-In may process coarse location and related technical data as described above.
+- Microphone recordings are not uploaded to Matchingo or the developer’s servers
 - Advertising identifiers for cross-app tracking
 - Advertising SDKs or cross-app tracking
 
 ### Speech and audio
 
-The app plays bundled pronunciation audio and may use on-device text-to-speech. Say & Blast starts only where Apple on-device English speech recognition is supported. Microphone audio is processed on device and is not uploaded to Matchlingo or the developer’s servers.
+The app plays bundled pronunciation audio and may use on-device text-to-speech. Say & Blast starts only where Apple on-device English speech recognition is supported. Microphone audio is processed on device and is not uploaded to Matchingo or the developer’s servers.
 
 ### Account deletion and data deletion
 
@@ -47,7 +47,7 @@ While signed in, open **Profile → Delete account**. This permanently deletes y
 
 ### Children’s privacy
 
-Matchlingo is a general-audience app and is not submitted to the App Store Kids Category. Guest play does not require an account. Users under 13 (or the applicable minimum digital-consent age in their region, if higher) may use guest mode but must not create an account. A minor above that threshold may create an account only with parent or legal-guardian authorization where required by local law. If we learn that personal information was collected from a child below the applicable threshold, contact us and we will delete it.
+Matchingo is a general-audience app and is not submitted to the App Store Kids Category. Guest play does not require an account. Users under 13 (or the applicable minimum digital-consent age in their region, if higher) may use guest mode but must not create an account. A minor above that threshold may create an account only with parent or legal-guardian authorization where required by local law. If we learn that personal information was collected from a child below the applicable threshold, contact us and we will delete it.
 
 ### Contact
 
@@ -59,7 +59,7 @@ Questions: [vivaliang1018@gmail.com](mailto:vivaliang1018@gmail.com)
 
 ### 概述
 
-「Matchlingo」是一款词汇消消乐学习应用。您可以不登录、以访客身份游玩。可选登录（Apple、Google 或邮箱密码，由 Firebase Authentication 提供）后，学习进度可通过 Cloud Firestore 跨设备同步。我们不会出售您的个人信息，也不使用第三方广告追踪。
+「Matchingo」是一款词汇消消乐学习应用。您可以不登录、以访客身份游玩。可选登录（Apple、Google 或邮箱密码，由 Firebase Authentication 提供）后，学习进度可通过 Cloud Firestore 跨设备同步。我们不会出售您的个人信息，也不使用第三方广告追踪。
 
 ### 我们处理的信息
 
@@ -80,7 +80,7 @@ Questions: [vivaliang1018@gmail.com](mailto:vivaliang1018@gmail.com)
 
 ### 语音与未成年人
 
-「开口出击」仅使用 Apple 设备端英语语音识别；麦克风音频不会上传至 Matchlingo 或开发者服务器。本应用属于普通全年龄应用，不申请 App Store 儿童类别。13 岁以下用户（如所在地区规定更高的最低数字同意年龄，则以该年龄为准）可以使用游客模式，但不得创建账号。达到该年龄但仍属未成年人的用户，仅可在当地法律要求的父母或法定监护人授权下创建账号。如果我们得知误收集了低于适用年龄门槛的儿童个人信息，请联系我们，我们将予以删除。
+「开口出击」仅使用 Apple 设备端英语语音识别；麦克风音频不会上传至 Matchingo 或开发者服务器。本应用属于普通全年龄应用，不申请 App Store 儿童类别。13 岁以下用户（如所在地区规定更高的最低数字同意年龄，则以该年龄为准）可以使用游客模式，但不得创建账号。达到该年龄但仍属未成年人的用户，仅可在当地法律要求的父母或法定监护人授权下创建账号。如果我们得知误收集了低于适用年龄门槛的儿童个人信息，请联系我们，我们将予以删除。
 
 ### 联系我们
 

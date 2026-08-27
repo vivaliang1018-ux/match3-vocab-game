@@ -667,7 +667,7 @@
 💡 | 灯泡 | Light Bulb
 🔦 | 手电筒 | Flashlight
 🏮 | 御手玉 | Paper Lantern
-🪔 | 蜡烛 | Diya Lamp
+🪔 | （印度）迪亚油灯 | Diya Lamp
 📔 | 笔记本 | Notebook with Decorative Cover
 📕 | 合本书 | Closed Book
 📖 | 打开书 | Open Book
@@ -709,7 +709,7 @@
 💼 | 公文包 | Briefcase
 📁 | 文件夹 | Folder
 📂 | 打开文件夹 | Open Folder
-🗂️ | 索引卡 | Card Index
+🗂️ | 卡片索引分隔板 | Card Index Dividers
 📅 | 日历 | Calendar
 📆 | 翻页日历 | Tear-Off Calendar
 🗒️ | 便签 | Spiral Notepad
@@ -753,7 +753,7 @@
 🎟️ | 票 | Admission Tickets
 🎫 | 门票 | Ticket
 🎪 | 马戏团帐篷 | Circus Tent
-🤹 | 杂耍 | Person Juggling
+🤹 | 杂耍 | Juggling
 🎭 | 面具 | Performing Arts
 🩰 | 舞鞋 | Ballet Shoes
 🎨 | 调色板 | Artist Palette

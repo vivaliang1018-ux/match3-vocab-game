@@ -1,6 +1,5 @@
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,
   initializeAuth,
@@ -12,6 +11,8 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signInWithCredential,
+  reauthenticateWithPopup,
+  revokeAccessToken,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -24,60 +25,9 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { getFirestore, type Firestore } from 'firebase/firestore';
-import appletConfig from '../firebase-applet-config.json';
+import { getFirebaseApp, isFirebaseConfigured } from './firebaseCore';
 
-type AppletConfig = {
-  apiKey?: string;
-  authDomain?: string;
-  projectId?: string;
-  appId?: string;
-  storageBucket?: string;
-  messagingSenderId?: string;
-  firestoreDatabaseId?: string;
-};
-
-const env = import.meta.env;
-
-function readConfig(): AppletConfig | null {
-  const apiKey = (env.VITE_FIREBASE_API_KEY as string | undefined) || appletConfig.apiKey;
-  if (!apiKey) return null;
-  return {
-    apiKey,
-    authDomain:
-      (env.VITE_FIREBASE_AUTH_DOMAIN as string | undefined) || appletConfig.authDomain,
-    projectId: (env.VITE_FIREBASE_PROJECT_ID as string | undefined) || appletConfig.projectId,
-    appId: (env.VITE_FIREBASE_APP_ID as string | undefined) || appletConfig.appId,
-    storageBucket:
-      (env.VITE_FIREBASE_STORAGE_BUCKET as string | undefined) || appletConfig.storageBucket,
-    messagingSenderId:
-      (env.VITE_FIREBASE_MESSAGING_SENDER_ID as string | undefined) ||
-      appletConfig.messagingSenderId,
-    firestoreDatabaseId:
-      (env.VITE_FIREBASE_FIRESTORE_DATABASE_ID as string | undefined) ||
-      appletConfig.firestoreDatabaseId,
-  };
-}
-
-const clientConfig = readConfig();
-
-export function isFirebaseConfigured(): boolean {
-  return Boolean(clientConfig?.apiKey && clientConfig.authDomain && clientConfig.projectId);
-}
-
-let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
-let db: Firestore | null = null;
-
-function getFirebaseApp(): FirebaseApp {
-  if (!clientConfig) {
-    throw new Error('Firebase is not configured');
-  }
-  if (!app) {
-    app = getApps()[0] ?? initializeApp(clientConfig);
-  }
-  return app;
-}
 
 /**
  * Capacitor WKWebView needs explicit Auth persistence; plain getAuth() often
@@ -105,16 +55,6 @@ export function getFirebaseAuth(): Auth {
     }
   }
   return auth;
-}
-
-export function getFirebaseDb(): Firestore {
-  if (!db) {
-    const databaseId = clientConfig?.firestoreDatabaseId;
-    db = databaseId
-      ? getFirestore(getFirebaseApp(), databaseId)
-      : getFirestore(getFirebaseApp());
-  }
-  return db;
 }
 
 const googleProvider = new GoogleAuthProvider();
@@ -254,6 +194,66 @@ export function userHasPasswordProvider(user: User | null | undefined): boolean 
   return Boolean(user?.providerData.some((p) => p.providerId === 'password'));
 }
 
+export type AppleTokenRevocation = {
+  token: string;
+  native: boolean;
+};
+
+/**
+ * Ask an Apple user to authenticate again and keep the fresh, short-lived
+ * revocation credential in memory until their cloud data is removed.
+ */
+export async function prepareAppleTokenRevocation(): Promise<AppleTokenRevocation | null> {
+  const a = getFirebaseAuth();
+  const user = a.currentUser;
+  if (!user) {
+    throw new Error('not_signed_in');
+  }
+  if (!user.providerData.some((provider) => provider.providerId === 'apple.com')) {
+    return null;
+  }
+
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithApple({
+      skipNativeAuth: true,
+    });
+    const idToken = result.credential?.idToken;
+    const rawNonce = result.credential?.nonce;
+    const authorizationCode = result.credential?.authorizationCode;
+    if (!idToken) {
+      throw new Error('missing_apple_id_token');
+    }
+    if (!authorizationCode) {
+      throw new Error('missing_apple_authorization_code');
+    }
+
+    const credential = appleProvider.credential({
+      idToken,
+      rawNonce: rawNonce ?? undefined,
+    });
+    await reauthenticateWithCredential(user, credential);
+    return { token: authorizationCode, native: true };
+  }
+
+  const result = await reauthenticateWithPopup(user, appleProvider);
+  const credential = OAuthProvider.credentialFromResult(result);
+  if (!credential?.accessToken) {
+    throw new Error('missing_apple_access_token');
+  }
+  return { token: credential.accessToken, native: false };
+}
+
+export async function revokePreparedAppleToken(
+  revocation: AppleTokenRevocation | null,
+): Promise<void> {
+  if (!revocation) return;
+  if (revocation.native) {
+    await FirebaseAuthentication.revokeAccessToken({ token: revocation.token });
+    return;
+  }
+  await revokeAccessToken(getFirebaseAuth(), revocation.token);
+}
+
 async function reauthenticateWithPassword(currentPassword: string): Promise<User> {
   const user = getFirebaseAuth().currentUser;
   if (!user?.email) {
@@ -299,4 +299,4 @@ export async function signOutUser(): Promise<void> {
   await firebaseSignOut(getFirebaseAuth());
 }
 
-export { authErrorMessage, type User };
+export { authErrorMessage, isFirebaseConfigured, type User };

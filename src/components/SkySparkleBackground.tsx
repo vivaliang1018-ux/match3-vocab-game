@@ -45,7 +45,8 @@ export function SkySparkleBackground({
         <span
           key={i}
           className={cn(
-            'splash-star pointer-events-none absolute z-0',
+            'splash-star pointer-events-none absolute',
+            variant === 'splash' ? 'z-10' : 'z-0',
             i % 3 === 0 ? 'text-amber-100' : i % 3 === 1 ? 'text-white' : 'text-pink-100',
           )}
           style={

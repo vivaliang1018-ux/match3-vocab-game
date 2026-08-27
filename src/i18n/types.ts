@@ -92,6 +92,7 @@ export type Messages = {
     emojiProgress: string;
     emojiProgressDetail: (cleared: number, total: number) => string;
     language: string;
+    languageHint: string;
     preferencesTitle: string;
     toggleOn: string;
     toggleOff: string;
@@ -194,6 +195,11 @@ export type Messages = {
     bgm: string;
     mute: string;
     restart: string;
+    home: string;
+    homeConfirmTitle: string;
+    homeConfirmBody: string;
+    homeConfirmStay: string;
+    homeConfirmLeave: string;
   };
   modes: {
     pickerTitle: string;
@@ -342,6 +348,7 @@ export type Messages = {
     reviewTag: string;
     peekCn: string;
     peekCnAria: string;
+    listenAgain: string;
     prevQuestion: string;
     nextQuestion: string;
     tryAgain: string;

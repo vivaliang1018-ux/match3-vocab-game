@@ -4,8 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node scripts/patch-capacitor-firebase-auth.mjs",
+    "patch:firebase-auth-ios": "node scripts/patch-capacitor-firebase-auth.mjs",
     "dev": "vite",
     "dev:loading": "vite --open /loading-preview.html",
+    "dev:voice-review": "vite --open /emoji-voice-review.html",
+    "dev:voice-regen-review": "vite --open /emoji-voice-regen-review.html --port 5189 --strictPort",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
@@ -14,7 +18,10 @@
     "cap:sync": "npx cap sync",
     "emoji:generate": "tsx scripts/generate-emoji-nouns.ts",
     "thiings:generate": "tsx scripts/generate-thiings-dataset.ts",
-    "voice:audit": "tsx scripts/audit-emoji-voice.ts"
+    "voice:audit": "tsx scripts/audit-emoji-voice.ts",
+    "voice:normalize": "tsx scripts/normalize-emoji-voice.ts",
+    "voice:regen:generate": "tsx scripts/generate-emoji-voice-regen.ts",
+    "voice:regen:queue": "node scripts/build-friends-rachel-queue.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
@@ -34,6 +41,7 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
+    "@google/genai": "^2.17.1",
     "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
@@ -41,6 +49,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "tailwindcss": "^4.3.2",
+    "tsx": "^4.23.12",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }

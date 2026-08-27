@@ -10,6 +10,7 @@ import { useI18n } from '../../i18n';
 type SignInSheetProps = {
   open: boolean;
   onClose: () => void;
+  initialMode?: 'signIn' | 'signUp';
 };
 
 function mapAuthCode(
@@ -28,7 +29,7 @@ function mapAuthCode(
   return t.auth.errorUnknown;
 }
 
-export function SignInSheet({ open, onClose }: SignInSheetProps) {
+export function SignInSheet({ open, onClose, initialMode = 'signIn' }: SignInSheetProps) {
   const { t } = useI18n();
   const {
     busy,
@@ -55,13 +56,13 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
 
   useEffect(() => {
     if (open && !wasOpen.current) {
-      setMode('signIn');
+      setMode(initialMode);
       setStatusError(null);
       setSuccessMsg(null);
       clearError();
     }
     wasOpen.current = open;
-  }, [open, clearError]);
+  }, [open, clearError, initialMode]);
 
   useEffect(() => {
     if (!open || !user || !successMsg) return;
@@ -270,7 +271,7 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                   }}
                 >
                   <AppleMark />
-                  Apple
+                  {t.auth.appleCta}
                 </button>
                 <button
                   type="button"
@@ -285,7 +286,7 @@ export function SignInSheet({ open, onClose }: SignInSheetProps) {
                   }}
                 >
                   <GoogleMark />
-                  Google
+                  {t.auth.googleCta}
                 </button>
               </div>
             </div>

@@ -1,5 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
+import {
+  compareWordsForSpacedReview,
+  isDue,
+  memoryKeyForWord,
+  type WordMemory,
+} from '../../lib/ebbinghausMemory';
 import { roundLearnedItemIds } from '../../lib/roundLearned';
 import { speakWordQuick } from '../../lib/wordSpeech';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
@@ -7,43 +13,95 @@ import {
   MOTION_STAGGER_TIGHT_CONTAINER,
   MOTION_STAGGER_TIGHT_ITEM,
 } from '../../lib/motionChoreography';
-import { useI18n } from '../../i18n';
+import { formatCountdownLocalized, useI18n } from '../../i18n';
+import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import type { WordItem } from '../../types/game';
-import { EmojiClearStatsBlock } from './EmojiClearStatsBlock';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 import { LearnedWordModal } from './LearnedWordModal';
 import { cn } from '../../lib/utils';
 
+type MemoryStatus = 'review' | 'growing' | 'strong';
+type MemoryFilter = 'all' | 'review' | 'strong';
+
+type LearnedEntry = {
+  item: WordItem;
+  memory?: WordMemory;
+  status: MemoryStatus;
+};
+
 type LearnedPanelProps = {
   roundLearnedIds: string[];
-  totalEmojiPool: number;
   itemById: Map<string, WordItem>;
   allPool: WordItem[];
-  /** Enough words + unlock to start review mode. */
+  wordMemory: Map<string, WordMemory>;
+  /** Enough learned words + unlock to build a six-word review board. */
   canGoReview: boolean;
   onGoReview: () => void;
 };
 
 export function LearnedPanel({
   roundLearnedIds,
-  totalEmojiPool,
   itemById,
   allPool,
+  wordMemory,
   canGoReview,
   onGoReview,
 }: LearnedPanelProps) {
-  const { t, showChinese } = useI18n();
+  const { locale, t, ui } = useI18n();
   const [selectedItem, setSelectedItem] = useState<WordItem | null>(null);
+  const [filter, setFilter] = useState<MemoryFilter>('all');
+  const [now, setNow] = useState(Date.now());
 
-  const learnedIds = roundLearnedItemIds(roundLearnedIds, allPool);
-  const clearedItems = learnedIds
-    .map((id) => itemById.get(id))
-    .filter((item): item is WordItem => item != null);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const entries = useMemo<LearnedEntry[]>(() => {
+    const learnedIds = roundLearnedItemIds(roundLearnedIds, allPool);
+    return learnedIds
+      .map((id) => itemById.get(id))
+      .filter((item): item is WordItem => item != null)
+      .map((item) => {
+        const memory = wordMemory.get(memoryKeyForWord(item.word));
+        const status: MemoryStatus = !memory || isDue(memory, now)
+          ? 'review'
+          : memory.stage >= 5
+            ? 'strong'
+            : 'growing';
+        return { item, memory, status };
+      })
+      .sort((a, b) => compareWordsForSpacedReview(a.memory, b.memory, now));
+  }, [allPool, itemById, now, roundLearnedIds, wordMemory]);
+
+  const dueCount = entries.filter((entry) => entry.status === 'review').length;
+  const nextReviewAt = entries.reduce<number | null>((earliest, entry) => {
+    if (!entry.memory || entry.status === 'review') return earliest;
+    return earliest === null
+      ? entry.memory.nextReviewAt
+      : Math.min(earliest, entry.memory.nextReviewAt);
+  }, null);
+  const visibleEntries = entries.filter((entry) => {
+    if (filter === 'review') return entry.status === 'review';
+    if (filter === 'strong') return entry.status === 'strong';
+    return true;
+  });
+
+  const statusLabel = (entry: LearnedEntry): string => {
+    if (entry.status === 'review') return ui.learned.ready;
+    if (entry.status === 'strong') return ui.learned.fortified;
+    if (!entry.memory) return ui.learned.ready;
+    return `${ui.learned.growing} · ${formatCountdownLocalized(entry.memory.nextReviewAt - now, t.review.countdown)}`;
+  };
 
   const handleChipClick = (item: WordItem) => {
     setSelectedItem(item);
     speakWordQuick(item.word);
   };
+
+  const selectedMemory = selectedItem
+    ? wordMemory.get(memoryKeyForWord(selectedItem.word))
+    : undefined;
 
   return (
     <>
@@ -52,74 +110,122 @@ export function LearnedPanel({
           <CandyFrostingHeader title="LEARNED" />
 
           <div className="profile-candy-body">
-            <section>
-              <div className="profile-candy-panel">
-                <EmojiClearStatsBlock
-                  learnedCount={learnedIds.length}
-                  totalEmojiPool={totalEmojiPool}
-                  variant="learned"
-                  theme="candy"
-                />
-                <motion.button
-                  type="button"
-                  whileTap={canGoReview ? MOTION_PRESS_TAP : undefined}
-                  disabled={!canGoReview}
-                  onClick={onGoReview}
-                  className={cn(
-                    'candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full',
-                    !canGoReview && 'candy-sheet-action-btn-disabled',
-                  )}
-                  aria-label={t.learned.goReview}
-                >
-                  {t.learned.goReview}
-                </motion.button>
-                {!canGoReview ? (
-                  <p className="mt-2 text-center text-[11px] font-semibold leading-snug text-sky-800/75">
-                    {t.modes.insufficientReviewHint}
-                  </p>
-                ) : null}
+            <section className="profile-candy-panel text-center">
+              <div className="text-xs font-black uppercase tracking-wide text-sky-700/70">
+                {ui.learned.learnedCount(entries.length)}
               </div>
+              {dueCount > 0 ? (
+                <>
+                  <div className="mt-3 text-xl font-black text-sky-950">
+                    🛡️ {ui.learned.shieldsDue(dueCount)}
+                  </div>
+                  <p className="mt-1 text-[11px] font-semibold text-sky-800/70">
+                    {ui.learned.dueHint}
+                  </p>
+                  {canGoReview ? (
+                    <motion.button
+                      type="button"
+                      whileTap={MOTION_PRESS_TAP}
+                      onClick={onGoReview}
+                      className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
+                    >
+                      {dueCount >= 6 ? ui.learned.reviewSix : ui.learned.startReview}
+                    </motion.button>
+                  ) : (
+                    <p className="mt-3 text-[11px] font-semibold text-sky-800/75">
+                      {t.modes.insufficientReviewHint}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="mt-3 text-xl font-black text-emerald-700">
+                    ✨ {ui.learned.stable}
+                  </div>
+                  {nextReviewAt !== null && (
+                    <p className="mt-1 text-[11px] font-semibold text-sky-800/70">
+                      {ui.learned.nextReview(
+                        formatCountdownLocalized(nextReviewAt - now, t.review.countdown),
+                      )}
+                    </p>
+                  )}
+                </>
+              )}
             </section>
 
-            {clearedItems.length > 0 && (
+            {entries.length > 0 && (
               <section className="mt-4">
-                <div className="profile-candy-section-label">
-                  <span className="text-sm leading-none" aria-hidden>
-                    ⭐
-                  </span>
-                  <span>{t.learned.collectionTitle}</span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="profile-candy-section-label">
+                    <span className="text-sm" aria-hidden>🌱</span>
+                    <span>{ui.learned.myWords}</span>
+                  </div>
+                  <div className="flex rounded-full bg-white/65 p-1 text-[10px] font-black text-sky-800">
+                    {(['all', 'review', 'strong'] as const).map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setFilter(id)}
+                        className={cn(
+                          'rounded-full px-2 py-1',
+                          filter === id && 'bg-sky-500 text-white shadow-sm',
+                        )}
+                      >
+                        {id === 'all'
+                          ? ui.learned.all
+                          : id === 'review'
+                            ? ui.learned.reinforce
+                            : ui.learned.fortified}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
                 <div className="profile-candy-panel mt-2">
                   <motion.div
-                    className="grid grid-cols-4 gap-2 sm:grid-cols-5"
+                    className="grid grid-cols-2 gap-2"
                     variants={MOTION_STAGGER_TIGHT_CONTAINER}
                     initial="hidden"
                     animate="visible"
                   >
-                    {clearedItems.map((item) => (
+                    {visibleEntries.map((entry) => (
                       <motion.button
-                        key={item.id}
+                        key={entry.item.id}
                         type="button"
                         variants={MOTION_STAGGER_TIGHT_ITEM}
                         whileTap={MOTION_PRESS_TAP}
-                        onClick={() => handleChipClick(item)}
-                        className="learned-candy-chip"
-                        aria-label={t.learned.openWord(item.word)}
+                        onClick={() => handleChipClick(entry.item)}
+                        className={cn(
+                          'learned-candy-chip learned-candy-chip-memory',
+                          entry.status === 'review' && 'learned-candy-chip-review',
+                          entry.status === 'strong' && 'learned-candy-chip-strong',
+                        )}
+                        aria-label={t.learned.openWord(entry.item.word)}
                       >
                         <div className="learned-candy-chip-icon">
-                          {item.imgSrc ? (
-                            <img src={item.imgSrc} alt="" className="h-8 w-8 object-contain" />
+                          {entry.item.imgSrc ? (
+                            <img src={entry.item.imgSrc} alt="" className="h-8 w-8 object-contain" />
                           ) : (
-                            <span className="text-2xl leading-none">{item.emoji ?? '·'}</span>
+                            <span className="text-2xl leading-none">{entry.item.emoji ?? '·'}</span>
                           )}
                         </div>
-                        <span className="learned-candy-chip-word">{item.word}</span>
-                        {showChinese && item.cn && (
-                          <span className="learned-candy-chip-cn">{item.cn}</span>
+                        <span className="learned-candy-chip-word">{entry.item.word}</span>
+                        {getEmojiLearningTranslation(entry.item, locale) && (
+                          <span className="learned-candy-chip-cn">
+                            {getEmojiLearningTranslation(entry.item, locale)}
+                          </span>
                         )}
+                        <span className={cn('learned-memory-status', `learned-memory-status-${entry.status}`)}>
+                          {statusLabel(entry)}
+                        </span>
                       </motion.button>
                     ))}
                   </motion.div>
+                  {visibleEntries.length === 0 && (
+                    <p className="py-5 text-center text-xs font-bold text-sky-800/65">
+                      {ui.learned.empty}
+                    </p>
+                  )}
                 </div>
               </section>
             )}
@@ -131,8 +237,9 @@ export function LearnedPanel({
 
       <LearnedWordModal
         item={selectedItem}
+        memory={selectedMemory}
+        now={now}
         open={selectedItem != null}
-        showChinese={showChinese}
         onClose={() => setSelectedItem(null)}
       />
     </>

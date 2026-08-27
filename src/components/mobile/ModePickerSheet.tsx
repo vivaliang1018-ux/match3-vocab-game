@@ -17,11 +17,10 @@ import type { FeatureGuideTarget } from '../../lib/firstTimeGuide';
 import { GuidedTapHint } from './GuidedTapHint';
 import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
 
-const MODE_EMOJI: Record<ChallengeMode, string> = {
+const MODE_EMOJI: Record<Exclude<ChallengeMode, 'review'>, string> = {
   random: '🏁',
   mood: '🎨',
   category: '🧩',
-  review: '⭐',
 };
 const SAY_BLAST_MODE_ID = 'say-blast' as const;
 
@@ -42,10 +41,12 @@ type ModePickerSheetProps = {
   onShuffleWords: () => void;
   onRestart: () => void;
   canPlay: boolean;
-  reviewUnlocked: boolean;
   categoryUnlocked: boolean;
+  moodUnlocked: boolean;
+  /** False when today's Mood Board play limit is reached. */
+  moodCanStartNew?: boolean;
+  sayBlastUnlocked: boolean;
   onOpenSayBlast: () => void;
-  pendingForcedReview?: boolean;
   guideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard'> | null;
   guidePlayCount?: number;
   onGuidePlaybackStart?: (
@@ -64,15 +65,16 @@ export function ModePickerSheet({
   onShuffleWords,
   onRestart,
   canPlay,
-  reviewUnlocked,
   categoryUnlocked,
+  moodUnlocked,
+  moodCanStartNew = true,
+  sayBlastUnlocked,
   onOpenSayBlast,
-  pendingForcedReview = false,
   guideTarget = null,
   guidePlayCount = 0,
   onGuidePlaybackStart,
 }: ModePickerSheetProps) {
-  const { locale, t } = useI18n();
+  const { locale, t, ui } = useI18n();
   const [pulseCategoryId, setPulseCategoryId] = useState<string | null>(null);
   const sayBlastButtonRef = useRef<HTMLButtonElement | null>(null);
   const moodBoardButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -85,32 +87,34 @@ export function ModePickerSheet({
   });
   const guideButtonRef =
     guideTarget === 'sayAndBlast' ? sayBlastButtonRef : moodBoardButtonRef;
+  const canShuffleWords =
+    canPlay && !(challengeMode === 'mood' && !moodCanStartNew);
 
   const modeOptions: {
     id: ChallengeMode | typeof SAY_BLAST_MODE_ID;
     label: string;
     emoji: string;
+    description: string;
+    disabled?: boolean;
   }[] = [
-    { id: 'random', label: t.modes.random, emoji: MODE_EMOJI.random },
-    { id: 'mood', label: t.modes.moodBoard, emoji: MODE_EMOJI.mood },
-    {
+    { id: 'random', label: t.modes.random, emoji: MODE_EMOJI.random, description: t.modes.randomDesc },
+    ...(moodUnlocked ? [{
+      id: 'mood',
+      label: t.modes.moodBoard,
+      emoji: MODE_EMOJI.mood,
+      description: moodCanStartNew
+        ? ui.mode.moodDescription
+        : ui.mode.moodDailyLimitReached,
+      disabled: !moodCanStartNew && challengeMode !== 'mood',
+    } as const] : []),
+    ...(sayBlastUnlocked ? [{
       id: SAY_BLAST_MODE_ID,
       label: t.modes.sayBlast,
       emoji: '🎤',
-    },
-    ...(reviewUnlocked
-      ? [
-          {
-            id: 'review' as const,
-            label: pendingForcedReview
-              ? `${t.modes.review} · ${t.modes.pendingReviewBanner}`
-              : t.modes.review,
-            emoji: MODE_EMOJI.review,
-          },
-        ]
-      : []),
+      description: `${t.modes.sayBlastDesc} · 3★ +1 ❤️`,
+    } as const] : []),
     ...(categoryUnlocked
-      ? [{ id: 'category' as const, label: t.modes.category, emoji: MODE_EMOJI.category }]
+      ? [{ id: 'category' as const, label: t.modes.category, emoji: MODE_EMOJI.category, description: t.modes.categoryDesc }]
       : []),
   ];
 
@@ -125,6 +129,7 @@ export function ModePickerSheet({
       onOpenSayBlast();
       return;
     }
+    if (mode === 'mood' && !moodCanStartNew && challengeMode !== 'mood') return;
     onChallengeModeChange(mode);
     if (mode !== 'category') {
       setPulseCategoryId(null);
@@ -213,6 +218,7 @@ export function ModePickerSheet({
               >
                 {modeOptions.map((opt) => {
                   const selected = opt.id !== SAY_BLAST_MODE_ID && challengeMode === opt.id;
+                  const disabled = Boolean(opt.disabled);
                   return (
                     <motion.button
                       key={opt.id}
@@ -225,11 +231,13 @@ export function ModePickerSheet({
                       }
                       type="button"
                       variants={MOTION_STAGGER_ITEM}
-                      whileTap={MOTION_PRESS_TAP}
+                      whileTap={disabled ? undefined : MOTION_PRESS_TAP}
                       onClick={() => pickMode(opt.id)}
+                      disabled={disabled}
                       className={cn(
                         'candy-sheet-mode-btn',
                         selected && 'candy-sheet-mode-btn-active',
+                        disabled && 'opacity-45',
                         guidePlaying &&
                           ((guideTarget === 'sayAndBlast' && opt.id === SAY_BLAST_MODE_ID) ||
                             (guideTarget === 'moodBoard' && opt.id === 'mood')) &&
@@ -237,6 +245,7 @@ export function ModePickerSheet({
                       )}
                       aria-label={opt.label}
                       aria-pressed={selected}
+                      aria-disabled={disabled}
                     >
                       <span className="candy-sheet-mode-gloss" aria-hidden />
                       {selected && (
@@ -246,6 +255,9 @@ export function ModePickerSheet({
                         {opt.emoji}
                       </span>
                       <div className="candy-sheet-mode-label">{opt.label}</div>
+                      <div className="mt-1 max-w-[13rem] text-[10px] font-bold leading-snug text-sky-800/70">
+                        {opt.description}
+                      </div>
                     </motion.button>
                   );
                 })}
@@ -299,11 +311,11 @@ export function ModePickerSheet({
                 <motion.button
                   type="button"
                   onClick={shuffle}
-                  disabled={!canPlay}
-                  whileTap={canPlay ? MOTION_PRESS_TAP : undefined}
+                  disabled={!canShuffleWords}
+                  whileTap={canShuffleWords ? MOTION_PRESS_TAP : undefined}
                   className={cn(
                     'candy-sheet-action-btn candy-sheet-action-btn-blue',
-                    !canPlay && 'candy-sheet-action-btn-disabled',
+                    !canShuffleWords && 'candy-sheet-action-btn-disabled',
                   )}
                 >
                   <RefreshCw size={15} aria-hidden />

@@ -1,5 +1,12 @@
 /** Player journey: streaks + tiered award tracks (Matchingo candy style). */
 
+import {
+  claimGuestProgress,
+  clearScopedProgress,
+  readScopedProgress,
+  writeScopedProgress,
+} from './progressScope';
+
 const STORAGE_KEY = 'match3-player-summary-v1';
 
 export type BadgeId =
@@ -31,6 +38,8 @@ export type EarnedBadge = {
 };
 
 export type PlayerSummary = {
+  /** Achievement threshold schema, used to migrate claimed tiers safely. */
+  awardRulesVersion: number;
   /** Local calendar day of last counted play (`YYYY-MM-DD`). */
   lastPlayDay: string | null;
   dayStreak: number;
@@ -38,6 +47,8 @@ export type PlayerSummary = {
   /** Consecutive adventure set clears without a fail. */
   clearStreak: number;
   bestClearStreak: number;
+  /** Completed review sets, including mandatory and player-initiated review. */
+  completedReviewSets: number;
   badges: EarnedBadge[];
   /**
    * Highest award tier the player has claimed (celebrated) per track.
@@ -56,11 +67,13 @@ export type SummaryContext = {
 };
 
 const DEFAULT_SUMMARY: PlayerSummary = {
+  awardRulesVersion: 2,
   lastPlayDay: null,
   dayStreak: 0,
   bestDayStreak: 0,
   clearStreak: 0,
   bestClearStreak: 0,
+  completedReviewSets: 0,
   badges: [],
   claimedAwardTiers: {},
   claimedAwardAt: {},
@@ -121,7 +134,8 @@ export const AWARD_TRACKS: readonly AwardTrackDef[] = [
     id: 'set_hunter',
     iconSrc: '/branding/awards/set_hunter.webp',
     accent: 'pink',
-    thresholds: [1, 3, 10, 30],
+    // Adventure contains 186 full sets; reward every ten completed sets.
+    thresholds: Array.from({ length: 18 }, (_, index) => (index + 1) * 10),
     faceValue: (p) => p.next,
     metric: (ctx) => ctx.adventureClears,
   },
@@ -153,9 +167,13 @@ export const AWARD_TRACKS: readonly AwardTrackDef[] = [
     id: 'review_brain',
     iconSrc: '/branding/awards/review_brain.webp',
     accent: 'violet',
-    thresholds: [1],
-    faceValue: () => 1,
-    metric: (ctx) => (ctx.reviewUnlocked ? 1 : 0),
+    thresholds: [5],
+    faceValue: () => 5,
+    // Preserve already-claimed legacy awards; new players must complete 5 reviews.
+    metric: (_ctx, summary) =>
+      (summary.claimedAwardTiers.review_brain ?? 0) > 0
+        ? 5
+        : summary.completedReviewSets,
   },
   {
     id: 'category_fan',
@@ -207,6 +225,7 @@ export function claimAwardTrack(
   trackId: AwardTrackId,
   tier: number,
   now = Date.now(),
+  userUid?: string | null,
 ): PlayerSummary {
   if (tier <= 0) return summary;
   const prev = summary.claimedAwardTiers[trackId] ?? 0;
@@ -216,7 +235,7 @@ export function claimAwardTrack(
     claimedAwardTiers: { ...summary.claimedAwardTiers, [trackId]: tier },
     claimedAwardAt: { ...summary.claimedAwardAt, [trackId]: now },
   };
-  savePlayerSummary(next);
+  savePlayerSummary(next, userUid);
   return next;
 }
 
@@ -238,31 +257,98 @@ export function dayKeyDiff(from: string, to: string): number {
   return Math.round((parseDayKey(to) - parseDayKey(from)) / 86_400_000);
 }
 
-export function loadPlayerSummary(): PlayerSummary {
+export function parsePlayerSummary(raw: unknown): PlayerSummary {
+  const parsed = raw && typeof raw === 'object' ? raw as Partial<PlayerSummary> : {};
+  const legacyAwardRules = Math.max(0, Math.floor(Number(parsed.awardRulesVersion) || 0)) < 2;
+  const badges = Array.isArray(parsed.badges)
+    ? parsed.badges.filter(
+        (b): b is EarnedBadge =>
+          Boolean(b) &&
+          typeof b === 'object' &&
+          typeof (b as EarnedBadge).id === 'string' &&
+          typeof (b as EarnedBadge).earnedAt === 'number' &&
+          BADGE_CATALOG.includes((b as EarnedBadge).id),
+      )
+    : [];
+  const claimedAwardTiers = sanitizeClaimedTiers(parsed.claimedAwardTiers);
+  const claimedAwardAt = sanitizeClaimedAt(parsed.claimedAwardAt);
+  if (legacyAwardRules) {
+    // Old Trailblazer tiers started at 1 and 3 sets. They cannot map safely to
+    // the new 10-set cadence, so let the next valid 10-set milestone claim anew.
+    delete claimedAwardTiers.set_hunter;
+    delete claimedAwardAt.set_hunter;
+  }
+  return {
+    awardRulesVersion: 2,
+    lastPlayDay: typeof parsed.lastPlayDay === 'string' ? parsed.lastPlayDay : null,
+    dayStreak: Math.max(0, Math.floor(Number(parsed.dayStreak) || 0)),
+    bestDayStreak: Math.max(0, Math.floor(Number(parsed.bestDayStreak) || 0)),
+    clearStreak: Math.max(0, Math.floor(Number(parsed.clearStreak) || 0)),
+    bestClearStreak: Math.max(0, Math.floor(Number(parsed.bestClearStreak) || 0)),
+    completedReviewSets: Math.max(0, Math.floor(Number(parsed.completedReviewSets) || 0)),
+    badges,
+    claimedAwardTiers,
+    claimedAwardAt,
+  };
+}
+
+export function mergePlayerSummaries(
+  local: PlayerSummary,
+  remote: PlayerSummary,
+): PlayerSummary {
+  const badgeMap = new Map(local.badges.map((badge) => [badge.id, badge]));
+  for (const badge of remote.badges) {
+    const current = badgeMap.get(badge.id);
+    if (!current || badge.earnedAt < current.earnedAt) badgeMap.set(badge.id, badge);
+  }
+  const claimedAwardTiers = { ...remote.claimedAwardTiers };
+  for (const [id, tier] of Object.entries(local.claimedAwardTiers)) {
+    claimedAwardTiers[id as AwardTrackId] = Math.max(
+      claimedAwardTiers[id as AwardTrackId] ?? 0,
+      tier ?? 0,
+    );
+  }
+  const claimedAwardAt = { ...remote.claimedAwardAt };
+  for (const [id, at] of Object.entries(local.claimedAwardAt)) {
+    claimedAwardAt[id as AwardTrackId] = Math.max(
+      claimedAwardAt[id as AwardTrackId] ?? 0,
+      at ?? 0,
+    );
+  }
+  const localDay = local.lastPlayDay ?? '';
+  const remoteDay = remote.lastPlayDay ?? '';
+  const latest = localDay >= remoteDay ? local : remote;
+  return {
+    awardRulesVersion: Math.max(local.awardRulesVersion, remote.awardRulesVersion),
+    lastPlayDay: latest.lastPlayDay,
+    dayStreak: latest.dayStreak,
+    bestDayStreak: Math.max(local.bestDayStreak, remote.bestDayStreak),
+    clearStreak: Math.max(local.clearStreak, remote.clearStreak),
+    bestClearStreak: Math.max(local.bestClearStreak, remote.bestClearStreak),
+    completedReviewSets: Math.max(local.completedReviewSets, remote.completedReviewSets),
+    badges: [...badgeMap.values()],
+    claimedAwardTiers,
+    claimedAwardAt,
+  };
+}
+
+export function loadPlayerSummary(userUid?: string | null): PlayerSummary {
+  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+    try {
+      return JSON.stringify(
+        mergePlayerSummaries(
+          parsePlayerSummary(JSON.parse(accountRaw)),
+          parsePlayerSummary(JSON.parse(guestRaw)),
+        ),
+      );
+    } catch {
+      return accountRaw;
+    }
+  });
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readScopedProgress(STORAGE_KEY, userUid);
     if (!raw) return { ...DEFAULT_SUMMARY, badges: [] };
-    const parsed = JSON.parse(raw) as Partial<PlayerSummary>;
-    const badges = Array.isArray(parsed.badges)
-      ? parsed.badges.filter(
-          (b): b is EarnedBadge =>
-            Boolean(b) &&
-            typeof b === 'object' &&
-            typeof (b as EarnedBadge).id === 'string' &&
-            typeof (b as EarnedBadge).earnedAt === 'number' &&
-            BADGE_CATALOG.includes((b as EarnedBadge).id),
-        )
-      : [];
-    return {
-      lastPlayDay: typeof parsed.lastPlayDay === 'string' ? parsed.lastPlayDay : null,
-      dayStreak: Math.max(0, Math.floor(Number(parsed.dayStreak) || 0)),
-      bestDayStreak: Math.max(0, Math.floor(Number(parsed.bestDayStreak) || 0)),
-      clearStreak: Math.max(0, Math.floor(Number(parsed.clearStreak) || 0)),
-      bestClearStreak: Math.max(0, Math.floor(Number(parsed.bestClearStreak) || 0)),
-      badges,
-      claimedAwardTiers: sanitizeClaimedTiers(parsed.claimedAwardTiers),
-      claimedAwardAt: sanitizeClaimedAt(parsed.claimedAwardAt),
-    };
+    return parsePlayerSummary(JSON.parse(raw));
   } catch {
     return { ...DEFAULT_SUMMARY, badges: [], claimedAwardTiers: {}, claimedAwardAt: {} };
   }
@@ -290,12 +376,12 @@ function sanitizeClaimedAt(raw: unknown): Partial<Record<AwardTrackId, number>> 
   return out;
 }
 
-export function savePlayerSummary(summary: PlayerSummary): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(summary));
-  } catch {
-    // ignore quota
-  }
+export function savePlayerSummary(summary: PlayerSummary, userUid?: string | null): void {
+  writeScopedProgress(STORAGE_KEY, JSON.stringify(summary), userUid);
+}
+
+export function clearPlayerSummary(userUid?: string | null): void {
+  clearScopedProgress(STORAGE_KEY, userUid);
 }
 
 function withBadge(summary: PlayerSummary, id: BadgeId, now: number): PlayerSummary {
@@ -349,10 +435,32 @@ export function recordLearningActivity(
   summary: PlayerSummary,
   ctx: SummaryContext,
   now = Date.now(),
+  userUid?: string | null,
+  maxDayStreak?: number,
 ): PlayerSummary {
-  const withDay = applyDayStreak(summary, now);
+  const candidate = applyDayStreak(summary, now);
+  const withDay = maxDayStreak && candidate.dayStreak > maxDayStreak ? summary : candidate;
   const reconciled = reconcileBadges(withDay, ctx, now);
-  savePlayerSummary(reconciled);
+  savePlayerSummary(reconciled, userUid);
+  return reconciled;
+}
+
+/** Count a completed six-word review, whether mandatory or player-initiated. */
+export function recordReviewComplete(
+  summary: PlayerSummary,
+  ctx: SummaryContext,
+  now = Date.now(),
+  userUid?: string | null,
+  maxDayStreak?: number,
+): PlayerSummary {
+  const candidate = applyDayStreak(summary, now);
+  const withDay = maxDayStreak && candidate.dayStreak > maxDayStreak ? summary : candidate;
+  const next = {
+    ...withDay,
+    completedReviewSets: withDay.completedReviewSets + 1,
+  };
+  const reconciled = reconcileBadges(next, ctx, now);
+  savePlayerSummary(reconciled, userUid);
   return reconciled;
 }
 
@@ -361,8 +469,11 @@ export function recordAdventureClear(
   summary: PlayerSummary,
   ctx: SummaryContext,
   now = Date.now(),
+  userUid?: string | null,
+  maxDayStreak?: number,
 ): PlayerSummary {
-  const withDay = applyDayStreak(summary, now);
+  const candidate = applyDayStreak(summary, now);
+  const withDay = maxDayStreak && candidate.dayStreak > maxDayStreak ? summary : candidate;
   const clearStreak = withDay.clearStreak + 1;
   const next: PlayerSummary = {
     ...withDay,
@@ -370,20 +481,25 @@ export function recordAdventureClear(
     bestClearStreak: Math.max(withDay.bestClearStreak, clearStreak),
   };
   const reconciled = reconcileBadges(next, ctx, now);
-  savePlayerSummary(reconciled);
+  savePlayerSummary(reconciled, userUid);
   return reconciled;
 }
 
 /** Call when an attempted adventure is actually lost (revive failed or abandoned). */
-export function recordAdventureFail(summary: PlayerSummary, ctx: SummaryContext, now = Date.now()): PlayerSummary {
+export function recordAdventureFail(
+  summary: PlayerSummary,
+  ctx: SummaryContext,
+  now = Date.now(),
+  userUid?: string | null,
+): PlayerSummary {
   if (summary.clearStreak === 0) {
     const reconciled = reconcileBadges(summary, ctx, now);
-    if (reconciled !== summary) savePlayerSummary(reconciled);
+    if (reconciled !== summary) savePlayerSummary(reconciled, userUid);
     return reconciled;
   }
   const next: PlayerSummary = { ...summary, clearStreak: 0 };
   const reconciled = reconcileBadges(next, ctx, now);
-  savePlayerSummary(reconciled);
+  savePlayerSummary(reconciled, userUid);
   return reconciled;
 }
 

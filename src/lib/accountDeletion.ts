@@ -5,20 +5,23 @@ import {
   authErrorMessage,
   getFirebaseAuth,
   isFirebaseConfigured,
+  prepareAppleTokenRevocation,
+  revokePreparedAppleToken,
 } from './firebase';
 import {
   clearWordMemoriesForScope,
   memoryScopeForUserId,
 } from './ebbinghausMemory';
-import { deleteCloudWordMemories } from './memoryCloudSync';
 import { clearAvatarPreset } from './accountProfile';
 import { clearRoundLearnedIds } from './roundLearned';
 import { clearModeUnlocks } from './modeUnlocks';
 import { clearAdventureSetHistory } from './adventureSetHistory';
 import { clearFirstTimeGuideState } from './firstTimeGuide';
+import { clearSayBlastStats } from './sayBlastStats';
+import { clearPlayerSummary } from './playerSummary';
 
 /**
- * Permanently delete the signed-in account: cloud progress, local user bucket, then Auth user.
+ * Permanently delete the signed-in account: cloud progress, Auth user, then local user bucket.
  * May surface requires_recent_login — ask the user to sign in again and retry.
  */
 export async function deleteAccountUser(): Promise<void> {
@@ -34,17 +37,17 @@ export async function deleteAccountUser(): Promise<void> {
   const uid = user.uid;
   const scope = memoryScopeForUserId(uid);
 
-  try {
-    await deleteCloudWordMemories(uid);
-  } catch {
-    // Best-effort: still delete Auth user so the account cannot sign in.
-  }
-  clearWordMemoriesForScope(scope);
-  clearRoundLearnedIds(uid);
-  clearModeUnlocks(uid);
-  clearAdventureSetHistory(uid);
-  clearFirstTimeGuideState(uid);
-  clearAvatarPreset(uid);
+  // Firebase does not retain the Apple token needed for revocation. Apple
+  // accounts must authenticate again so the fresh authorization code can be
+  // revoked after cloud data is gone and before the Firebase user is deleted.
+  const appleRevocation = await prepareAppleTokenRevocation();
+
+  // Never delete the Auth identity while its cloud data still exists. If the
+  // Firestore operation fails, abort so the user can retry with an account that
+  // still has permission to remove its own data.
+  const { deleteCloudWordMemories } = await import('./memoryCloudSync');
+  await deleteCloudWordMemories(uid);
+  await revokePreparedAppleToken(appleRevocation);
 
   try {
     await deleteUser(user);
@@ -57,6 +60,15 @@ export async function deleteAccountUser(): Promise<void> {
     }
     throw error;
   }
+
+  clearWordMemoriesForScope(scope);
+  clearRoundLearnedIds(uid);
+  clearModeUnlocks(uid);
+  clearAdventureSetHistory(uid);
+  clearFirstTimeGuideState(uid);
+  clearSayBlastStats(uid);
+  clearPlayerSummary(uid);
+  clearAvatarPreset(uid);
 
   if (Capacitor.isNativePlatform()) {
     try {

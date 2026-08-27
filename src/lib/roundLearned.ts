@@ -8,7 +8,19 @@ import {
 const STORAGE_KEY = 'smellycat-match3-round-learned-v1';
 
 export function loadRoundLearnedIds(userUid?: string | null): string[] {
-  claimGuestProgress(STORAGE_KEY, userUid);
+  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+    try {
+      const account = JSON.parse(accountRaw);
+      const guest = JSON.parse(guestRaw);
+      const ids = [
+        ...(Array.isArray(account) ? account : []),
+        ...(Array.isArray(guest) ? guest : []),
+      ].filter((id): id is string => typeof id === 'string');
+      return JSON.stringify([...new Set(ids)]);
+    } catch {
+      return accountRaw;
+    }
+  });
   try {
     const raw = readScopedProgress(STORAGE_KEY, userUid);
     if (!raw) return [];

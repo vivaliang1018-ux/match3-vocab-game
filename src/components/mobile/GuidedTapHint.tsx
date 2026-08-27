@@ -133,16 +133,40 @@ export function GuidedTapHint({
         className="fixed left-0 top-0 text-[34px] leading-none drop-shadow-[0_4px_5px_rgba(15,23,42,0.38)]"
         style={{ x: start.x - 12, y: start.y - 8, transformOrigin: '10px 4px' }}
         animate={{
-          x: [start.x - 12, start.x - 12, targetCenter.x - 12, targetCenter.x - 12],
-          y: [start.y - 8, start.y - 8, targetCenter.y - 8, targetCenter.y - 8],
-          opacity: [0, 1, 1, 0],
-          scale: mode === 'tap' ? [1, 1, 0.82, 0.9] : [0.92, 1, 0.88, 0.92],
+          x:
+            mode === 'drag'
+              ? [
+                  start.x - 12,
+                  start.x - 12,
+                  start.x - 12,
+                  targetCenter.x - 12,
+                  targetCenter.x - 12,
+                ]
+              : [start.x - 12, start.x - 12, targetCenter.x - 12, targetCenter.x - 12],
+          y:
+            mode === 'drag'
+              ? [
+                  start.y - 8,
+                  start.y - 8,
+                  start.y - 8,
+                  targetCenter.y - 8,
+                  targetCenter.y - 8,
+                ]
+              : [start.y - 8, start.y - 8, targetCenter.y - 8, targetCenter.y - 8],
+          opacity: mode === 'drag' ? [0, 1, 1, 1, 0] : [0, 1, 1, 0],
+          scale:
+            mode === 'tap'
+              ? [1, 1, 0.82, 0.9]
+              : [0.92, 1, 1, 0.88, 0.92],
         }}
         transition={{
-          duration: 1.95,
-          times: mode === 'tap' ? [0, 0.24, 0.52, 0.7] : [0, 0.16, 0.62, 0.78],
+          duration: mode === 'drag' ? 2.35 : 1.95,
+          times:
+            mode === 'tap'
+              ? [0, 0.24, 0.52, 0.7]
+              : [0, 0.1, 0.38, 0.8, 0.9],
           repeat: Infinity,
-          repeatDelay: 1,
+          repeatDelay: mode === 'drag' ? 0.45 : 1,
           ease: [0.22, 1, 0.36, 1],
         }}
       >

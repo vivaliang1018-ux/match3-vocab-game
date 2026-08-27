@@ -20,6 +20,7 @@ type CelebrationBurstProps = {
   onDone?: () => void;
   durationMs?: number;
   className?: string;
+  actionLabel?: string;
 };
 
 function pickHeroEmoji(preferred?: string): string {
@@ -37,6 +38,7 @@ export function CelebrationBurst({
   onDone,
   durationMs = 1800,
   className,
+  actionLabel,
 }: CelebrationBurstProps) {
   const [heroEmoji, setHeroEmoji] = useState(emoji ?? '🎉');
 
@@ -46,10 +48,10 @@ export function CelebrationBurst({
   }, [show, emoji, title, subtitle]);
 
   useEffect(() => {
-    if (!show) return;
+    if (!show || actionLabel) return;
     const t = window.setTimeout(() => onDone?.(), durationMs);
     return () => window.clearTimeout(t);
-  }, [show, durationMs, onDone]);
+  }, [show, durationMs, onDone, actionLabel]);
 
   const particles = BURST.map((c, i) => {
     const angle = (i / BURST.length) * Math.PI * 2;
@@ -72,7 +74,11 @@ export function CelebrationBurst({
           animate="visible"
           exit="exit"
           variants={MOTION_VIGNETTE}
-          className={cn('candy-celebration-overlay', className)}
+          className={cn(
+            'candy-celebration-overlay',
+            actionLabel && 'candy-celebration-overlay-actionable',
+            className,
+          )}
           aria-live="polite"
           aria-label={title}
         >
@@ -131,6 +137,16 @@ export function CelebrationBurst({
               >
                 {subtitle}
               </motion.div>
+            )}
+            {actionLabel && (
+              <motion.button
+                type="button"
+                className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
+                onClick={onDone}
+                whileTap={{ scale: 0.96 }}
+              >
+                {actionLabel}
+              </motion.button>
             )}
           </motion.div>
         </motion.div>

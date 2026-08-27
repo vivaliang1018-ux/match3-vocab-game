@@ -13,17 +13,21 @@ const SPEED_OPTIONS = [
 ] as const;
 
 const VARIANT_OPTIONS: { label: string; value: SplashVariant }[] = [
-  { label: 'Candy Logo', value: 'logo' },
+  { label: 'Matchingo Logo', value: 'logo' },
   { label: '三消→标题', value: 'tiles' },
   { label: 'Wave 文字', value: 'wave' },
 ];
+
+/** Matches BootApp MIN_BOOT_SPLASH_MS. */
+const BOOT_SPLASH_MS = 1800;
 
 export function LoadingSplashPreview() {
   const [playKey, setPlayKey] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [loop, setLoop] = useState(true);
-  const [timeScale, setTimeScale] = useState(2);
+  const [timeScale, setTimeScale] = useState(1);
   const [variant, setVariant] = useState<SplashVariant>('logo');
+  const [seamlessEntry, setSeamlessEntry] = useState(true);
 
   const replay = useCallback(() => {
     setPlaying(true);
@@ -42,21 +46,22 @@ export function LoadingSplashPreview() {
     <div className="relative h-full min-h-0 overflow-hidden">
       {playing && (
         <LoadingSplash
-          key={`${playKey}-${variant}`}
+          key={`${playKey}-${variant}-${seamlessEntry}`}
           timeScale={timeScale}
-          durationMs={2400}
+          durationMs={BOOT_SPLASH_MS}
+          seamlessEntry={seamlessEntry}
           onDone={handleDone}
           variant={variant}
         />
       )}
 
       {!playing && (
-        <div className="absolute inset-0 z-[210] flex flex-col items-center justify-center gap-3 bg-[#faf8ff] text-violet-900">
+        <div className="absolute inset-0 z-[210] flex flex-col items-center justify-center gap-3 bg-[#0284c7] text-white">
           <p className="text-sm font-bold">动画已结束</p>
           <button
             type="button"
             onClick={replay}
-            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white active:bg-violet-700"
+            className="rounded-full bg-white/20 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/30 active:bg-white/30"
           >
             重新播放
           </button>
@@ -68,7 +73,7 @@ export function LoadingSplashPreview() {
           Loading 预览 · {LOADING_SPLASH_BUILD}
         </h1>
         <p className="pointer-events-auto mt-0.5 text-xs text-white/75">
-          Candy Logo（默认）· 三消 / Wave 可切换
+          当前 App 启动 loading（炫光 + 星光 + 小 logo）
         </p>
       </div>
 
@@ -77,7 +82,7 @@ export function LoadingSplashPreview() {
           <button
             type="button"
             onClick={replay}
-            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-bold text-white active:bg-violet-700"
+            className="rounded-full bg-sky-500 px-4 py-2 text-xs font-bold text-white active:bg-sky-600"
           >
             重播
           </button>
@@ -91,6 +96,20 @@ export function LoadingSplashPreview() {
             }
           >
             {loop ? '循环：开' : '循环：关'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSeamlessEntry((v) => !v);
+              replay();
+            }}
+            className={
+              seamlessEntry
+                ? 'rounded-full bg-amber-400 px-4 py-2 text-xs font-bold text-amber-950'
+                : 'rounded-full bg-white/15 px-4 py-2 text-xs font-bold text-white/80'
+            }
+          >
+            {seamlessEntry ? '无缝交接：开' : '无缝交接：关'}
           </button>
         </div>
 

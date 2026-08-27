@@ -1,9 +1,12 @@
 import { assetUrl } from './assetUrl';
 
 export const BGM_ENABLED_KEY = 'smellycat-match3-bgm-enabled';
-export const DEFAULT_BGM_VOLUME = 0.08;
+// The BGM asset itself is mastered to about -32 LUFS because iOS ignores
+// HTMLMediaElement.volume. Keep playback at unity for consistent Web/iOS output.
+export const HOME_BGM_VOLUME = 1;
+export const DEFAULT_BGM_VOLUME = 1;
 
-const BGM_FILE = 'bgm/mutou-tangyun.mp3';
+const BGM_FILE = 'bgm/matchingo.mp3';
 
 export function getBgmUrl(): string {
   return assetUrl(BGM_FILE);

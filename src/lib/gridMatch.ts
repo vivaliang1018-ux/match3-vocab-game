@@ -572,6 +572,7 @@ export function createBalancedOpeningGrid(
 
   let best: Tile[][] | null = null;
   let bestLongDistance = Number.POSITIVE_INFINITY;
+  let bestPlayableItemCount = -1;
   for (let attempt = 0; attempt < 320; attempt++) {
     const quotas = openingQuotas(itemIds);
     const desiredOpportunityCount = Math.random() < 0.5 ? 1 : 2;
@@ -597,6 +598,10 @@ export function createBalancedOpeningGrid(
       hasSwapMatchForItem(candidate, id),
     );
     if (!preferredPlayable) continue;
+    const playableItemCount = itemIds.reduce(
+      (count, id) => count + (hasSwapMatchForItem(candidate, id) ? 1 : 0),
+      0,
+    );
 
     const longDistance =
       analysis.longMoveCount < 1
@@ -604,11 +609,20 @@ export function createBalancedOpeningGrid(
         : analysis.longMoveCount > 2
           ? analysis.longMoveCount - 2
           : 0;
-    if (longDistance < bestLongDistance) {
+    if (
+      playableItemCount > bestPlayableItemCount ||
+      (playableItemCount === bestPlayableItemCount && longDistance < bestLongDistance)
+    ) {
       best = candidate;
+      bestPlayableItemCount = playableItemCount;
       bestLongDistance = longDistance;
     }
-    if (longDistance === 0) return candidate;
+    // Four of six words immediately playable is a good opening spread without
+    // spending hundreds of randomized attempts chasing a perfect board.
+    const balancedOpportunityTarget = Math.min(itemIds.length, 4);
+    if (playableItemCount >= balancedOpportunityTarget && longDistance === 0) {
+      return candidate;
+    }
   }
 
   if (best) return best;
@@ -880,20 +894,21 @@ export function ensureTimedTargetPlayable(
   grid: Tile[][],
   targetItemId: string,
   allItemIds: string[],
-): void {
-  if (!targetItemId || allItemIds.length === 0) return;
-  if (hasSwapMatchForItem(grid, targetItemId)) return;
+): boolean {
+  if (!targetItemId || allItemIds.length === 0) return false;
+  if (hasSwapMatchForItem(grid, targetItemId)) return true;
 
   let attempts = 0;
   while (attempts < 64) {
     attempts++;
-    if (plantNearMatchForItem(grid, targetItemId, allItemIds, randInt(2) === 0)) return;
+    if (plantNearMatchForItem(grid, targetItemId, allItemIds, randInt(2) === 0)) return true;
   }
 
-  if (forcePlantTargetMatch(grid, targetItemId, allItemIds)) return;
+  if (forcePlantTargetMatch(grid, targetItemId, allItemIds)) return true;
 
   // Final guarantee: rebuild a minimal playable window even if the board is hostile.
   forcePlantTargetMatch(grid, targetItemId, allItemIds);
+  return hasSwapMatchForItem(grid, targetItemId);
 }
 
 /** @deprecated Use ensureTimedTargetPlayable */

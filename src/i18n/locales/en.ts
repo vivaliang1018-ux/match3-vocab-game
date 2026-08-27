@@ -51,7 +51,7 @@ export const en: Messages = {
       (
         {
           sets: `You have officially completed ${value} Adventure word sets.`,
-          day: `You have learned for ${value} consecutive days. Valid Adventure, Review, Forced Review, or Category learning all count.`,
+          day: `You have learned for ${value} consecutive days. Learning in Adventure, Review, Forced Review, and Category modes all counts.`,
           combo: `You have won ${value} Adventure sets in a row. A successful Rescue followed by the final Quiz counts; an official loss ends the streak.`,
         } as const
       )[id],
@@ -69,7 +69,7 @@ export const en: Messages = {
           day_nail: `Hit a ${next}-day streak to become Calendar Regular!`,
           combo_king: `Reach a ${next}-set clear streak for Combo Wobbler!`,
           dex_collector: `Master ${next} emojis to earn Dex Maniac!`,
-          review_brain: 'Clear your first set to unlock Memory Refiner!',
+          review_brain: `Complete ${next} reviews to unlock Memory Refiner!`,
           category_fan: 'Push adventure further to unlock Theme Explorer!',
         } as const
       )[id],
@@ -80,7 +80,7 @@ export const en: Messages = {
           day_nail: `Longest day streak: ${value}. You're a Calendar Regular!`,
           combo_king: `${value}-set clear streak — Combo Wobbler status!`,
           dex_collector: `${value} emojis mastered — Dex Maniac!`,
-          review_brain: 'Review mode unlocked — Memory Refiner is online!',
+          review_brain: `${value} reviews completed — Memory Refiner unlocked!`,
           category_fan: 'Categories unlocked — Theme Explorer, go!',
         } as const
       )[id],
@@ -98,7 +98,8 @@ export const en: Messages = {
     emojisCleared: 'Completed emojis',
     emojiProgress: 'Completion progress',
     emojiProgressDetail: (cleared: number, total: number) => `${cleared} / ${total} types`,
-    language: 'Language',
+    language: 'Menu language',
+    languageHint: 'Menus only · Emoji names and audio stay in English',
     preferencesTitle: 'Preferences',
     toggleOn: 'ON',
     toggleOff: 'OFF',
@@ -125,7 +126,7 @@ export const en: Messages = {
     deleteAccountConfirmAction: 'Delete permanently',
     deleteAccountCancel: 'Cancel',
     deleteAccountDone: 'Account deleted',
-    deleteAccountNeedsRelogin: 'For security, sign out, sign in again, then retry delete.',
+    deleteAccountNeedsRelogin: 'For security, sign out, sign in again, then try deleting your account again.',
     deleteAccountFailed: 'Could not delete account. Please try again.',
     accountSettingsTitle: 'Account settings',
     accountOpenSettings: 'Account settings',
@@ -202,6 +203,11 @@ export const en: Messages = {
     bgm: 'Music',
     mute: 'Mute',
     restart: 'Restart board',
+    home: 'Home',
+    homeConfirmTitle: 'Return Home?',
+    homeConfirmBody: 'Your current board will be abandoned. Your next game will start with a new board.',
+    homeConfirmStay: 'Keep Playing',
+    homeConfirmLeave: 'Return Home',
   },
   modes: {
     pickerTitle: 'Choose mode',
@@ -227,7 +233,7 @@ export const en: Messages = {
     moodBoard: 'Mood Board',
     moodSwitchBoard: 'Try a color',
     sayBlast: 'Say & Blast',
-    sayBlastDesc: 'Say learned words to blast falling emoji',
+    sayBlastDesc: 'Say learned words to blast falling emojis',
     moodPaletteName: (id) =>
       (
         {
@@ -253,7 +259,7 @@ export const en: Messages = {
     lockedReviewHint: 'Clear Adventure set 1 to unlock Review.',
     lockedCategoryHint: 'Clear Adventure set 5 to unlock Category.',
     noStamina: 'Out of energy',
-    noStaminaHint: 'Regain 1 every 2 hours, or wait for tomorrow. Review is free.',
+    noStaminaHint: 'Regain 1 stamina point every hour, or wait until tomorrow. Review is free.',
     forcedReviewTitle: 'Review checkpoint',
     forcedReviewSubtitle: 'Every 3 new sets — time to reinforce memory',
     pendingReviewBanner: 'Review pending',
@@ -298,22 +304,22 @@ export const en: Messages = {
     outOfMovesSubtitle: 'Enter revive — clear all 6 words ×2 to continue',
     retrySameSet: 'Retry this set',
     waitStamina: 'Wait for energy',
-    deadTitle: 'System crashed 💀',
-    deadSubtitle: 'You’re out of energy. The board is haunted until it recharges.',
-    deadWait: 'Energy +1 every 2 hours — come back later',
+    deadTitle: 'Machine recharging ⚡️',
+    deadSubtitle: 'The next set requires 1 stamina point. Other modes are still available.',
+    deadWait: 'Energy +1 every hour — come back later',
     deadGoReview: 'Boost with Review ⭐',
   },
   consent: {
     dialogAria: 'Terms of Service',
     title: 'Terms of Service',
     intro:
-      'Before we play, here’s some legal stuff—to provide a great experience, Matchingo collects some personal info. You can access or delete your data at the bottom of the Me tab.',
-    agreeBefore: 'By tapping “OK”, you’re consenting to our ',
+      'You can play as a guest with progress stored on this device. If you choose to sign in, your account information and learning progress are sent to Firebase for cross-device sync.',
+    agreeBefore: 'Review our ',
     termsLink: 'Terms of Service',
     agreeAnd: ' & ',
     privacyLink: 'Privacy Policy',
-    agreeAfter: '.',
-    accept: 'OK',
+    agreeAfter: ' before continuing.',
+    accept: 'Continue',
   },
   celebration: {
     roundCelebrateCards: [
@@ -321,7 +327,7 @@ export const en: Messages = {
         title: 'You cleared it all?! The emojis want to call the cops 👮',
         subtitle: 'Board spotless — cleaner than your brain right now 🧠✨',
         primaryCta: 'Next! I dare you to win again 😎',
-        secondaryCta: 'Clock out, go slack ☕',
+        secondaryCta: 'Clock out and slack off ☕',
       },
       {
         title: 'Fine, you win. You’re free… for today 💥',
@@ -336,16 +342,16 @@ export const en: Messages = {
         secondaryCta: 'Take a breather ☕',
       },
       {
-        title: 'Board cleared! Nominate yourself for Match-3 Nobel 🏆',
+        title: 'Board cleared! Nominate yourself for the Match-3 Nobel Prize 🏆',
         subtitle: 'Scary good. Ex-whack-a-mole pro, right?!',
         primaryCta: 'Stay humble — next set 💅',
         secondaryCta: 'Screenshot & brag 📱',
       },
       {
         title: 'You cleared it?! Okay, you conquered me',
-        subtitle: 'Emojis surrender in a line — quiz is the real courtroom',
+        subtitle: 'Emojis surrender in a line — the quiz is the real courtroom',
         primaryCta: 'Quiz me. Judge me ⚖️',
-        secondaryCta: 'One breath… then trial 😮‍💨',
+        secondaryCta: 'One breath… then the trial 😮‍💨',
       },
       {
         title: 'Whoa — you actually wiped the set',
@@ -363,7 +369,7 @@ export const en: Messages = {
         title: 'Whole set down. Collecting us, huh?',
         subtitle: 'Wild emojis wiped. Next stop: quiz checks if you’re legit',
         primaryCta: 'Inspection time 🎯',
-        secondaryCta: 'Pretend I’m calm 😌',
+        secondaryCta: 'Pretend to be calm 😌',
       },
     ],
     default: 'Great job!',
@@ -387,7 +393,7 @@ export const en: Messages = {
       {
         title: `You unlocked ${n} emojis. Not bad`,
         subtitle: 'Deposited. Learning capital landed. Boss pie charts can wait',
-        primaryCta: 'Strike while hot 🔥',
+        primaryCta: 'Strike while it’s hot 🔥',
         secondaryCta: 'Take it and slack ☕',
       },
       {
@@ -415,7 +421,7 @@ export const en: Messages = {
         secondaryCta: 'Clock out — flee 🏃',
       },
       {
-        title: `Award yourself the “learned ${n} emojis” cup 🏆`,
+        title: `Award yourself the “${n} emojis learned” cup 🏆`,
         subtitle: 'Terrifying. This isn’t studying — it’s an emoji hunt livestream',
         primaryCta: 'Next hunt 🎯',
         secondaryCta: 'Acceptance speech: bye 👋',
@@ -436,7 +442,7 @@ export const en: Messages = {
       },
       {
         title: `Forgetting curve: debt delayed`,
-        subtitle: `${n} emojis thank you for remembering`,
+        subtitle: `${n} emojis thank you for remembering them`,
         primaryCta: 'One more set',
         secondaryCta: 'Clock out',
       },
@@ -465,6 +471,7 @@ export const en: Messages = {
     reviewTag: '· Review',
     peekCn: 'Show meaning',
     peekCnAria: 'Show meaning',
+    listenAgain: 'Listen again',
     prevQuestion: 'Previous',
     nextQuestion: 'Next',
     tryAgain: 'Try again',
@@ -483,7 +490,7 @@ export const en: Messages = {
   review: {
     title: 'Spaced review',
     whatIsThis: 'What is this?',
-    summary: 'Board matches only count as exposure. Passing the quiz advances 12h → 1d → 2d…. Misses in Review/Revive pull words back sooner.',
+    summary: 'Board matches only count as exposure. Passing the quiz advances 12h → 1d → 2d… Misses in Review/Revive pull words back sooner.',
     intro:
       'Your review hub: every match is tracked. In Play → Review mode, due words are prioritized.',
     tracked: (n: number) => `Tracking ${n} word${n === 1 ? '' : 's'}`,
@@ -507,7 +514,7 @@ export const en: Messages = {
   words: {
     title: 'All emojis',
     stats: (categories: number, total: number) =>
-      `${categories} categories · ${total} emojis`,
+      `${categories} ${categories === 1 ? 'category' : 'categories'} · ${total} ${total === 1 ? 'emoji' : 'emojis'}`,
     searchPlaceholder: 'Search English or emoji',
     noResults: 'No matching emojis',
     categoryCount: (subtitle: string, n: number) => `${subtitle} · ${n}`,

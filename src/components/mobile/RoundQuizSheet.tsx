@@ -8,21 +8,19 @@ import {
   MOTION_STAGGER_ITEM,
   MOTION_VIGNETTE,
 } from '../../lib/motionChoreography';
-import { Check, ChevronLeft, ChevronRight, Eye, Link2, Sparkles, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Eye, Link2, Volume2, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
-import type { CelebrationCard } from '../../i18n/types';
+import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import {
   playQuizWrongSfx,
-  speakWordToCompletion,
+  queueWordSpeechToCompletion,
   stopAllWordSpeech,
 } from '../../lib/wordSpeech';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
 import { pickQuizChoices } from '../../lib/quizDistractors';
-import { pickRandom } from '../../lib/pickRandom';
 import { cn } from '../../lib/utils';
 import type { QuizKind, WordItem } from '../../types/game';
 import { SkySparkleBackground } from '../SkySparkleBackground';
-import { CelebrationBurst } from './CelebrationBurst';
 
 type Phase = QuizKind;
 
@@ -31,14 +29,10 @@ type RoundQuizSheetProps = {
   items: WordItem[];
   /** Broader pool for pick-quiz distractors (outside this round). */
   distractorPool?: WordItem[];
-  /** `review` uses reinforce copy instead of “new emoji” celebration. */
-  celebrateKind?: 'learned' | 'review';
   /** Single quiz type for this round (randomly chosen by parent). */
   quizKind: QuizKind;
-  /** Words gained this round — shown on quiz-complete celebration. */
-  congratsGained: number;
   /** Passed the quiz — count as learned / clear. */
-  onComplete: () => void;
+  onComplete: (mistakenItemIds: string[]) => void;
   /** Confirmed abandon — restart set, do not count as learned. */
   onAbandon: () => void;
 };
@@ -79,13 +73,11 @@ function ItemVisual({ item, size = 'md' }: { item: WordItem; size?: 'sm' | 'md' 
 function RoundQuizSheetInner({
   items,
   distractorPool,
-  celebrateKind = 'learned',
   quizKind,
-  congratsGained,
   onComplete,
   onAbandon,
 }: RoundQuizSheetInnerProps) {
-  const { t, showChinese } = useI18n();
+  const { locale, t } = useI18n();
   const pickOrder = useMemo(() => shuffleItems(items), [items]);
   const emojiColumn = useMemo(() => shuffleItems(items), [items]);
   const choicePool = distractorPool && distractorPool.length > 0 ? distractorPool : items;
@@ -103,8 +95,6 @@ function RoundQuizSheetInner({
     pickChoicesByIndexRef.current = [first];
     return first;
   });
-  const [celebrate, setCelebrate] = useState<'done' | null>(null);
-  const [celebrateCard, setCelebrateCard] = useState<CelebrationCard | null>(null);
   const [peekCn, setPeekCn] = useState(false);
   const [tryAgainOpen, setTryAgainOpen] = useState(false);
   const [tryAgainLabel, setTryAgainLabel] = useState('');
@@ -115,15 +105,14 @@ function RoundQuizSheetInner({
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
-  const openLearnedCelebrate = useCallback(() => {
-    const cards =
-      celebrateKind === 'review'
-        ? t.celebration.reviewCelebrateCards(congratsGained)
-        : t.celebration.learnedCelebrateCards(congratsGained);
-    setCelebrateCard(pickRandom(cards));
-    setCelebrate('done');
-  }, [celebrateKind, congratsGained, t]);
+  const mistakenItemIdsRef = useRef<Set<string>>(new Set());
+  const finishQuiz = useCallback(
+    () => onComplete([...mistakenItemIdsRef.current]),
+    [onComplete],
+  );
   const speechTaskRef = useRef<Promise<boolean> | null>(null);
+  const pickSpeechQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
+  const pickSpeechRunRef = useRef(0);
 
   /**
    * Start the requested word immediately. A new question or word tap supersedes
@@ -131,11 +120,47 @@ function RoundQuizSheetInner({
    */
   const speakNow = useCallback(
     (word: string, options?: { quickStart?: boolean }): Promise<boolean> => {
-      stopAllWordSpeech();
-      const task = speakWordToCompletion(word, options);
+      const task = queueWordSpeechToCompletion(word, options);
       speechTaskRef.current = task;
       const release = () => {
         if (speechTaskRef.current === task) speechTaskRef.current = null;
+      };
+      void task.then(release, release);
+      return task;
+    },
+    [],
+  );
+
+  /** Keep the prompt ahead of replay taps and tapped answer words. */
+  const startPickPrompt = useCallback((word: string): Promise<boolean> => {
+    const runId = ++pickSpeechRunRef.current;
+    const task = queueWordSpeechToCompletion(word);
+    pickSpeechQueueRef.current = task;
+    speechTaskRef.current = task;
+    const release = () => {
+      if (pickSpeechRunRef.current === runId && speechTaskRef.current === task) {
+        speechTaskRef.current = null;
+      }
+    };
+    void task.then(release, release);
+    return task;
+  }, []);
+
+  const queuePickSpeech = useCallback(
+    (word: string, options?: { quickStart?: boolean }): Promise<boolean> => {
+      const runId = pickSpeechRunRef.current;
+      const task = pickSpeechQueueRef.current
+        .catch(() => false)
+        .then(() => {
+          if (pickSpeechRunRef.current !== runId || phaseRef.current !== 'pick') return false;
+          return queueWordSpeechToCompletion(word, options);
+        });
+      pickSpeechQueueRef.current = task;
+      speechTaskRef.current = task;
+      const release = () => {
+        if (pickSpeechRunRef.current === runId && speechTaskRef.current === task) {
+          speechTaskRef.current = null;
+        }
       };
       void task.then(release, release);
       return task;
@@ -193,6 +218,7 @@ function RoundQuizSheetInner({
     stopAllWordSpeech();
     return () => {
       answerFlowIdRef.current += 1;
+      pickSpeechRunRef.current += 1;
       speechTaskRef.current = null;
       stopAllWordSpeech();
       if (tryAgainTimerRef.current) window.clearTimeout(tryAgainTimerRef.current);
@@ -215,11 +241,11 @@ function RoundQuizSheetInner({
   }, [phase, pickIndex, pickOrder, items, choicePool]);
 
   useLayoutEffect(() => {
-    if (phase !== 'pick' || celebrate) return;
+    if (phase !== 'pick') return;
     const current = pickOrder[pickIndex];
     if (!current) return;
-    speakNow(current.word);
-  }, [phase, pickIndex, pickOrder, celebrate, speakNow]);
+    startPickPrompt(current.word);
+  }, [phase, pickIndex, pickOrder, startPickPrompt]);
 
   const handleWordClick = (item: WordItem) => {
     if (answerPending || connectedIds.has(item.id)) return;
@@ -249,24 +275,32 @@ function RoundQuizSheetInner({
         setSelectedWordId(null);
         setPoppingPairId(null);
         setAnswerPending(false);
-        if (nextCount >= items.length) openLearnedCelebrate();
+        if (nextCount >= items.length) finishQuiz();
       })();
       return;
     }
 
     triggerGameHaptic('quizWrong');
+    mistakenItemIdsRef.current.add(selectedWordId);
     showTryAgain();
   };
 
   const handlePick = (choice: WordItem) => {
-    if (answerPending || pickIndex < furthestPickIndex) return;
+    if (answerPending) return;
+    if (pickIndex < furthestPickIndex) {
+      // Historical answers are read-only, but every option remains useful as
+      // pronunciation practice (including the three distractors).
+      speakNow(choice.word, { quickStart: true });
+      return;
+    }
     const current = pickOrder[pickIndex];
     if (!current) return;
     if (choice.id !== current.id) {
       triggerGameHaptic('quizWrong');
+      mistakenItemIdsRef.current.add(current.id);
       showTryAgain(
         choice.word,
-        () => speakNow(choice.word, { quickStart: true }),
+        () => queuePickSpeech(choice.word, { quickStart: true }),
       );
       return;
     }
@@ -280,7 +314,7 @@ function RoundQuizSheetInner({
       if (answerFlowIdRef.current !== flowId) return;
       setAnswerPending(false);
       if (nextIndex >= pickOrder.length) {
-        openLearnedCelebrate();
+        finishQuiz();
         return;
       }
       setPickIndex(nextIndex);
@@ -300,28 +334,24 @@ function RoundQuizSheetInner({
     setPickIndex((i) => i + 1);
   };
 
-  const handleCelebrateDone = () => {
-    if (celebrate === 'done') {
-      setCelebrate(null);
-      onComplete();
-    }
-  };
-
   const handleExit = () => {
     setAbandonConfirmOpen(true);
   };
 
   const confirmAbandon = () => {
     answerFlowIdRef.current += 1;
+    pickSpeechRunRef.current += 1;
     speechTaskRef.current = null;
     stopAllWordSpeech();
     if (tryAgainTimerRef.current) window.clearTimeout(tryAgainTimerRef.current);
-    setCelebrate(null);
     setAbandonConfirmOpen(false);
     onAbandon();
   };
 
   const currentPick = pickOrder[pickIndex];
+  const currentTranslation = currentPick
+    ? getEmojiLearningTranslation(currentPick, locale)
+    : null;
   const isPickReview = phase === 'pick' && pickIndex < furthestPickIndex;
   const canGoPrevPick = phase === 'pick' && pickIndex > 0 && !answerPending;
   const canGoNextPick =
@@ -357,7 +387,6 @@ function RoundQuizSheetInner({
                   </>
                 ) : (
                   <>
-                    <Sparkles size={12} aria-hidden />
                     {t.quiz.phasePickSolo}
                   </>
                 )}
@@ -473,11 +502,23 @@ function RoundQuizSheetInner({
                       </span>
                     )}
                   </div>
-                  <div className="candy-quiz-pick-word">{currentPick.word}</div>
-                  {showChinese && currentPick.cn && (
+                  <div className="candy-quiz-pick-word-row">
+                    <div className="candy-quiz-pick-word">{currentPick.word}</div>
+                    <motion.button
+                      type="button"
+                      disabled={answerPending}
+                      onClick={() => queuePickSpeech(currentPick.word)}
+                      className="candy-quiz-listen-btn"
+                      aria-label={`${t.quiz.listenAgain}: ${currentPick.word}`}
+                      whileTap={answerPending ? undefined : MOTION_PRESS_TAP}
+                    >
+                      <Volume2 size={18} aria-hidden />
+                    </motion.button>
+                  </div>
+                  {currentTranslation && (
                     <div className="candy-quiz-pick-peek-slot">
                       {peekCn ? (
-                        <div className="candy-quiz-peek-cn">{currentPick.cn}</div>
+                        <div className="candy-quiz-peek-cn">{currentTranslation}</div>
                       ) : (
                         <motion.button
                           type="button"
@@ -498,18 +539,24 @@ function RoundQuizSheetInner({
                         <motion.button
                           key={`pick-${choice.id}-${pickIndex}`}
                           type="button"
-                          disabled={isPickReview || answerPending}
+                          disabled={answerPending}
                           onClick={() => handlePick(choice)}
+                          aria-label={isPickReview
+                            ? `${t.quiz.listenAgain}: ${choice.word}`
+                            : choice.word}
                           whileTap={
-                            isPickReview || answerPending ? undefined : MOTION_PRESS_TAP
+                            answerPending ? undefined : MOTION_PRESS_TAP
                           }
                           className={cn(
                             'candy-quiz-pick-choice',
                             isPickReview && isCorrectChoice && 'candy-quiz-pick-choice-correct',
-                            isPickReview && !isCorrectChoice && 'opacity-55',
+                            isPickReview && !isCorrectChoice && 'ring-1 ring-sky-200/80',
                           )}
                         >
                           <ItemVisual item={choice} size="lg" />
+                          {isPickReview && (
+                            <Volume2 size={14} className="mt-1 text-sky-600" aria-hidden />
+                          )}
                           {isPickReview && isCorrectChoice && (
                             <Check size={16} className="mt-1 text-emerald-600" aria-hidden />
                           )}
@@ -556,15 +603,6 @@ function RoundQuizSheetInner({
           </div>
         </div>
       </div>
-
-      <CelebrationBurst
-        show={celebrate === 'done'}
-        title={celebrateCard?.title}
-        subtitle={celebrateCard?.subtitle}
-        emoji={celebrateKind === 'review' ? '🧠' : '🌈'}
-        durationMs={1800}
-        onDone={handleCelebrateDone}
-      />
 
       <AnimatePresence>
         {tryAgainOpen && (

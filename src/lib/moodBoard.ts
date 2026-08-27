@@ -149,11 +149,6 @@ export function moodPaletteForDay(now = new Date()): MoodPaletteId {
   return 'rainbow';
 }
 
-export function nextMoodPalette(id: MoodPaletteId): MoodPaletteId {
-  const current = MOOD_PALETTES.findIndex((palette) => palette.id === id);
-  return MOOD_PALETTES[(current + 1 + MOOD_PALETTES.length) % MOOD_PALETTES.length]!.id;
-}
-
 export function moodPaletteSwatch(id: MoodPaletteId): string {
   return MOOD_PALETTES.find((palette) => palette.id === id)?.swatch ?? '🌈';
 }
@@ -166,4 +161,65 @@ export function moodBoardItems(
   if (!palette) return [];
   const allowed = new Set(palette.emojis);
   return allItems.filter((item) => Boolean(item.emoji) && allowed.has(item.emoji!));
+}
+
+const MOOD_DAILY_STORAGE_KEY = 'matchingo-mood-daily-v1';
+
+export const MOOD_DAILY_PLAY_MAX = 3;
+
+export type MoodDailyState = {
+  dayKey: string;
+  plays: number;
+};
+
+function moodDayKeyFrom(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function loadMoodDailyState(now = Date.now()): MoodDailyState {
+  const today = moodDayKeyFrom(now);
+  try {
+    const raw = localStorage.getItem(MOOD_DAILY_STORAGE_KEY);
+    if (!raw) return { dayKey: today, plays: 0 };
+    const parsed = JSON.parse(raw) as Partial<MoodDailyState>;
+    if (typeof parsed.dayKey !== 'string' || parsed.dayKey !== today) {
+      return { dayKey: today, plays: 0 };
+    }
+    const plays =
+      typeof parsed.plays === 'number' && Number.isFinite(parsed.plays)
+        ? Math.max(0, Math.floor(parsed.plays))
+        : 0;
+    return { dayKey: today, plays };
+  } catch {
+    return { dayKey: today, plays: 0 };
+  }
+}
+
+function saveMoodDailyState(state: MoodDailyState): void {
+  try {
+    localStorage.setItem(MOOD_DAILY_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore quota
+  }
+}
+
+export function moodPlaysRemainingToday(now = Date.now()): number {
+  const state = loadMoodDailyState(now);
+  return Math.max(0, MOOD_DAILY_PLAY_MAX - state.plays);
+}
+
+export function canPlayMoodToday(now = Date.now()): boolean {
+  return moodPlaysRemainingToday(now) > 0;
+}
+
+/** Spend one daily mood play. Returns false when the daily limit is already reached. */
+export function tryConsumeMoodPlay(now = Date.now()): boolean {
+  const state = loadMoodDailyState(now);
+  if (state.plays >= MOOD_DAILY_PLAY_MAX) return false;
+  saveMoodDailyState({ dayKey: state.dayKey, plays: state.plays + 1 });
+  return true;
 }

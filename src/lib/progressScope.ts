@@ -63,15 +63,18 @@ export function clearScopedProgress(
 export function claimGuestProgress(
   baseKey: string,
   userUid: string | null | undefined,
+  merge?: (accountRaw: string, guestRaw: string) => string,
 ): void {
   if (!userUid) return;
   try {
     const guestRaw = readScopedProgress(baseKey, null);
     if (guestRaw === null) return;
     const userKey = scopedStorageKey(baseKey, userUid);
-    if (localStorage.getItem(userKey) === null) {
-      localStorage.setItem(userKey, guestRaw);
-    }
+    const accountRaw = localStorage.getItem(userKey);
+    localStorage.setItem(
+      userKey,
+      accountRaw === null ? guestRaw : merge ? merge(accountRaw, guestRaw) : accountRaw,
+    );
     localStorage.removeItem(scopedStorageKey(baseKey, null));
   } catch {
     // keep the source bucket if storage is unavailable

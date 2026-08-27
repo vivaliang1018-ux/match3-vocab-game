@@ -1,4 +1,5 @@
 import { assetUrl } from './assetUrl';
+import { encodeVoicePathSegment } from './emojiVoiceFileUrl';
 
 type SpeakOptions = {
   /** Call `speak` in the same task as the user gesture (required on iOS Safari). */
@@ -21,14 +22,12 @@ type CompletionSpeechOptions = {
 };
 
 const RECORDED_VOICE_BASE = assetUrl('emoji-voice');
-/** Recorded clips are mastered quiet; boost above 1.0 via Web Audio when available. */
-const WORD_PLAYBACK_GAIN = 2.3;
+/** Recordings are mastered to -16 LUFS; unity gain avoids clipping their peaks. */
+const WORD_PLAYBACK_GAIN = 1;
 
 let voiceAudioEl: HTMLAudioElement | null = null;
-let voiceAudioCtx: AudioContext | null = null;
-let voiceGainNode: GainNode | null = null;
-let voiceRoutedThroughWebAudio = false;
 let speechGeneration = 0;
+let wordSpeechQueue: Promise<boolean> = Promise.resolve(true);
 
 type BgmDuckController = {
   duck: () => void;
@@ -52,51 +51,18 @@ function endBgmDuck(): void {
   if (bgmDuckDepth === 0) bgmDuckController?.restore();
 }
 
-async function resumeVoiceAudioContext(): Promise<void> {
-  if (!voiceAudioCtx) return;
-  if (voiceAudioCtx.state === 'suspended') {
-    try {
-      await voiceAudioCtx.resume();
-    } catch {
-      // ignore
-    }
-  }
-}
-
 function getVoiceAudioElement(): HTMLAudioElement {
   if (!voiceAudioEl) {
     voiceAudioEl = new Audio();
     voiceAudioEl.preload = 'auto';
-  }
-  if (!voiceRoutedThroughWebAudio) {
-    try {
-      const Ctx =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (Ctx && voiceAudioEl) {
-        voiceAudioCtx = new Ctx();
-        const source = voiceAudioCtx.createMediaElementSource(voiceAudioEl);
-        voiceGainNode = voiceAudioCtx.createGain();
-        voiceGainNode.gain.value = WORD_PLAYBACK_GAIN;
-        source.connect(voiceGainNode);
-        voiceGainNode.connect(voiceAudioCtx.destination);
-        voiceRoutedThroughWebAudio = true;
-      }
-    } catch {
-      // Fall back to element.volume on platforms that reject MediaElementSource.
-    }
   }
   return voiceAudioEl;
 }
 
 function setWordPlaybackLevel(level: number): void {
   const vol = Math.min(1, Math.max(0, level));
-  if (voiceGainNode && voiceAudioCtx) {
-    voiceGainNode.gain.value = WORD_PLAYBACK_GAIN * vol;
-    return;
-  }
   const a = voiceAudioEl;
-  if (a) a.volume = vol;
+  if (a) a.volume = WORD_PLAYBACK_GAIN * vol;
 }
 
 export function stopVoicePlayback(): void {
@@ -117,6 +83,7 @@ export function stopVoicePlayback(): void {
 /** Stop recorded audio and cancel pending / in-flight TTS. */
 export function stopAllWordSpeech(): void {
   speechGeneration += 1;
+  wordSpeechQueue = Promise.resolve(false);
   stopVoicePlayback();
   if (bgmDuckDepth > 0) {
     bgmDuckDepth = 0;
@@ -138,7 +105,7 @@ function buildRecordedWordUrls(word: string): string[] {
   const push = (s: string) => {
     const t = s.trim();
     if (!t) return;
-    urls.add(`${RECORDED_VOICE_BASE}/${encodeURIComponent(t)}.mp3`);
+    urls.add(`${RECORDED_VOICE_BASE}/${encodeVoicePathSegment(t)}.mp3`);
   };
   const addVariants = (s: string) => {
     const forms = [s, s.normalize('NFC'), s.normalize('NFD')];
@@ -185,7 +152,6 @@ async function tryPlayAudioUrl(url: string): Promise<boolean> {
   beginBgmDuck();
   try {
     const a = getVoiceAudioElement();
-    await resumeVoiceAudioContext();
     a.pause();
     a.src = url;
     setWordPlaybackLevel(1);
@@ -209,7 +175,6 @@ async function tryPlayAudioUrlAndWait(
   try {
     if (isStillCurrent && !isStillCurrent()) return false;
     const a = getVoiceAudioElement();
-    await resumeVoiceAudioContext();
     a.pause();
     a.src = url;
     setWordPlaybackLevel(1);
@@ -238,7 +203,10 @@ async function tryPlayAudioUrlAndWait(
       window.setTimeout(() => {
         cleanup();
         resolve();
-      }, Math.min(8000, Math.max(1200, dur * 1000 + 300)));
+      // `duration` is often still unknown immediately after play() on iOS.
+      // Never use the old 1.2s fallback there: it could release the queue and
+      // let the next word replace a recording that was still speaking.
+      }, dur > 0 ? Math.min(8000, dur * 1000 + 500) : 8000);
     });
 
     if (isStillCurrent && !isStillCurrent()) return false;
@@ -380,7 +348,6 @@ export function speak(word: string, options?: SpeakOptions): boolean {
 /** iOS/Safari: first user interaction often required before any audio/TTS works. */
 export function unlockSpeechSynthesis() {
   try {
-    void resumeVoiceAudioContext();
     if (!('speechSynthesis' in window)) return;
     const synth = window.speechSynthesis;
     synth.resume();
@@ -390,6 +357,27 @@ export function unlockSpeechSynthesis() {
     synth.getVoices();
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Drop background-suspended work and rebuild the vocabulary-audio queue.
+ * Other game sounds use short-lived contexts, while word playback keeps one
+ * media element/context and otherwise remains stuck after an iOS app switch.
+ */
+export function resetWordSpeechAfterBackground(): void {
+  stopAllWordSpeech();
+  // Recreate the media element after every foreground transition. A persistent
+  // WebAudio MediaElementSource can remain interrupted forever in WKWebView,
+  // while a fresh native HTMLAudioElement starts normally on the next match.
+  voiceAudioEl = null;
+  try {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.resume();
+      window.speechSynthesis.getVoices();
+    }
+  } catch {
+    // The next user gesture will run unlockSpeechSynthesis again.
   }
 }
 
@@ -418,20 +406,12 @@ export function playQuizWrongSfx(): void {
 
 /** User tap — prefer recording, fallback TTS in the same gesture. */
 export function speakWordQuick(word: string): void {
-  const gen = speechGeneration;
-  void playRecordedWord(word).then((ok) => {
-    if (gen !== speechGeneration) return;
-    if (!ok) speak(word, { sync: true });
-  });
+  void queueWordSpeechToCompletion(word, { quickStart: true });
 }
 
 /** Auto-play when a new quiz question appears. */
 export async function speakWordAuto(word: string): Promise<boolean> {
-  const gen = speechGeneration;
-  const ok = await playRecordedWord(word);
-  if (gen !== speechGeneration) return false;
-  if (ok) return true;
-  return speak(word);
+  return queueWordSpeechToCompletion(word);
 }
 
 function waitForSpeechSynthesisEnd(maxMs = 8000): Promise<void> {
@@ -481,4 +461,34 @@ export async function speakWordToCompletion(
   if (!speak(word, { sync: true })) return false;
   await waitForSpeechSynthesisEnd();
   return gen === speechGeneration;
+}
+
+/**
+ * App-wide vocabulary audio contract: a newly requested word waits for the
+ * current word to finish instead of cutting it off. Only an explicit
+ * `stopAllWordSpeech` (leaving/resetting a flow) cancels queued playback.
+ */
+export function queueWordSpeechToCompletion(
+  word: string,
+  options?: CompletionSpeechOptions,
+): Promise<boolean> {
+  const gen = speechGeneration;
+  const task = wordSpeechQueue
+    .catch(() => false)
+    .then(() => {
+      if (gen !== speechGeneration) return false;
+      return speakWordToCompletion(word, options);
+    });
+  wordSpeechQueue = task;
+  return task;
+}
+
+/**
+ * Time-sensitive prompt speech: the newest target replaces any older prompt
+ * or queued vocabulary audio. Unlike match-card speech, stale prompts must
+ * never finish after the visible question has changed.
+ */
+export function speakLatestWordPrompt(word: string): Promise<boolean> {
+  stopAllWordSpeech();
+  return speakWordToCompletion(word, { quickStart: true });
 }

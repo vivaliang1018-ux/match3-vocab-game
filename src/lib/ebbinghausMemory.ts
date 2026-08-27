@@ -191,7 +191,9 @@ export function recordWordRecallSuccess(
 
 /**
  * Review / revive miss (wrong match or timeout): pull schedule back.
- * Stage drops by 1 (min 0); next review is due now at stage 0, else after the shorter interval.
+ * Pull back at least one stage and never leave a missed word beyond the 2-day
+ * interval. A miss on a previously strong word should return soon enough to
+ * rebuild recall instead of waiting another week.
  */
 export function recordWordRecallFailure(
   map: Map<string, WordMemory>,
@@ -214,7 +216,7 @@ export function recordWordRecallFailure(
     return map;
   }
 
-  const nextStage = Math.max(0, prev.stage - 1);
+  const nextStage = Math.min(2, Math.max(0, prev.stage - 1));
   map.set(key, {
     ...prev,
     word: word.trim(),

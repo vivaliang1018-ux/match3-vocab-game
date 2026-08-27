@@ -17,6 +17,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { MOTION_PRESS_DEEP, MOTION_SPRING_BOUNCY } from '../../lib/motionPresets';
 import { LOCALE_OPTIONS, useI18n } from '../../i18n';
 import { cn } from '../../lib/utils';
+import { readAppVersionLabel } from '../../lib/appVersion';
 import { ProfileJourneySummary } from './ProfileJourneySummary';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 import { SignInSheet } from './SignInSheet';
@@ -69,7 +70,19 @@ export function ProfilePanel({
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [versionLabel, setVersionLabel] = useState(t.meta.uiVersion);
   const masteredCount = masteredEmojiCount(wordMemory, allPool);
+
+  useEffect(() => {
+    let active = true;
+    setVersionLabel(t.meta.uiVersion);
+    void readAppVersionLabel(t.meta.uiVersion).then((label) => {
+      if (active) setVersionLabel(label);
+    });
+    return () => {
+      active = false;
+    };
+  }, [t.meta.uiVersion]);
 
   // Retroactively unlock badges from existing progress when opening profile.
   useEffect(() => {
@@ -88,10 +101,10 @@ export function ProfilePanel({
       .sort()
       .join('|');
     if (prevIds !== nextIds) {
-      savePlayerSummary(next);
+      savePlayerSummary(next, user?.uid ?? null);
       onPlayerSummaryChange(next);
     }
-  }, [adventureClears, masteredCount, playerSummary, onPlayerSummaryChange]);
+  }, [adventureClears, masteredCount, playerSummary, onPlayerSummaryChange, user?.uid]);
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || t.profile.guestName;
   const badge = user ? t.profile.signedInBadge : t.profile.guestBadge;
@@ -180,14 +193,41 @@ export function ProfilePanel({
           </div>
 
           <ProfileSection>
-            <ProfileJourneySummary
-              summary={playerSummary}
-              adventureClears={adventureClears}
-              masteredCount={masteredCount}
-              reviewUnlocked={isReviewUnlocked(adventureClears)}
-              categoryUnlocked={isCategoryUnlocked(adventureClears)}
-              onPlayerSummaryChange={onPlayerSummaryChange}
-            />
+            <div className="profile-candy-section-label mb-2">
+              {t.profile.language}
+            </div>
+            <div
+              className="flex flex-nowrap justify-center gap-1"
+              role="radiogroup"
+              aria-label={t.profile.language}
+              aria-describedby="profile-menu-language-hint"
+            >
+              {LOCALE_OPTIONS.map((opt) => {
+                const selected = locale === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-label={opt.label}
+                    onClick={() => setLocale(opt.id)}
+                    className={cn(
+                      'profile-candy-locale-btn',
+                      selected && 'profile-candy-locale-btn-active',
+                    )}
+                  >
+                    {opt.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <p
+              id="profile-menu-language-hint"
+              className="mt-2 text-center text-[9px] font-bold leading-snug text-sky-800/65"
+            >
+              {t.profile.languageHint}
+            </p>
           </ProfileSection>
 
           <ProfileSection>
@@ -227,31 +267,14 @@ export function ProfilePanel({
           </ProfileSection>
 
           <ProfileSection>
-            <div
-              className="flex flex-nowrap justify-center gap-1"
-              role="radiogroup"
-              aria-label={t.profile.language}
-            >
-              {LOCALE_OPTIONS.map((opt) => {
-                const selected = locale === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={opt.label}
-                    onClick={() => setLocale(opt.id)}
-                    className={cn(
-                      'profile-candy-locale-btn',
-                      selected && 'profile-candy-locale-btn-active',
-                    )}
-                  >
-                    {opt.shortLabel}
-                  </button>
-                );
-              })}
-            </div>
+            <ProfileJourneySummary
+              summary={playerSummary}
+              adventureClears={adventureClears}
+              masteredCount={masteredCount}
+              reviewUnlocked={isReviewUnlocked(adventureClears)}
+              categoryUnlocked={isCategoryUnlocked(adventureClears)}
+              onPlayerSummaryChange={onPlayerSummaryChange}
+            />
           </ProfileSection>
 
           <section className="profile-candy-about mt-5">
@@ -260,7 +283,7 @@ export function ProfilePanel({
               {t.profile.description}
             </p>
             <p className="mt-2.5 text-[10px] font-bold text-sky-800/75">
-              {t.profile.version}: {t.meta.uiVersion}
+              {t.profile.version}: {versionLabel}
             </p>
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <button

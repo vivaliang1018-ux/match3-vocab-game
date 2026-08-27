@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   computeRefillMotions,
   GRID_COLS,
@@ -59,10 +59,10 @@ export function useBoardGravityRefill({
   const runningAnimsRef = useRef<Animation[]>([]);
   const [active, setActive] = useState(false);
 
-  const setActiveBoth = (next: boolean) => {
+  const setActiveBoth = useCallback((next: boolean) => {
     setActive(next);
     onActiveChange?.(next);
-  };
+  }, [onActiveChange]);
 
   const activeSpritesRef = useRef<HTMLElement[]>([]);
 
@@ -170,7 +170,7 @@ export function useBoardGravityRefill({
         cancelRunning();
       }
     };
-  }, [boardRef, burst, enabled]);
+  }, [boardRef, burst, enabled, setActiveBoth]);
 
   return active;
 }

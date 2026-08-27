@@ -7,7 +7,21 @@ import {
   saveWordMemoriesForScope,
   type WordMemory,
 } from './ebbinghausMemory';
-import { getFirebaseDb, isFirebaseConfigured } from './firebase';
+import { isFirebaseConfigured } from './firebaseCore';
+import { getFirebaseDb } from './firebaseDb';
+import {
+  loadModeUnlocks,
+  saveModeUnlocks,
+  type ModeUnlockState,
+} from './modeUnlocks';
+import {
+  loadPlayerSummary,
+  mergePlayerSummaries,
+  parsePlayerSummary,
+  savePlayerSummary,
+  type PlayerSummary,
+} from './playerSummary';
+import { loadRoundLearnedIds, saveRoundLearnedIds } from './roundLearned';
 
 /** Firestore: users/{uid}/match3/state */
 const MATCH3_COLLECTION = 'match3';
@@ -15,7 +29,16 @@ const MATCH3_STATE_DOC = 'state';
 
 type CloudMemoryDoc = {
   memories?: unknown;
+  learnedIds?: unknown;
+  modeUnlocks?: unknown;
+  playerSummary?: unknown;
   updatedAtMs?: number;
+};
+
+export type CoreProgressSnapshot = {
+  learnedIds: string[];
+  modeUnlocks: ModeUnlockState;
+  playerSummary: PlayerSummary;
 };
 
 function isWordMemory(value: unknown): value is WordMemory {
@@ -51,6 +74,84 @@ function parseCloudMemories(raw: unknown): Map<string, WordMemory> {
 
 function memoriesDocRef(uid: string) {
   return doc(getFirebaseDb(), 'users', uid, MATCH3_COLLECTION, MATCH3_STATE_DOC);
+}
+
+function parseLearnedIds(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? [...new Set(raw.filter((id): id is string => typeof id === 'string' && id.length > 0))]
+    : [];
+}
+
+function parseModeUnlocks(raw: unknown): ModeUnlockState {
+  const parsed = raw && typeof raw === 'object' ? raw as Partial<ModeUnlockState> : {};
+  return {
+    adventureClears: Math.max(0, Math.floor(Number(parsed.adventureClears) || 0)),
+    reviewUnlockSeen: Boolean(parsed.reviewUnlockSeen),
+    categoryUnlockSeen: Boolean(parsed.categoryUnlockSeen),
+    pendingForcedReview: Boolean(parsed.pendingForcedReview),
+  };
+}
+
+function mergeCoreProgress(local: CoreProgressSnapshot, cloud: CoreProgressSnapshot): CoreProgressSnapshot {
+  return {
+    learnedIds: [...new Set([...local.learnedIds, ...cloud.learnedIds])],
+    modeUnlocks: {
+      adventureClears: Math.max(
+        local.modeUnlocks.adventureClears,
+        cloud.modeUnlocks.adventureClears,
+      ),
+      reviewUnlockSeen:
+        local.modeUnlocks.reviewUnlockSeen || cloud.modeUnlocks.reviewUnlockSeen,
+      categoryUnlockSeen:
+        local.modeUnlocks.categoryUnlockSeen || cloud.modeUnlocks.categoryUnlockSeen,
+      pendingForcedReview:
+        local.modeUnlocks.pendingForcedReview || cloud.modeUnlocks.pendingForcedReview,
+    },
+    playerSummary: mergePlayerSummaries(local.playerSummary, cloud.playerSummary),
+  };
+}
+
+export async function hydrateCoreProgressWithCloud(uid: string): Promise<CoreProgressSnapshot> {
+  const initialLocal: CoreProgressSnapshot = {
+    learnedIds: loadRoundLearnedIds(uid),
+    modeUnlocks: loadModeUnlocks(uid),
+    playerSummary: loadPlayerSummary(uid),
+  };
+  if (!isFirebaseConfigured()) return initialLocal;
+  try {
+    const snap = await getDoc(memoriesDocRef(uid));
+    // The player can keep learning while Firestore is in flight. Re-read the
+    // local bucket after the await so a slow hydration can never flush the
+    // stale snapshot captured when this function started.
+    const latestLocal: CoreProgressSnapshot = {
+      learnedIds: loadRoundLearnedIds(uid),
+      modeUnlocks: loadModeUnlocks(uid),
+      playerSummary: loadPlayerSummary(uid),
+    };
+    if (!snap.exists()) {
+      persistCoreProgress(uid, latestLocal, { flushCloud: true });
+      return latestLocal;
+    }
+    const data = snap.data() as CloudMemoryDoc;
+    const cloud: CoreProgressSnapshot = {
+      learnedIds: parseLearnedIds(data.learnedIds),
+      modeUnlocks: parseModeUnlocks(data.modeUnlocks),
+      playerSummary: parsePlayerSummary(data.playerSummary),
+    };
+    const merged = mergeCoreProgress(latestLocal, cloud);
+    saveRoundLearnedIds(merged.learnedIds, uid);
+    saveModeUnlocks(merged.modeUnlocks, uid);
+    savePlayerSummary(merged.playerSummary, uid);
+    persistCoreProgress(uid, merged, { flushCloud: true });
+    return merged;
+  } catch (error) {
+    console.warn('[match3] cloud core progress fetch failed', error);
+    return {
+      learnedIds: loadRoundLearnedIds(uid),
+      modeUnlocks: loadModeUnlocks(uid),
+      playerSummary: loadPlayerSummary(uid),
+    };
+  }
 }
 
 export async function fetchCloudWordMemories(uid: string): Promise<Map<string, WordMemory>> {
@@ -105,26 +206,58 @@ export async function hydrateMatch3MemoriesWithCloud(userUid: string | null | un
   map: Map<string, WordMemory>;
   scope: string;
 }> {
-  const local = hydrateMatch3Memories(userUid);
-  if (!userUid || local.scope === GUEST_MEMORY_SCOPE) {
-    return local;
+  const initialLocal = hydrateMatch3Memories(userUid);
+  if (!userUid || initialLocal.scope === GUEST_MEMORY_SCOPE) {
+    return initialLocal;
   }
 
   const cloud = await fetchCloudWordMemories(userUid);
+  // As with core progress, merge against the latest local state rather than
+  // the snapshot from before the network request.
+  const latestLocal = hydrateMatch3Memories(userUid);
   if (cloud.size === 0) {
-    if (local.map.size > 0) {
-      void pushCloudWordMemories(userUid, local.map);
+    if (latestLocal.map.size > 0) {
+      void pushCloudWordMemories(userUid, latestLocal.map);
     }
-    return local;
+    return latestLocal;
   }
 
-  const merged = mergeWordMemoryMaps(local.map, cloud);
-  saveWordMemoriesForScope(merged, local.scope);
+  const merged = mergeWordMemoryMaps(latestLocal.map, cloud);
+  saveWordMemoriesForScope(merged, latestLocal.scope);
   void pushCloudWordMemories(userUid, merged);
-  return { map: merged, scope: local.scope };
+  return { map: merged, scope: latestLocal.scope };
 }
 
 const pendingCloudWrites = new Map<string, number>();
+const pendingCoreCloudWrites = new Map<string, number>();
+
+export function persistCoreProgress(
+  uid: string,
+  progress: CoreProgressSnapshot,
+  options?: { flushCloud?: boolean },
+): void {
+  if (!uid || !isFirebaseConfigured()) return;
+  const existing = pendingCoreCloudWrites.get(uid);
+  if (existing) window.clearTimeout(existing);
+  const delay = options?.flushCloud ? 0 : 700;
+  const timer = window.setTimeout(() => {
+    pendingCoreCloudWrites.delete(uid);
+    void setDoc(
+      memoriesDocRef(uid),
+      {
+        learnedIds: progress.learnedIds,
+        modeUnlocks: progress.modeUnlocks,
+        playerSummary: progress.playerSummary,
+        updatedAtMs: Date.now(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    ).catch((error) => {
+      console.warn('[match3] cloud core progress push failed', error);
+    });
+  }, delay);
+  pendingCoreCloudWrites.set(uid, timer);
+}
 
 /** Debounced cloud write; always writes localStorage immediately via saveWordMemoriesForScope. */
 export function persistWordMemories(

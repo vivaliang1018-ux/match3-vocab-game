@@ -25,6 +25,11 @@ export type FirstTimeGuideStage =
 export type FirstTimeGuideState = {
   version: 1;
   hasCompletedFirstSwapTutorial: boolean;
+  hasStartedFreeMoveRuleTutorial: boolean;
+  hasCompletedFreeMoveRuleTutorial: boolean;
+  hasCompletedReviewTutorial: boolean;
+  hasSeenReviveTutorial: boolean;
+  hasSeenStaminaShortage: boolean;
   stage: FirstTimeGuideStage;
   promptCounts: Record<FeatureGuideTarget, number>;
 };
@@ -32,6 +37,11 @@ export type FirstTimeGuideState = {
 const DEFAULT_STATE: FirstTimeGuideState = {
   version: 1,
   hasCompletedFirstSwapTutorial: false,
+  hasStartedFreeMoveRuleTutorial: false,
+  hasCompletedFreeMoveRuleTutorial: false,
+  hasCompletedReviewTutorial: false,
+  hasSeenReviveTutorial: false,
+  hasSeenStaminaShortage: false,
   stage: 'none',
   promptCounts: {
     learned: 0,
@@ -73,6 +83,11 @@ export function loadFirstTimeGuideState(
       hasCompletedFirstSwapTutorial: Boolean(
         parsed.hasCompletedFirstSwapTutorial,
       ),
+      hasStartedFreeMoveRuleTutorial: Boolean(parsed.hasStartedFreeMoveRuleTutorial),
+      hasCompletedFreeMoveRuleTutorial: Boolean(parsed.hasCompletedFreeMoveRuleTutorial),
+      hasCompletedReviewTutorial: Boolean(parsed.hasCompletedReviewTutorial),
+      hasSeenReviveTutorial: Boolean(parsed.hasSeenReviveTutorial),
+      hasSeenStaminaShortage: Boolean(parsed.hasSeenStaminaShortage),
       stage:
         typeof parsed.stage === 'string' &&
         GUIDE_STAGES.has(parsed.stage as FirstTimeGuideStage)

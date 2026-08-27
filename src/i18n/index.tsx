@@ -1,12 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { de } from './locales/de';
 import { en } from './locales/en';
-import { es } from './locales/es';
-import { fr } from './locales/fr';
-import { ja } from './locales/ja';
-import { ko } from './locales/ko';
-import { zhCN } from './locales/zh-CN';
 import { LOCALES, type Locale, type Messages } from './types';
+import { APP_UI_COPY, type AppUiCopy } from './appUiCopy';
 
 export type { Locale, Messages } from './types';
 
@@ -22,15 +17,25 @@ export const LOCALE_OPTIONS: { id: Locale; label: string; shortLabel: string }[]
   { id: 'zh-CN', label: '中文', shortLabel: '中文' },
 ];
 
-const MESSAGES: Record<Locale, Messages> = {
-  'zh-CN': zhCN,
-  en,
-  es,
-  fr,
-  de,
-  ja,
-  ko,
-};
+const messageCache: Partial<Record<Locale, Messages>> = { en };
+
+async function loadMessages(locale: Locale): Promise<Messages> {
+  const cached = messageCache[locale];
+  if (cached) return cached;
+  const messages = await (async () => {
+    switch (locale) {
+      case 'zh-CN': return (await import('./locales/zh-CN')).zhCN;
+      case 'es': return (await import('./locales/es')).es;
+      case 'fr': return (await import('./locales/fr')).fr;
+      case 'de': return (await import('./locales/de')).de;
+      case 'ja': return (await import('./locales/ja')).ja;
+      case 'ko': return (await import('./locales/ko')).ko;
+      case 'en': return en;
+    }
+  })();
+  messageCache[locale] = messages;
+  return messages;
+}
 
 /** Map device / browser language tags to a supported locale; unknown → English. */
 export function detectSystemLocale(): Locale {
@@ -87,6 +92,8 @@ type I18nContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: Messages;
+  /** Locale-driven UI copy that is shared by newer game surfaces. */
+  ui: AppUiCopy;
   /** Show Chinese translations in learning UI (quiz peek, word list cn, etc.) */
   showChinese: boolean;
 };
@@ -95,13 +102,25 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => loadLocale());
+  const [messages, setMessages] = useState<Messages>(() => messageCache[loadLocale()] ?? en);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     saveLocale(next);
   }, []);
 
-  const t = MESSAGES[locale];
+  useEffect(() => {
+    let cancelled = false;
+    void loadMessages(locale).then((next) => {
+      if (!cancelled) setMessages(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  const t = messages;
+  const ui = APP_UI_COPY[locale];
   const showChinese = locale === 'zh-CN';
 
   useEffect(() => {
@@ -110,8 +129,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   }, [locale, t.meta.appTitle]);
 
   const value = useMemo(
-    () => ({ locale, setLocale, t, showChinese }),
-    [locale, setLocale, t, showChinese],
+    () => ({ locale, setLocale, t, ui, showChinese }),
+    [locale, setLocale, t, ui, showChinese],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -140,8 +159,18 @@ export function formatCountdownLocalized(
 
 /** Category label for mode picker / word list chrome */
 export function categoryDisplayName(
-  cat: { label: string; subtitle: string },
+  cat: { id?: string; label: string; subtitle: string },
   locale: Locale,
 ): string {
-  return locale === 'zh-CN' ? cat.label : cat.subtitle;
+  if (locale === 'zh-CN') return cat.label;
+  if (locale === 'en' || !cat.id) return cat.subtitle;
+  return CATEGORY_NAMES[locale][cat.id] ?? cat.subtitle;
 }
+
+const CATEGORY_NAMES: Record<Exclude<Locale, 'en' | 'zh-CN'>, Record<string, string>> = {
+  es: { 'smileys-emotion': 'Caritas y emociones', body: 'Cuerpo', people: 'Personas', animals: 'Animales', plants: 'Plantas y flores', 'food-drink': 'Comida y bebida', weather: 'Tiempo', travel: 'Viajes', 'travel-transport': 'Viajes: transporte', 'travel-signs': 'Viajes: señales de tráfico', 'travel-time': 'Viajes: tiempo', 'sports-games': 'Deportes y juegos', holidays: 'Celebraciones', 'arts-culture': 'Arte y cultura', music: 'Música', 'clothing-accessories': 'Ropa y accesorios', tools: 'Herramientas', objects: 'Objetos', symbols: 'Símbolos' },
+  fr: { 'smileys-emotion': 'Smileys et émotions', body: 'Corps', people: 'Personnes', animals: 'Animaux', plants: 'Plantes et fleurs', 'food-drink': 'Nourriture et boissons', weather: 'Météo', travel: 'Voyages', 'travel-transport': 'Voyages : transports', 'travel-signs': 'Voyages : panneaux routiers', 'travel-time': 'Voyages : temps', 'sports-games': 'Sports et jeux', holidays: 'Fêtes', 'arts-culture': 'Arts et culture', music: 'Musique', 'clothing-accessories': 'Vêtements et accessoires', tools: 'Outils', objects: 'Objets', symbols: 'Symboles' },
+  de: { 'smileys-emotion': 'Smileys & Emotionen', body: 'Körper', people: 'Menschen', animals: 'Tiere', plants: 'Pflanzen & Blumen', 'food-drink': 'Essen & Trinken', weather: 'Wetter', travel: 'Reisen', 'travel-transport': 'Reisen: Verkehrsmittel', 'travel-signs': 'Reisen: Verkehrsschilder', 'travel-time': 'Reisen: Zeit', 'sports-games': 'Sport & Spiele', holidays: 'Feiertage', 'arts-culture': 'Kunst & Kultur', music: 'Musik', 'clothing-accessories': 'Kleidung & Accessoires', tools: 'Werkzeuge', objects: 'Gegenstände', symbols: 'Symbole' },
+  ja: { 'smileys-emotion': 'スマイリーと感情', body: '身体', people: '人物', animals: '動物', plants: '植物と花', 'food-drink': '食べ物と飲み物', weather: '天気', travel: '旅行', 'travel-transport': '旅行：乗り物', 'travel-signs': '旅行：道路標識', 'travel-time': '旅行：時間', 'sports-games': 'スポーツとゲーム', holidays: '祝日とイベント', 'arts-culture': '芸術と文化', music: '音楽', 'clothing-accessories': '衣類とアクセサリー', tools: '道具', objects: '物', symbols: '記号' },
+  ko: { 'smileys-emotion': '스마일리와 감정', body: '신체', people: '사람', animals: '동물', plants: '식물과 꽃', 'food-drink': '음식과 음료', weather: '날씨', travel: '여행', 'travel-transport': '여행: 교통수단', 'travel-signs': '여행: 도로 표지판', 'travel-time': '여행: 시간', 'sports-games': '스포츠와 게임', holidays: '기념일', 'arts-culture': '예술과 문화', music: '음악', 'clothing-accessories': '의류와 액세서리', tools: '도구', objects: '사물', symbols: '기호' },
+};

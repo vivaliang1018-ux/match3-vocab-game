@@ -60,6 +60,10 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("speech-recognizer-unavailable")
             return
         }
+        guard recognizer?.supportsOnDeviceRecognition == true else {
+            call.reject("on-device-speech-unavailable")
+            return
+        }
 
         DispatchQueue.main.async { [weak self] in
             guard let self else {
@@ -167,7 +171,11 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         @unknown default:
             microphone = "denied"
         }
-        return ["speechRecognition": speech, "microphone": microphone]
+        return [
+            "speechRecognition": speech,
+            "microphone": microphone,
+            "onDeviceRecognitionSupported": recognizer?.supportsOnDeviceRecognition == true
+        ]
     }
 
     private func requestMicrophonePermission(_ completion: @escaping (Bool) -> Void) {
@@ -238,14 +246,19 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognizer is unavailable."]
             )
         }
+        guard recognizer.supportsOnDeviceRecognition else {
+            throw NSError(
+                domain: "MatchingoSpeech",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is unavailable."]
+            )
+        }
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.taskHint = .search
         request.contextualStrings = contextualWords
-        if recognizer.supportsOnDeviceRecognition {
-            request.requiresOnDeviceRecognition = true
-        }
+        request.requiresOnDeviceRecognition = true
 
         recognitionRequest = request
         cycleId += 1

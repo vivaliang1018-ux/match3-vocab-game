@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import {
@@ -6,23 +5,29 @@ import {
   MOTION_VIGNETTE,
 } from '../../lib/motionChoreography';
 import { Volume2, X } from 'lucide-react';
-import { useI18n } from '../../i18n';
-import { speakWordQuick, stopAllWordSpeech } from '../../lib/wordSpeech';
+import { formatCountdownLocalized, useI18n } from '../../i18n';
+import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
+import { speakWordQuick } from '../../lib/wordSpeech';
 import type { WordItem } from '../../types/game';
+import { isDue, type WordMemory } from '../../lib/ebbinghausMemory';
 
 type LearnedWordModalProps = {
   item: WordItem | null;
+  memory?: WordMemory;
+  now?: number;
   open: boolean;
-  showChinese: boolean;
   onClose: () => void;
 };
 
-export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWordModalProps) {
-  const { t } = useI18n();
-
-  useEffect(() => {
-    if (!open) stopAllWordSpeech();
-  }, [open]);
+export function LearnedWordModal({
+  item,
+  memory,
+  now = Date.now(),
+  open,
+  onClose,
+}: LearnedWordModalProps) {
+  const { locale, t, ui } = useI18n();
+  const nativeTranslation = item ? getEmojiLearningTranslation(item, locale) : null;
 
   const handlePlay = () => {
     if (!item) return;
@@ -85,16 +90,26 @@ export function LearnedWordModal({ item, open, showChinese, onClose }: LearnedWo
             >
               {item.word}
             </motion.h3>
-            {showChinese && item.cn && (
+            {nativeTranslation && (
               <motion.p
                 className="learned-word-modal-cn"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.16, type: 'spring', stiffness: 380, damping: 28 }}
               >
-                {item.cn}
+                {nativeTranslation}
               </motion.p>
             )}
+
+            <div className="mt-3 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-700">
+              {!memory || isDue(memory, now)
+                ? ui.learned.shieldReady
+                : memory.stage >= 5
+                  ? ui.learned.fortified
+                  : ui.learned.growingWithCountdown(
+                      formatCountdownLocalized(memory.nextReviewAt - now, t.review.countdown),
+                    )}
+            </div>
 
             <motion.div
               className="learned-word-modal-play-wrap"

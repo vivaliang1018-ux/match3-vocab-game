@@ -13,7 +13,15 @@ dist-ssr
 ios/App/Pods
 ios/App/App/public
 ios/DerivedData
+/.derived-data/
+/tmp/
 *.local
+
+# Local audit and generated review artifacts
+/audit-screenshots/
+/outputs/
+/public/emoji-voice-regen/
+/public/emoji-voice/_archived/
 
 # Editor directories and files
 .vscode/*

@@ -1,5 +1,4 @@
 import { motion } from 'motion/react';
-import { Sparkles } from 'lucide-react';
 import { MOTION_SPRING_POP } from '../../lib/motionPresets';
 import { useI18n } from '../../i18n';
 
@@ -53,10 +52,7 @@ export function EmojiClearStatsBlock({
           transition={{ delay: 0.1, ...MOTION_SPRING_POP }}
         >
           <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-sky-900">
-            <span className="inline-flex items-center gap-1">
-              <Sparkles size={12} className="text-sky-500" aria-hidden />
-              {copy.emojiProgress}
-            </span>
+            <span>{copy.emojiProgress}</span>
             <span className="tabular-nums">{copy.emojiProgressDetail(learnedCount, totalEmojiPool)}</span>
           </div>
           <div className="profile-candy-progress-track mt-2">
@@ -88,8 +84,7 @@ export function EmojiClearStatsBlock({
 
   return (
     <>
-      <div className="flex items-center justify-center gap-2">
-        <Sparkles size={16} className="text-violet-600" aria-hidden />
+      <div className="flex items-center justify-center">
         <div className="text-xs font-black text-violet-900">{copy.statsTitle}</div>
       </div>
 

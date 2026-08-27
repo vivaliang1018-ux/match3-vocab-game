@@ -11,8 +11,8 @@ import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
 
 const TAB_EMOJI: Record<AppTab, string> = {
   game: '🎮',
-  learned: '🧩',
-  words: '🤲',
+  learned: '🤲',
+  words: '🧩',
   profile: '🥳',
 };
 
