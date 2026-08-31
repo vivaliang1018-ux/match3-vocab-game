@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { MOTION_MODAL_CARD, MOTION_VIGNETTE } from '../../lib/motionChoreography';
@@ -8,6 +9,7 @@ import { assetUrl } from '../../lib/assetUrl';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
 import type { AwardTrackDef, AwardTrackProgress } from '../../lib/playerSummary';
 import { calendarDayKey } from '../../lib/playerSummary';
+import { useModalDialog } from './useModalDialog';
 
 type AwardClaimSheetProps = {
   open: boolean;
@@ -31,6 +33,10 @@ export function AwardClaimSheet({
 }: AwardClaimSheetProps) {
   const { t, locale } = useI18n();
   const hapticOpenIdRef = useRef<string | null>(null);
+  const dialogRef = useModalDialog({
+    open: open && Boolean(def) && Boolean(progress),
+    onClose,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -43,7 +49,7 @@ export function AwardClaimSheet({
     void triggerGameHaptic('newBadgeOpen');
   }, [def, open, progress?.unlocked]);
 
-  if (!def || !progress) return null;
+  if (!def || !progress || typeof document === 'undefined') return null;
 
   const milestone = progress.unlocked
     ? progress.achieved > 0
@@ -63,36 +69,38 @@ export function AwardClaimSheet({
       ? t.profile.awardClaimCta
       : t.profile.awardClaimedCta;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key={`award-claim-${def.id}`}
           initial="hidden"
           animate="visible"
           exit="exit"
           variants={MOTION_VIGNETTE}
-          className="pointer-events-auto fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-sky-50 via-white to-rose-50"
+          className="candy-reward-screen"
           role="dialog"
           aria-modal="true"
           aria-label={t.profile.awardName(def.id)}
+          tabIndex={-1}
         >
-          <div className="flex items-center justify-between px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="candy-reward-header">
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-sky-800/70 transition hover:bg-sky-100"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-sky-800/70 transition hover:bg-sky-100"
               aria-label={t.common.close}
             >
               <X size={22} strokeWidth={2.5} />
             </button>
-            <div className="text-[11px] font-black uppercase tracking-wide text-sky-800/50">
+            <div className="candy-reward-kicker">
               {t.profile.awardsTitle}
             </div>
-            <div className="w-10" aria-hidden />
+            <div className="w-11" aria-hidden />
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 pb-4">
+          <div className="candy-reward-body">
             <motion.div
               variants={MOTION_MODAL_CARD}
               className="relative flex flex-col items-center"
@@ -123,7 +131,7 @@ export function AwardClaimSheet({
             </motion.div>
           </div>
 
-          <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
+          <div className="candy-reward-footer">
             <motion.button
               type="button"
               whileTap={MOTION_PRESS_TAP}
@@ -135,7 +143,8 @@ export function AwardClaimSheet({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const fr: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: 'Fermer',
@@ -52,7 +52,7 @@ export const fr: Messages = {
         {
           sets: `Tu as officiellement terminé ${value} sets de mots en Aventure.`,
           day: `Tu apprends depuis ${value} jours consécutifs. Toute session valide en Aventure, Révision, Révision forcée ou Catégorie compte.`,
-          combo: `Tu as gagné ${value} sets Aventure d’affilée. Un Rescue réussi suivi du Quiz final compte aussi ; une défaite officielle interrompt la série.`,
+          combo: `Tu as remporté ${value} séries d’Aventure d’affilée. Un sauvetage réussi suivi du quiz final compte aussi ; une défaite officielle interrompt la série.`,
         } as const
       )[id],
     awardMaxed: 'Au max !',
@@ -68,7 +68,7 @@ export const fr: Messages = {
           set_hunter: `Termine ${next} sets pour débloquer Pionnier des sets.`,
           day_nail: `Enchaîne ${next} jours pour devenir Habitué du calendrier.`,
           combo_king: `Fais une série de ${next} sets pour Combo culbuto.`,
-          dex_collector: `Maîtrise ${next} emojis pour Dex maniaque.`,
+          dex_collector: `Maîtrise ${next} emojis pour devenir Collectionneur d’emojis.`,
           review_brain: `Termine ${next} révisions pour débloquer Affineur de mémoire.`,
           category_fan: 'Avance en Aventure pour débloquer Explorateur de thèmes.',
         } as const
@@ -79,7 +79,7 @@ export const fr: Messages = {
           set_hunter: `Tu as terminé ${value} sets — Pionnier des sets débloqué !`,
           day_nail: `Série de jours max : ${value}. Tu es Habitué du calendrier !`,
           combo_king: `Série de ${value} sets — Combo culbuto !`,
-          dex_collector: `${value} emojis maîtrisés — Dex maniaque !`,
+          dex_collector: `${value} emojis maîtrisés — Collectionneur d’emojis !`,
           review_brain: `${value} révisions terminées — Affineur de mémoire débloqué !`,
           category_fan: 'Catégories débloquées — Explorateur de thèmes, go !',
         } as const
@@ -90,7 +90,7 @@ export const fr: Messages = {
           set_hunter: 'Pionnier des sets',
           day_nail: 'Habitué du calendrier',
           combo_king: 'Combo culbuto',
-          dex_collector: 'Dex maniaque',
+          dex_collector: 'Collectionneur d’emojis',
           review_brain: 'Affineur de mémoire',
           category_fan: 'Explorateur de thèmes',
         } as const
@@ -101,8 +101,8 @@ export const fr: Messages = {
     language: 'Langue des menus',
     languageHint: 'Menus uniquement · Les noms et l’audio des emojis restent en anglais',
     preferencesTitle: 'Préférences',
-    toggleOn: 'ON',
-    toggleOff: 'OFF',
+    toggleOn: 'Activé',
+    toggleOff: 'Désactivé',
     bgm: 'Musique',
     sfx: 'Effets sonores',
     haptics: 'Retour haptique',
@@ -110,7 +110,7 @@ export const fr: Messages = {
     openLearned: 'Voir appris',
     openWords: 'Parcourir la liste de mots',
     aboutTitle: 'À propos',
-    description: 'Que chaque combo t’apporte un peu d’anglais.\nExplore l’anglais avec les emojis !',
+    description: 'Avec LingoMatch, chaque combinaison devient une petite victoire en anglais.\nExplore l’anglais avec les emojis !',
     version: 'Version',
     termsOfService: "Conditions d'utilisation",
     privacyPolicy: 'Politique de confidentialité',
@@ -191,8 +191,8 @@ export const fr: Messages = {
     errorEmailInUse: 'E-mail déjà utilisé. Connectez-vous.',
     errorWeakPassword: 'Le mot de passe doit contenir au moins 6 caractères',
     errorTooManyRequests: 'Trop de tentatives. Réessayez plus tard.',
-    errorNotConfigured: 'Firebase non configuré. Voir docs/auth-setup.md',
-    errorProviderDisabled: "Cette méthode de connexion n'est pas activée dans Firebase",
+    errorNotConfigured: 'La connexion est temporairement indisponible. Réessaie plus tard.',
+    errorProviderDisabled: 'Cette méthode de connexion est indisponible. Essaie une autre option.',
     errorRequiresRecentLogin: 'Reconnectez-vous avant de supprimer le compte',
     errorNetwork: 'Erreur réseau. Vérifiez la connexion et réessayez.',
     errorUnknown: 'Échec de la connexion. Réessayez.',
@@ -257,7 +257,7 @@ export const fr: Messages = {
     insufficientPoolHint: 'Ouvrez le sélecteur de mode et choisissez une autre catégorie.',
     locked: 'Verrouillé',
     lockedReviewHint: 'Terminez la manche 1 d’Aventure pour débloquer Révision.',
-    lockedCategoryHint: 'Terminez la manche 5 d’Aventure pour débloquer Catégorie.',
+    lockedCategoryHint: 'Terminez la manche 3 d’Aventure pour débloquer Catégorie.',
     noStamina: 'Plus d’énergie',
     forcedReviewTitle: 'Épreuve de révision',
     forcedReviewSubtitle: 'Tous les 3 nouveaux sets — on renforce',
@@ -276,10 +276,10 @@ export const fr: Messages = {
     noStaminaHint: '1 point toutes les heures, ou attends demain. La révision est gratuite.',
   },
   hud: {
-    wordSet: 'Set',
+    wordSet: 'Série',
     wordSetCount: (current) => `${current}`,
     wordSetOf: (current, _total) => `${current}`,
-    score: 'Score',
+    score: 'Points',
     moves: 'Coups',
     stamina: 'Énergie',
     staminaCount: (current, max) => `${current}/${max}`,
@@ -380,7 +380,7 @@ export const fr: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `Tiens — ${n} nouveaux emojis aujourd’hui !`,
-        subtitle: `${n} emojis qui rient dans ton vocab… Matchingo applaudirait 👏`,
+        subtitle: `${n} emojis qui rient dans ton vocab… LingoMatch applaudirait 👏`,
         primaryCta: 'Encore ! Je te défie 😎',
         secondaryCta: 'Petite pause ☕',
       },
@@ -415,7 +415,7 @@ export const fr: Messages = {
         secondaryCta: 'Laisse-les dormir 😴',
       },
       {
-        title: `${n} emojis enregistrés. KPI du jour écrasé !`,
+        title: `${n} emojis enregistrés. Objectif du jour dépassé !`,
         subtitle: 'Mode salarié : mauvaise vibe éliminée. Fais semblant de bosser 🤡',
         primaryCta: 'Encore une manche chaotique 🤪',
         secondaryCta: 'Fin de service — fuis 🏃',

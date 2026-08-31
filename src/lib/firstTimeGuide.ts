@@ -4,6 +4,7 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { loadSayBlastStats } from './sayBlastStats';
 
 const STORAGE_KEY = 'matchingo-first-time-guide-v1';
 
@@ -12,7 +13,9 @@ export type FeatureGuideTarget =
   | 'sayAndBlastModePicker'
   | 'sayAndBlast'
   | 'moodBoardModePicker'
-  | 'moodBoard';
+  | 'moodBoard'
+  | 'categoryModePicker'
+  | 'category';
 
 export type FirstTimeGuideStage =
   | 'none'
@@ -30,6 +33,9 @@ export type FirstTimeGuideState = {
   hasCompletedReviewTutorial: boolean;
   hasSeenReviveTutorial: boolean;
   hasSeenStaminaShortage: boolean;
+  hasCompletedLearnedTour: boolean;
+  /** The player has opened Say & Blast without needing a gesture prompt. */
+  hasVisitedSayAndBlast: boolean;
   stage: FirstTimeGuideStage;
   promptCounts: Record<FeatureGuideTarget, number>;
 };
@@ -42,6 +48,8 @@ const DEFAULT_STATE: FirstTimeGuideState = {
   hasCompletedReviewTutorial: false,
   hasSeenReviveTutorial: false,
   hasSeenStaminaShortage: false,
+  hasCompletedLearnedTour: false,
+  hasVisitedSayAndBlast: false,
   stage: 'none',
   promptCounts: {
     learned: 0,
@@ -49,6 +57,8 @@ const DEFAULT_STATE: FirstTimeGuideState = {
     sayAndBlast: 0,
     moodBoardModePicker: 0,
     moodBoard: 0,
+    categoryModePicker: 0,
+    category: 0,
   },
 };
 
@@ -78,6 +88,16 @@ export function loadFirstTimeGuideState(
     const counts = parsed.promptCounts as
       | Partial<Record<FeatureGuideTarget, unknown>>
       | undefined;
+    // Backfill the flag for players who used Say & Blast before this field
+    // existed, so an app update does not re-teach a feature they already know.
+    const hasVisitedSayAndBlast =
+      Boolean(parsed.hasVisitedSayAndBlast) ||
+      loadSayBlastStats(userUid).attemptsStarted > 0;
+    const parsedStage =
+      typeof parsed.stage === 'string' &&
+      GUIDE_STAGES.has(parsed.stage as FirstTimeGuideStage)
+        ? (parsed.stage as FirstTimeGuideStage)
+        : 'none';
     return {
       version: 1,
       hasCompletedFirstSwapTutorial: Boolean(
@@ -88,17 +108,20 @@ export function loadFirstTimeGuideState(
       hasCompletedReviewTutorial: Boolean(parsed.hasCompletedReviewTutorial),
       hasSeenReviveTutorial: Boolean(parsed.hasSeenReviveTutorial),
       hasSeenStaminaShortage: Boolean(parsed.hasSeenStaminaShortage),
+      hasCompletedLearnedTour: Boolean(parsed.hasCompletedLearnedTour),
+      hasVisitedSayAndBlast,
       stage:
-        typeof parsed.stage === 'string' &&
-        GUIDE_STAGES.has(parsed.stage as FirstTimeGuideStage)
-          ? (parsed.stage as FirstTimeGuideStage)
-          : 'none',
+        hasVisitedSayAndBlast && parsedStage === 'sayAndBlast'
+          ? 'moodBoard'
+          : parsedStage,
       promptCounts: {
         learned: promptCount(counts?.learned),
         sayAndBlastModePicker: promptCount(counts?.sayAndBlastModePicker),
         sayAndBlast: promptCount(counts?.sayAndBlast),
         moodBoardModePicker: promptCount(counts?.moodBoardModePicker),
         moodBoard: promptCount(counts?.moodBoard),
+        categoryModePicker: promptCount(counts?.categoryModePicker),
+        category: promptCount(counts?.category),
       },
     };
   } catch {

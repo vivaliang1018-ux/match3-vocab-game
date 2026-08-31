@@ -1,4 +1,4 @@
-/** Player journey: streaks + tiered award tracks (Matchingo candy style). */
+/** Player journey: streaks + tiered award tracks (LingoMatch candy style). */
 
 import {
   claimGuestProgress,

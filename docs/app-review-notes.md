@@ -4,7 +4,7 @@
 
 ## English review notes
 
-Matchingo is a general-audience vocabulary game. It is not submitted to the Kids Category. Reviewers can use all guest gameplay without signing in.
+LingoMatch is a general-audience vocabulary game. It is not submitted to the Kids Category. Reviewers can use all guest gameplay without signing in.
 
 Optional account features can be reviewed with:
 

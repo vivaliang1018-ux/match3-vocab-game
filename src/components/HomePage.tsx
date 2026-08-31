@@ -23,7 +23,6 @@ import {
   SAY_BLAST_DAILY_REWARD_MAX,
 } from '../lib/stamina';
 import { canPlayMoodToday } from '../lib/moodBoard';
-import { loadFirstTimeGuideState } from '../lib/firstTimeGuide';
 import { SkySparkleBackground } from './SkySparkleBackground';
 
 const AccountSettingsSheet = lazy(() =>
@@ -195,7 +194,6 @@ export function HomePage({ onPlay }: HomePageProps) {
     const learnedIds = loadRoundLearnedIds(userId);
     const unlocks = loadModeUnlocks(userId);
     const summary = loadPlayerSummary(userId);
-    const guide = loadFirstTimeGuideState(userId);
     return {
       learnedCount: learnedIds.length,
       clears: unlocks.adventureClears,
@@ -204,7 +202,6 @@ export function HomePage({ onPlay }: HomePageProps) {
       canReview: isReviewUnlocked(unlocks.adventureClears) && learnedIds.length >= 6,
       canPlayMood: unlocks.adventureClears >= 3 && canPlayMoodToday(),
       canPlaySayBlast:
-        guide.hasSeenStaminaShortage &&
         learnedIds.filter((id) => id.startsWith('emoji-')).length >= 6,
     };
   }, [cloudRefreshKey, user?.uid]);

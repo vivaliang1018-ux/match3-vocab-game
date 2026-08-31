@@ -4,6 +4,7 @@ import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { MOTION_VIGNETTE } from '../../lib/motionChoreography';
 import { useI18n } from '../../i18n';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
+import { useModalDialog } from './useModalDialog';
 
 type DeadMachineSheetProps = {
   open: boolean;
@@ -35,6 +36,7 @@ export function DeadMachineSheet({
 }: DeadMachineSheetProps) {
   const { t, ui } = useI18n();
   const [now, setNow] = useState(Date.now());
+  const dialogRef = useModalDialog({ open, closeOnEscape: false });
 
   useEffect(() => {
     if (!open) return;
@@ -74,6 +76,7 @@ export function DeadMachineSheet({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key="dead-machine"
           initial="hidden"
           animate="visible"
@@ -83,12 +86,11 @@ export function DeadMachineSheet({
           role="dialog"
           aria-modal="true"
           aria-label={hasStamina ? ui.deadMachine.chargingComplete : t.adventure.deadTitle}
+          tabIndex={-1}
         >
-          <motion.button
-            type="button"
-            className="absolute inset-0 z-0 cursor-default border-0 bg-slate-950/55 backdrop-blur-[2px]"
-            aria-label={t.common.close}
-            onClick={onGoHome}
+          <motion.div
+            className="absolute inset-0 z-0 bg-slate-950/55 backdrop-blur-[2px]"
+            aria-hidden
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.86, y: 28, x: 0 }}
@@ -158,7 +160,7 @@ export function DeadMachineSheet({
                   className="w-full rounded-2xl border border-violet-300/30 bg-gradient-to-r from-violet-700 via-indigo-600 to-violet-700 px-3 py-3 text-sm font-black text-white shadow-[0_4px_18px_rgba(99,102,241,0.35)]"
                 >
                   <span className="block">{primary.label}</span>
-                  <span className="mt-0.5 block text-[10px] font-bold text-white/75">{primary.hint}</span>
+                  <span className="mt-0.5 block text-xs font-bold text-white/75">{primary.hint}</span>
                 </motion.button>
               ) : null}
               {secondary && (
@@ -169,7 +171,7 @@ export function DeadMachineSheet({
                     e.stopPropagation();
                     secondary.action();
                   }}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-black text-[#e7dddd]"
+                  className="min-h-11 w-full rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-black text-[#e7dddd]"
                 >
                   {secondary.label}
                 </motion.button>
@@ -181,7 +183,7 @@ export function DeadMachineSheet({
                   e.stopPropagation();
                   onGoHome();
                 }}
-                className="px-3 py-1.5 text-center text-xs font-bold text-white/60"
+                className="min-h-11 px-3 py-2 text-center text-xs font-bold text-white/60"
               >
                 {ui.deadMachine.later}
               </motion.button>

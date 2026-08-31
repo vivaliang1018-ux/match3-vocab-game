@@ -10,6 +10,7 @@ import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import { speakWordQuick } from '../../lib/wordSpeech';
 import type { WordItem } from '../../types/game';
 import { isDue, type WordMemory } from '../../lib/ebbinghausMemory';
+import { useModalDialog } from './useModalDialog';
 
 type LearnedWordModalProps = {
   item: WordItem | null;
@@ -28,6 +29,7 @@ export function LearnedWordModal({
 }: LearnedWordModalProps) {
   const { locale, t, ui } = useI18n();
   const nativeTranslation = item ? getEmojiLearningTranslation(item, locale) : null;
+  const dialogRef = useModalDialog({ open: open && Boolean(item), onClose });
 
   const handlePlay = () => {
     if (!item) return;
@@ -38,6 +40,7 @@ export function LearnedWordModal({
     <AnimatePresence>
       {open && item && (
         <motion.div
+          ref={dialogRef}
           key="learned-word-modal"
           initial="hidden"
           animate="visible"
@@ -47,6 +50,7 @@ export function LearnedWordModal({
           role="dialog"
           aria-modal="true"
           aria-label={t.learned.wordDialogAria}
+          tabIndex={-1}
           onClick={onClose}
         >
           <motion.div className="absolute inset-0 bg-black/45" aria-hidden />

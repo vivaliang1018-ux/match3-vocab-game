@@ -2,21 +2,22 @@ import { useEffect, useRef } from 'react';
 import { assetUrl } from '../lib/assetUrl';
 import { SkySparkleBackground } from './SkySparkleBackground';
 
-export const LOADING_SPLASH_BUILD = '2026-08-27-matchingo-logo';
+export const LOADING_SPLASH_BUILD = '2026-08-31-lingomatch-logo';
 
-/** Previous logo concepts live under docs/branding/archived/; the active Matchingo asset is splash-logo.* */
+/** Previous logo concepts live under docs/branding/archived/; the active LingoMatch asset is splash-logo.* */
 export type SplashVariant = 'logo' | 'tiles' | 'wave';
 
-const MATCHINGO_LETTERS = [
+const LINGOMATCH_LETTERS = [
+  { ch: 'L', smile: false },
+  { ch: 'i', smile: false },
+  { ch: 'n', smile: false },
+  { ch: 'g', smile: false },
+  { ch: 'o', smile: true },
   { ch: 'M', smile: false },
   { ch: 'a', smile: false },
   { ch: 't', smile: false },
   { ch: 'c', smile: false },
   { ch: 'h', smile: false },
-  { ch: 'i', smile: false },
-  { ch: 'n', smile: false },
-  { ch: 'g', smile: false },
-  { ch: 'o', smile: true },
 ] as const;
 
 const SMILE_FACES = ['😊', '😄', '😁'] as const;
@@ -30,7 +31,7 @@ export type LoadingSplashProps = {
   exiting?: boolean;
   /** Start from the native launch screen's settled logo instead of replaying the entrance. */
   seamlessEntry?: boolean;
-  /** Default: Matchingo logo. `tiles` / `wave` are alternate schemes. */
+  /** Default: LingoMatch logo. `tiles` / `wave` are alternate schemes. */
   variant?: SplashVariant;
 };
 
@@ -99,9 +100,9 @@ export function LoadingSplash({
               </div>
             </div>
 
-            <div className="splash-matchingo" aria-label="Matchingo">
+            <div className="splash-matchingo" aria-label="LingoMatch">
               <div className="splash-matchingo-title">
-                {MATCHINGO_LETTERS.map((item, i) => (
+                {LINGOMATCH_LETTERS.map((item, i) => (
                   <span
                     key={`${item.ch}-${i}`}
                     className={
@@ -130,8 +131,8 @@ export function LoadingSplash({
           </div>
         ) : variant === 'wave' ? (
           <div className="splash-wave relative z-20 px-3 text-center">
-            <div className="splash-wave-title" aria-label="Matchingo">
-              {MATCHINGO_LETTERS.map((item, i) => (
+            <div className="splash-wave-title" aria-label="LingoMatch">
+              {LINGOMATCH_LETTERS.map((item, i) => (
                 <span
                   key={`${item.ch}-${i}`}
                   className={
@@ -163,13 +164,13 @@ export function LoadingSplash({
           >
             <picture>
               <source
-                srcSet={`${assetUrl('splash-logo.webp')}?v=20260827b`}
+                srcSet={`${assetUrl('splash-logo.webp')}?v=20260831a`}
                 type="image/webp"
               />
               <img
                 ref={logoRef}
-                src={`${assetUrl('splash-logo.png')}?v=20260827b`}
-                alt="Matchingo"
+                src={`${assetUrl('splash-logo.png')}?v=20260831a`}
+                alt="LingoMatch"
                 className="splash-logo-image mx-auto w-[min(44vw,205px)] max-w-full"
                 draggable={false}
                 decoding="sync"

@@ -24,6 +24,7 @@ import {
 import { speakWordQuick } from '../../lib/wordSpeech';
 import { cn } from '../../lib/utils';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
+import { useModalDialog } from './useModalDialog';
 
 const ITEMS_PER_PAGE = 12;
 const ALL_COLLECTION_ITEMS = EMOJI_NOUN_CATEGORIES.flatMap((category) =>
@@ -199,6 +200,10 @@ export function WordsPanel({
   const closeAlbum = () => {
     setSelectedAlbum(null);
   };
+  const albumDialogRef = useModalDialog({
+    open: Boolean(selectedAlbum),
+    onClose: closeAlbum,
+  });
 
   const openCollectedItem = (item: EmojiNounItem) => {
     if (!selectedAlbum) return;
@@ -400,6 +405,7 @@ export function WordsPanel({
       <AnimatePresence>
         {selectedAlbum && (
           <motion.div
+            ref={albumDialogRef}
             className="collection-detail-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -407,6 +413,7 @@ export function WordsPanel({
             role="dialog"
             aria-modal="true"
             aria-label={albumDisplayName(selectedAlbum, showChinese)}
+            tabIndex={-1}
           >
             <motion.div
               className="collection-detail-sheet"
@@ -415,7 +422,7 @@ export function WordsPanel({
               exit={{ opacity: 0, scale: 0.96, y: 18 }}
               transition={MOTION_SPRING_SNAPPY}
             >
-              <button type="button" className="collection-detail-close" onClick={closeAlbum} aria-label="Close"><X size={22} aria-hidden /></button>
+              <button type="button" className="collection-detail-close" onClick={closeAlbum} aria-label={t.common.close}><X size={22} aria-hidden /></button>
               <div className="collection-detail-hero">
                 <div className="collection-detail-preview" aria-hidden>{categoryPreview(selectedAlbum).map((item) => item.emoji).join('')}</div>
                 <div className="collection-detail-title">{albumDisplayName(selectedAlbum, showChinese)}</div>

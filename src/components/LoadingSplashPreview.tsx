@@ -13,7 +13,7 @@ const SPEED_OPTIONS = [
 ] as const;
 
 const VARIANT_OPTIONS: { label: string; value: SplashVariant }[] = [
-  { label: 'Matchingo Logo', value: 'logo' },
+  { label: 'LingoMatch Logo', value: 'logo' },
   { label: '三消→标题', value: 'tiles' },
   { label: 'Wave 文字', value: 'wave' },
 ];

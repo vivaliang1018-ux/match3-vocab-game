@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import {
   MOTION_CARD_POP,
@@ -21,6 +22,7 @@ import { pickQuizChoices } from '../../lib/quizDistractors';
 import { cn } from '../../lib/utils';
 import type { QuizKind, WordItem } from '../../types/game';
 import { SkySparkleBackground } from '../SkySparkleBackground';
+import { useModalDialog } from './useModalDialog';
 
 type Phase = QuizKind;
 
@@ -96,10 +98,19 @@ function RoundQuizSheetInner({
     return first;
   });
   const [peekCn, setPeekCn] = useState(false);
+  const [reviewRevealedChoiceId, setReviewRevealedChoiceId] = useState<string | null>(null);
   const [tryAgainOpen, setTryAgainOpen] = useState(false);
   const [tryAgainLabel, setTryAgainLabel] = useState('');
   const [answerPending, setAnswerPending] = useState(false);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
+  const quizDialogRef = useModalDialog({
+    open: !abandonConfirmOpen,
+    closeOnEscape: false,
+  });
+  const abandonDialogRef = useModalDialog({
+    open: abandonConfirmOpen,
+    onClose: () => setAbandonConfirmOpen(false),
+  });
   const tryAgainTimerRef = useRef<number | null>(null);
   const answerFlowIdRef = useRef(0);
   const phaseRef = useRef(phase);
@@ -227,6 +238,7 @@ function RoundQuizSheetInner({
 
   useEffect(() => {
     setPeekCn(false);
+    setReviewRevealedChoiceId(null);
   }, [pickIndex, phase]);
 
   useLayoutEffect(() => {
@@ -290,6 +302,7 @@ function RoundQuizSheetInner({
     if (pickIndex < furthestPickIndex) {
       // Historical answers are read-only, but every option remains useful as
       // pronunciation practice (including the three distractors).
+      setReviewRevealedChoiceId(choice.id);
       speakNow(choice.word, { quickStart: true });
       return;
     }
@@ -359,15 +372,18 @@ function RoundQuizSheetInner({
 
   return (
     <motion.div
+      ref={quizDialogRef}
       key="round-quiz"
       variants={MOTION_FULLSCREEN_RISE}
       initial="hidden"
       animate="visible"
       exit="exit"
       className="candy-quiz-overlay"
-      role="dialog"
-      aria-modal="true"
+      role={abandonConfirmOpen ? undefined : 'dialog'}
+      aria-modal={abandonConfirmOpen ? undefined : 'true'}
+      aria-hidden={abandonConfirmOpen ? true : undefined}
       aria-label={t.quiz.dialogAria}
+      tabIndex={abandonConfirmOpen ? undefined : -1}
     >
       <SkySparkleBackground variant="game" />
       <div className="candy-quiz-panel">
@@ -535,6 +551,8 @@ function RoundQuizSheetInner({
                   <div className="candy-quiz-pick-choices">
                     {pickChoicesList.map((choice) => {
                       const isCorrectChoice = choice.id === currentPick.id;
+                      const showReviewWord =
+                        isPickReview && reviewRevealedChoiceId === choice.id;
                       return (
                         <motion.button
                           key={`pick-${choice.id}-${pickIndex}`}
@@ -554,6 +572,26 @@ function RoundQuizSheetInner({
                           )}
                         >
                           <ItemVisual item={choice} size="lg" />
+                          {isPickReview && (
+                            <span
+                              className="mt-1 flex min-h-4 max-w-full items-center justify-center"
+                              aria-live="polite"
+                            >
+                              <AnimatePresence initial={false}>
+                                {showReviewWord && (
+                                  <motion.span
+                                    key={`review-word-${choice.id}`}
+                                    initial={{ opacity: 0, y: 4, scale: 0.94 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 2 }}
+                                    className="max-w-full break-words text-center text-xs font-black leading-tight text-sky-900"
+                                  >
+                                    {choice.word}
+                                  </motion.span>
+                                )}
+                              </AnimatePresence>
+                            </span>
+                          )}
                           {isPickReview && (
                             <Volume2 size={14} className="mt-1 text-sky-600" aria-hidden />
                           )}
@@ -631,9 +669,10 @@ function RoundQuizSheetInner({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
+      {typeof document !== 'undefined' && createPortal(<AnimatePresence>
         {abandonConfirmOpen && (
           <motion.div
+            ref={abandonDialogRef}
             key="abandon-confirm"
             initial="hidden"
             animate="visible"
@@ -643,16 +682,17 @@ function RoundQuizSheetInner({
             role="alertdialog"
             aria-modal="true"
             aria-label={t.quiz.abandonConfirmTitle}
+            tabIndex={-1}
           >
             <motion.div
               variants={MOTION_CARD_POP}
-              className="w-full max-w-sm rounded-[24px] border border-white/90 bg-white px-5 py-6 text-center shadow-xl"
+              className="candy-modal-surface"
             >
-              <div className="text-lg font-black text-sky-950">{t.quiz.abandonConfirmTitle}</div>
-              <div className="mt-2 text-sm font-semibold leading-snug text-sky-800/85">
+              <div className="candy-modal-title">{t.quiz.abandonConfirmTitle}</div>
+              <div className="candy-modal-body">
                 {t.quiz.abandonConfirmBody}
               </div>
-              <div className="mt-4 flex flex-col gap-2">
+              <div className="candy-modal-actions">
                 <motion.button
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
@@ -665,7 +705,7 @@ function RoundQuizSheetInner({
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
                   onClick={confirmAbandon}
-                  className="candy-sheet-action-btn candy-sheet-action-btn-blue w-full"
+                  className="candy-sheet-action-btn candy-sheet-action-btn-danger w-full"
                 >
                   {t.quiz.abandonConfirmLeave}
                 </motion.button>
@@ -673,7 +713,7 @@ function RoundQuizSheetInner({
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </motion.div>
   );
 }

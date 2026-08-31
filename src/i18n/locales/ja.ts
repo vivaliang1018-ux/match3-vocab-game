@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const ja: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: '閉じる',
@@ -50,9 +50,9 @@ export const ja: Messages = {
     recordStory: (id, value) =>
       (
         {
-          sets: `Adventure の単語セットを正式に ${value} 組クリアしました。`,
-          day: `${value} 日連続で学習しています。Adventure、Review、Forced Review、Category の有効な学習が対象です。`,
-          combo: `Adventure を ${value} 組連続でクリアしています。Rescue 成功後に最終 Quiz を通過した場合も加算され、正式な失敗で連勝が止まります。`,
+          sets: `冒険の単語セットを正式に ${value} 組クリアしました。`,
+          day: `${value} 日連続で学習しています。冒険、復習、必須復習、カテゴリーモードでの有効な学習が対象です。`,
+          combo: `冒険を ${value} 組連続でクリアしています。救済チャレンジ成功後に最終クイズを通過した場合も加算され、正式な失敗で連勝が止まります。`,
         } as const
       )[id],
     awardMaxed: 'カンスト！',
@@ -101,8 +101,8 @@ export const ja: Messages = {
     language: 'メニュー言語',
     languageHint: 'メニューのみ変更 · Emoji名と音声は英語のままです',
     preferencesTitle: '設定',
-    toggleOn: 'ON',
-    toggleOff: 'OFF',
+    toggleOn: 'オン',
+    toggleOff: 'オフ',
     bgm: 'BGM',
     sfx: '効果音',
     haptics: '触覚フィードバック',
@@ -110,7 +110,7 @@ export const ja: Messages = {
     openLearned: '学習済みを見る',
     openWords: '絵文字一覧',
     aboutTitle: 'アプリについて',
-    description: '消すたびに、少しずつ英語が身につく。\n絵文字で英語の世界を探検しよう！',
+    description: 'LingoMatchなら、消すたびに英語が少しずつ身につく。\n絵文字で英語の世界を探検しよう！',
     version: 'バージョン',
     termsOfService: '利用規約',
     privacyPolicy: 'プライバシーポリシー',
@@ -191,8 +191,8 @@ export const ja: Messages = {
     errorEmailInUse: 'このメールは登録済みです。ログインしてください。',
     errorWeakPassword: 'パスワードは6文字以上必要です',
     errorTooManyRequests: '試行回数が多すぎます。しばらくしてからお試しください。',
-    errorNotConfigured: 'Firebase が未設定です。docs/auth-setup.md を参照してください',
-    errorProviderDisabled: 'Firebase コンソールでメール/パスワードを有効にしてください',
+    errorNotConfigured: 'ログインサービスは現在利用できません。しばらくしてからもう一度お試しください。',
+    errorProviderDisabled: 'このログイン方法は現在利用できません。別の方法をお試しください。',
     errorRequiresRecentLogin: 'アカウント削除前に再ログインしてください',
     errorNetwork: 'ネットワークエラーです。接続を確認して再試行してください。',
     errorUnknown: 'ログインに失敗しました。もう一度お試しください。',
@@ -257,7 +257,7 @@ export const ja: Messages = {
     insufficientPoolHint: 'モード選択で別のカテゴリを選んでください。',
     locked: 'ロック中',
     lockedReviewHint: '冒険の第1セットをクリアすると復習が解放されます。',
-    lockedCategoryHint: '冒険の第5セットをクリアするとカテゴリが解放されます。',
+    lockedCategoryHint: '冒険の第3セットをクリアするとカテゴリが解放されます。',
     noStamina: '体力切れ',
     forcedReviewTitle: '復習チェック',
     forcedReviewSubtitle: '新しいセット3つごとに記憶を固める',
@@ -276,7 +276,7 @@ export const ja: Messages = {
     noStaminaHint: '1時間ごとに1回復、または翌日まで待機。カテゴリ / 復習は無料です。',
   },
   hud: {
-    wordSet: 'Set',
+    wordSet: 'セット',
     wordSetCount: (current) => `${current}`,
     wordSetOf: (current, _total) => `${current}`,
     score: 'スコア',
@@ -380,7 +380,7 @@ export const ja: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `おや、今日${n}個の新絵文字ゲット！`,
-        subtitle: `${n}個が単語帳でこっそり笑ってる…Matchingoも拍手 👏`,
+        subtitle: `${n}個が単語帳でこっそり笑ってる…LingoMatchも拍手 👏`,
         primaryCta: 'もっと捕まえろ！挑戦状 😎',
         secondaryCta: 'ちょっと休憩 ☕',
       },
@@ -415,7 +415,7 @@ export const ja: Messages = {
         secondaryCta: '寝かせとく 😴',
       },
       {
-        title: `${n}個入帳。今日のKPI達成！`,
+        title: `${n}個を記録。今日の目標を達成！`,
         subtitle: '社畜モード：ネガ消滅。忙しそうにする時間 🤡',
         primaryCta: 'もう1局、暴走 🤪',
         secondaryCta: '退勤、逃げる 🏃',

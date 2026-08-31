@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const en: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: 'Close',
@@ -110,7 +110,7 @@ export const en: Messages = {
     openLearned: 'View learned',
     openWords: 'Browse all emojis',
     aboutTitle: 'About',
-    description: "What's That Emoji? Match emojis. Discover their names.",
+    description: 'LingoMatch turns every match into a little English win.\nExplore English through emojis!',
     version: 'Version',
     termsOfService: 'Terms of Service',
     privacyPolicy: 'Privacy Policy',
@@ -191,8 +191,8 @@ export const en: Messages = {
     errorEmailInUse: 'Email already registered. Sign in instead.',
     errorWeakPassword: 'Password must be at least 6 characters',
     errorTooManyRequests: 'Too many attempts. Try again later.',
-    errorNotConfigured: 'Firebase is not configured. See docs/auth-setup.md',
-    errorProviderDisabled: 'Enable Email/Password in the Firebase Console first',
+    errorNotConfigured: 'Sign-in is temporarily unavailable. Please try again later.',
+    errorProviderDisabled: 'This sign-in method is temporarily unavailable. Please try another option.',
     errorRequiresRecentLogin: 'Please sign in again before deleting your account',
     errorNetwork: 'Network error. Check your connection and try again.',
     errorUnknown: 'Sign-in failed. Please try again.',
@@ -257,7 +257,7 @@ export const en: Messages = {
     goAdventureCta: 'Go to Adventure',
     locked: 'Locked',
     lockedReviewHint: 'Clear Adventure set 1 to unlock Review.',
-    lockedCategoryHint: 'Clear Adventure set 5 to unlock Category.',
+    lockedCategoryHint: 'Clear Adventure set 3 to unlock Category.',
     noStamina: 'Out of energy',
     noStaminaHint: 'Regain 1 stamina point every hour, or wait until tomorrow. Review is free.',
     forcedReviewTitle: 'Review checkpoint',
@@ -380,7 +380,7 @@ export const en: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `Yo — you snagged ${n} new emojis today!`,
-        subtitle: `${n} emojis giggling in your stash… Matchingo would clap 👏`,
+        subtitle: `${n} emojis giggling in your stash… LingoMatch would clap 👏`,
         primaryCta: 'Catch more — I dare you 😎',
         secondaryCta: 'Take a breather ☕',
       },
@@ -415,7 +415,7 @@ export const en: Messages = {
         secondaryCta: 'Let them nap 😴',
       },
       {
-        title: `${n} emojis booked. Daily KPI crushed!`,
+        title: `${n} emojis logged. Daily goal crushed!`,
         subtitle: 'Worker mode: bad vibes cleared. Time to look busy 🤡',
         primaryCta: 'One more chaotic round 🤪',
         secondaryCta: 'Clock out — flee 🏃',

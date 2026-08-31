@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const es: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: 'Cerrar',
@@ -52,7 +52,7 @@ export const es: Messages = {
         {
           sets: `Has completado oficialmente ${value} sets de palabras de Aventura.`,
           day: `Llevas ${value} días seguidos aprendiendo. Cuenta el aprendizaje válido en Aventura, Repaso, Repaso forzado o Categoría.`,
-          combo: `Has ganado ${value} sets de Aventura seguidos. Un Rescue exitoso seguido del Quiz final también cuenta; una derrota oficial termina la racha.`,
+          combo: `Has ganado ${value} grupos de Aventura seguidos. Un rescate exitoso seguido del cuestionario final también cuenta; una derrota oficial termina la racha.`,
         } as const
       )[id],
     awardMaxed: '¡Al máximo!',
@@ -68,7 +68,7 @@ export const es: Messages = {
           set_hunter: `Completa ${next} sets para desbloquear Desbrozador de sets.`,
           day_nail: `Llega a ${next} días seguidos y sé Inquilino del calendario.`,
           combo_king: `Haz una racha de ${next} sets para Combo a prueba de tumbos.`,
-          dex_collector: `Domina ${next} emojis y gana Locura del dex.`,
+          dex_collector: `Domina ${next} emojis y gana Coleccionista de emojis.`,
           review_brain: `Completa ${next} repasos para desbloquear Fundidor de memoria.`,
           category_fan: 'Avanza en Aventura para desbloquear Explorador de temas.',
         } as const
@@ -79,7 +79,7 @@ export const es: Messages = {
           set_hunter: `Has completado ${value} sets — ¡Desbrozador de sets desbloqueado!`,
           day_nail: `Racha diaria máxima: ${value}. ¡Eres Inquilino del calendario!`,
           combo_king: `Racha de ${value} sets — ¡Combo a prueba de tumbos!`,
-          dex_collector: `${value} emojis dominados — ¡Locura del dex!`,
+          dex_collector: `${value} emojis dominados — ¡Coleccionista de emojis!`,
           review_brain: `${value} repasos completados — ¡Fundidor de memoria desbloqueado!`,
           category_fan: 'Categorías desbloqueadas — ¡Explorador de temas, adelante!',
         } as const
@@ -90,7 +90,7 @@ export const es: Messages = {
           set_hunter: 'Desbrozador de sets',
           day_nail: 'Inquilino del calendario',
           combo_king: 'Combo a prueba de tumbos',
-          dex_collector: 'Locura del dex',
+          dex_collector: 'Coleccionista de emojis',
           review_brain: 'Fundidor de memoria',
           category_fan: 'Explorador de temas',
         } as const
@@ -101,8 +101,8 @@ export const es: Messages = {
     language: 'Idioma del menú',
     languageHint: 'Solo menús · Los nombres y el audio de los emojis siguen en inglés',
     preferencesTitle: 'Preferencias',
-    toggleOn: 'ON',
-    toggleOff: 'OFF',
+    toggleOn: 'Activado',
+    toggleOff: 'Desactivado',
     bgm: 'Música',
     sfx: 'Efectos de sonido',
     haptics: 'Respuesta háptica',
@@ -110,7 +110,7 @@ export const es: Messages = {
     openLearned: 'Ver aprendido',
     openWords: 'Ver lista de palabras',
     aboutTitle: 'Acerca de',
-    description: 'Que cada combinación te dé un poco de inglés.\n¡Explora el inglés con emojis!',
+    description: 'Con LingoMatch, cada combinación se convierte en un pequeño logro en inglés.\n¡Explora el inglés con emojis!',
     version: 'Versión',
     termsOfService: 'Términos del servicio',
     privacyPolicy: 'Política de privacidad',
@@ -191,8 +191,8 @@ export const es: Messages = {
     errorEmailInUse: 'Correo ya registrado. Inicia sesión.',
     errorWeakPassword: 'La contraseña debe tener al menos 6 caracteres',
     errorTooManyRequests: 'Demasiados intentos. Inténtalo más tarde.',
-    errorNotConfigured: 'Firebase no configurado. Ver docs/auth-setup.md',
-    errorProviderDisabled: 'Este método de acceso no está habilitado en Firebase',
+    errorNotConfigured: 'El inicio de sesión no está disponible temporalmente. Inténtalo de nuevo más tarde.',
+    errorProviderDisabled: 'Este método de acceso no está disponible. Prueba otra opción.',
     errorRequiresRecentLogin: 'Vuelve a iniciar sesión antes de eliminar la cuenta',
     errorNetwork: 'Error de red. Comprueba la conexión e inténtalo de nuevo.',
     errorUnknown: 'Error al iniciar sesión. Inténtalo de nuevo.',
@@ -257,7 +257,7 @@ export const es: Messages = {
     insufficientPoolHint: 'Abre el selector de modo y elige otra categoría.',
     locked: 'Bloqueado',
     lockedReviewHint: 'Completa la ronda 1 de Aventura para desbloquear Repaso.',
-    lockedCategoryHint: 'Completa la ronda 5 de Aventura para desbloquear Categoría.',
+    lockedCategoryHint: 'Completa la ronda 3 de Aventura para desbloquear Categoría.',
     noStamina: 'Sin energía',
     forcedReviewTitle: 'Prueba de repaso',
     forcedReviewSubtitle: 'Cada 3 sets nuevos — refuerza la memoria',
@@ -276,7 +276,7 @@ export const es: Messages = {
     noStaminaHint: 'Recuperas 1 cada hora, o espera a mañana. También puedes repasar gratis.',
   },
   hud: {
-    wordSet: 'Set',
+    wordSet: 'Grupo',
     wordSetCount: (current) => `${current}`,
     wordSetOf: (current, _total) => `${current}`,
     score: 'Puntos',
@@ -380,7 +380,7 @@ export const es: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `¡Uy — te llevaste ${n} emojis nuevos hoy!`,
-        subtitle: `${n} emojis riéndose en tu vocabulario… Matchingo aplaudiría 👏`,
+        subtitle: `${n} emojis riéndose en tu vocabulario… LingoMatch aplaudiría 👏`,
         primaryCta: '¡A por más! Te reto 😎',
         secondaryCta: 'A descansar ☕',
       },
@@ -415,7 +415,7 @@ export const es: Messages = {
         secondaryCta: 'Que duerman un rato 😴',
       },
       {
-        title: `${n} emojis registrados. ¡KPI diario aplastado!`,
+        title: `${n} emojis registrados. ¡Objetivo diario superado!`,
         subtitle: 'Modo trabajador: mal rollo eliminado. Hora de parecer ocupado 🤡',
         primaryCta: 'Una ronda más de caos 🤪',
         secondaryCta: 'Cierro turno — huyo 🏃',

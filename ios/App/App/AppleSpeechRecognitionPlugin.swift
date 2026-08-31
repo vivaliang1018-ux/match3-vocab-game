@@ -194,7 +194,7 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         guard shouldContinue else { return }
         guard recognizer?.isAvailable == true else {
             throw NSError(
-                domain: "MatchingoSpeech",
+                domain: "LingoMatchSpeech",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognizer is unavailable."]
             )
@@ -215,7 +215,7 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         let format = inputNode.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
             throw NSError(
-                domain: "MatchingoSpeech",
+                domain: "LingoMatchSpeech",
                 code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "Microphone input is unavailable."]
             )
@@ -241,14 +241,14 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         guard shouldContinue else { return cycleId }
         guard let recognizer, recognizer.isAvailable else {
             throw NSError(
-                domain: "MatchingoSpeech",
+                domain: "LingoMatchSpeech",
                 code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognizer is unavailable."]
             )
         }
         guard recognizer.supportsOnDeviceRecognition else {
             throw NSError(
-                domain: "MatchingoSpeech",
+                domain: "LingoMatchSpeech",
                 code: 4,
                 userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is unavailable."]
             )
@@ -366,7 +366,7 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
             let samples = buffer.floatChannelData?[0]
         else {
             throw NSError(
-                domain: "MatchingoCountdown",
+                domain: "LingoMatchCountdown",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "Unable to create countdown audio."]
             )

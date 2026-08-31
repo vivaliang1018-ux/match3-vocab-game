@@ -29,6 +29,6 @@
 
 ## 提交前核对
 
-1. 三个 URL 均能在未登录浏览器中 HTTPS 打开，且显示 Matchingo 与 Bundle ID `com.matchingo.game`。
+1. 三个 URL 均能在未登录浏览器中 HTTPS 打开，且显示 LingoMatch 与 Bundle ID `com.matchingo.game`。
 2. 最终 Archive 不包含 Facebook SDK、`ep1.facebook.com` 或广告追踪域名。
 3. App Store Connect 隐私标签、网页隐私政策和最终二进制三者一致。

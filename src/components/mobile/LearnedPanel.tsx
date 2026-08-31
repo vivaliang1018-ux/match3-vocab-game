@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   compareWordsForSpacedReview,
   isDue,
@@ -16,6 +16,7 @@ import {
 import { formatCountdownLocalized, useI18n } from '../../i18n';
 import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import type { WordItem } from '../../types/game';
+import type { Locale } from '../../i18n/types';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
 import { LearnedWordModal } from './LearnedWordModal';
 import { cn } from '../../lib/utils';
@@ -37,6 +38,51 @@ type LearnedPanelProps = {
   /** Enough learned words + unlock to build a six-word review board. */
   canGoReview: boolean;
   onGoReview: () => void;
+  showFirstVisitGuide?: boolean;
+  onFirstVisitGuideComplete?: () => void;
+};
+
+const LEARNED_TOUR_COPY: Record<Locale, {
+  steps: Array<{ emoji: string; title: string; body: string }>;
+  next: string;
+  done: string;
+  skip: string;
+}> = {
+  en: { steps: [
+    { emoji: '📚', title: 'Your word collection', body: 'Emoji and English words learned in Adventure are saved here.' },
+    { emoji: '🛡️', title: 'Memory shields', body: 'A shield shows how strong each memory is. Review makes it stronger.' },
+    { emoji: '⏰', title: 'Come back at the right time', body: 'When a shield needs reinforcement, the word appears under Reinforce.' },
+  ], next: 'Next', done: 'Got it', skip: 'Skip' },
+  'zh-CN': { steps: [
+    { emoji: '📚', title: '这里是你的单词收藏', body: '闯关学会的 Emoji 和英文单词都会保存在这里。' },
+    { emoji: '🛡️', title: '记忆护盾', body: '护盾代表每个单词的记忆状态，完成复习可以让它变得更牢固。' },
+    { emoji: '⏰', title: '在合适的时间回来', body: '护盾需要加固时，单词会出现在「待加固」中。' },
+  ], next: '下一步', done: '知道了', skip: '跳过' },
+  es: { steps: [
+    { emoji: '📚', title: 'Tu colección de palabras', body: 'Los emojis y las palabras en inglés que aprendas en Aventura se guardan aquí.' },
+    { emoji: '🛡️', title: 'Escudos de memoria', body: 'El escudo muestra la fuerza de cada recuerdo. Repasar lo refuerza.' },
+    { emoji: '⏰', title: 'Vuelve en el momento justo', body: 'Cuando un escudo necesite refuerzo, la palabra aparecerá en Reforzar.' },
+  ], next: 'Siguiente', done: 'Entendido', skip: 'Omitir' },
+  fr: { steps: [
+    { emoji: '📚', title: 'Ta collection de mots', body: 'Les emojis et les mots anglais appris en Aventure sont enregistrés ici.' },
+    { emoji: '🛡️', title: 'Boucliers de mémoire', body: 'Le bouclier indique la solidité de chaque souvenir. Réviser le renforce.' },
+    { emoji: '⏰', title: 'Reviens au bon moment', body: 'Quand un bouclier faiblit, le mot apparaît dans À renforcer.' },
+  ], next: 'Suivant', done: 'Compris', skip: 'Ignorer' },
+  de: { steps: [
+    { emoji: '📚', title: 'Deine Wortsammlung', body: 'Emojis und englische Wörter aus dem Abenteuer werden hier gespeichert.' },
+    { emoji: '🛡️', title: 'Gedächtnisschilde', body: 'Der Schild zeigt, wie fest ein Wort sitzt. Wiederholen stärkt ihn.' },
+    { emoji: '⏰', title: 'Komm zur richtigen Zeit zurück', body: 'Wenn ein Schild schwächer wird, erscheint das Wort unter Verstärken.' },
+  ], next: 'Weiter', done: 'Verstanden', skip: 'Überspringen' },
+  ja: { steps: [
+    { emoji: '📚', title: '単語コレクション', body: '冒険で学んだ絵文字と英単語は、ここに保存されます。' },
+    { emoji: '🛡️', title: '記憶のシールド', body: 'シールドは記憶の定着度を表します。復習すると強くなります。' },
+    { emoji: '⏰', title: 'ちょうどよい時に復習', body: 'シールドが弱くなると、単語が「強化」に表示されます。' },
+  ], next: '次へ', done: 'わかりました', skip: 'スキップ' },
+  ko: { steps: [
+    { emoji: '📚', title: '나의 단어 컬렉션', body: '모험에서 배운 이모지와 영어 단어가 여기에 저장돼요.' },
+    { emoji: '🛡️', title: '기억 방패', body: '방패는 단어를 얼마나 잘 기억하는지 보여 줘요. 복습하면 더 단단해져요.' },
+    { emoji: '⏰', title: '알맞은 때에 다시 오세요', body: '방패를 강화할 때가 되면 단어가 강화 목록에 나타나요.' },
+  ], next: '다음', done: '알겠어요', skip: '건너뛰기' },
 };
 
 export function LearnedPanel({
@@ -46,11 +92,18 @@ export function LearnedPanel({
   wordMemory,
   canGoReview,
   onGoReview,
+  showFirstVisitGuide = false,
+  onFirstVisitGuideComplete,
 }: LearnedPanelProps) {
   const { locale, t, ui } = useI18n();
   const [selectedItem, setSelectedItem] = useState<WordItem | null>(null);
   const [filter, setFilter] = useState<MemoryFilter>('all');
   const [now, setNow] = useState(Date.now());
+  const [tourStep, setTourStep] = useState(0);
+
+  useEffect(() => {
+    if (showFirstVisitGuide) setTourStep(0);
+  }, [showFirstVisitGuide]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -242,6 +295,69 @@ export function LearnedPanel({
         open={selectedItem != null}
         onClose={() => setSelectedItem(null)}
       />
+
+      <AnimatePresence>
+        {showFirstVisitGuide && (
+          <motion.div
+            className="fixed inset-0 z-[180] flex items-center justify-center bg-sky-950/55 px-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label={LEARNED_TOUR_COPY[locale].steps[tourStep].title}
+          >
+            <motion.div
+              key={tourStep}
+              className="w-full max-w-sm rounded-[2rem] border-4 border-white bg-gradient-to-b from-white to-sky-50 px-6 py-6 text-center shadow-2xl"
+              initial={{ y: 24, scale: 0.92 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: -12, opacity: 0 }}
+            >
+              <button
+                type="button"
+                onClick={onFirstVisitGuideComplete}
+                className="float-right text-xs font-black text-sky-700/65"
+              >
+                {LEARNED_TOUR_COPY[locale].skip}
+              </button>
+              <div className="clear-both text-6xl" aria-hidden>
+                {LEARNED_TOUR_COPY[locale].steps[tourStep].emoji}
+              </div>
+              <h2 className="mt-4 text-xl font-black text-sky-950">
+                {LEARNED_TOUR_COPY[locale].steps[tourStep].title}
+              </h2>
+              <p className="mt-2 text-sm font-semibold leading-relaxed text-sky-800/80">
+                {LEARNED_TOUR_COPY[locale].steps[tourStep].body}
+              </p>
+              <div className="mt-5 flex justify-center gap-1.5" aria-hidden>
+                {LEARNED_TOUR_COPY[locale].steps.map((_, index) => (
+                  <span
+                    key={index}
+                    className={cn(
+                      'h-2 rounded-full transition-all',
+                      index === tourStep ? 'w-6 bg-pink-500' : 'w-2 bg-sky-200',
+                    )}
+                  />
+                ))}
+              </div>
+              <motion.button
+                type="button"
+                whileTap={MOTION_PRESS_TAP}
+                onClick={() => {
+                  if (tourStep < 2) setTourStep((step) => step + 1);
+                  else onFirstVisitGuideComplete?.();
+                }}
+                className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-5 w-full"
+              >
+                {tourStep < 2
+                  ? LEARNED_TOUR_COPY[locale].next
+                  : LEARNED_TOUR_COPY[locale].done}
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

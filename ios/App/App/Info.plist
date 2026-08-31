@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Matchingo</string>
+        <string>LingoMatch</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,9 +36,9 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Matchingo uses the microphone in Say &amp; Blast so spoken learned words can hit falling emoji.</string>
+	<string>LingoMatch uses the microphone in Say &amp; Blast so spoken learned words can hit falling emoji.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Matchingo uses speech recognition in Say &amp; Blast to match spoken words with falling emoji.</string>
+	<string>LingoMatch uses speech recognition in Say &amp; Blast to match spoken words with falling emoji.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

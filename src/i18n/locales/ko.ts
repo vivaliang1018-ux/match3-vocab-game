@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const ko: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: '닫기',
@@ -50,9 +50,9 @@ export const ko: Messages = {
     recordStory: (id, value) =>
       (
         {
-          sets: `Adventure 단어 세트를 정식으로 ${value}개 완료했어요.`,
-          day: `${value}일 연속 학습했어요. Adventure, Review, Forced Review, Category의 유효한 학습이 모두 포함돼요.`,
-          combo: `Adventure를 ${value}세트 연속으로 이겼어요. Rescue 성공 후 최종 Quiz를 통과한 경우도 포함되며, 정식 실패 시 연승이 끝나요.`,
+          sets: `모험 단어 세트를 정식으로 ${value}개 완료했어요.`,
+          day: `${value}일 연속 학습했어요. 모험, 복습, 필수 복습, 카테고리 모드의 유효한 학습이 모두 포함돼요.`,
+          combo: `모험을 ${value}세트 연속으로 이겼어요. 구출 도전 성공 후 최종 퀴즈를 통과한 경우도 포함되며, 정식 실패 시 연승이 끝나요.`,
         } as const
       )[id],
     awardMaxed: '만렙!',
@@ -110,7 +110,7 @@ export const ko: Messages = {
     openLearned: '학습함 보기',
     openWords: '이모지 목록',
     aboutTitle: '앱 정보',
-    description: '매치할 때마다 영어를 조금씩 배워요.\n이모지로 영어 세상을 탐험해 보세요!',
+    description: 'LingoMatch와 함께 매치할 때마다 영어를 조금씩 배워요.\n이모지로 영어 세상을 탐험해 보세요!',
     version: '버전',
     termsOfService: '이용약관',
     privacyPolicy: '개인정보 처리방침',
@@ -191,8 +191,8 @@ export const ko: Messages = {
     errorEmailInUse: '이미 등록된 이메일입니다. 로그인하세요.',
     errorWeakPassword: '비밀번호는 6자 이상이어야 합니다',
     errorTooManyRequests: '시도 횟수가 너무 많습니다. 나중에 다시 시도하세요.',
-    errorNotConfigured: 'Firebase가 설정되지 않았습니다. docs/auth-setup.md 참고',
-    errorProviderDisabled: 'Firebase 콘솔에서 이메일/비밀번호를 먼저 활성화하세요',
+    errorNotConfigured: '로그인 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+    errorProviderDisabled: '이 로그인 방법은 현재 사용할 수 없습니다. 다른 방법을 선택해 주세요.',
     errorRequiresRecentLogin: '계정 삭제 전에 다시 로그인하세요',
     errorNetwork: '네트워크 오류입니다. 연결을 확인하고 다시 시도하세요.',
     errorUnknown: '로그인에 실패했습니다. 다시 시도해 주세요.',
@@ -257,7 +257,7 @@ export const ko: Messages = {
     insufficientPoolHint: '모드 선택에서 다른 카테고리를 고르세요.',
     locked: '잠김',
     lockedReviewHint: '모험 1라운드를 클리어하면 복습이 해제됩니다.',
-    lockedCategoryHint: '모험 5라운드를 클리어하면 카테고리가 해제됩니다.',
+    lockedCategoryHint: '모험 3라운드를 클리어하면 카테고리가 해제됩니다.',
     noStamina: '체력 부족',
     forcedReviewTitle: '복습 체크',
     forcedReviewSubtitle: '새 세트 3개마다 기억을 다져요',
@@ -276,7 +276,7 @@ export const ko: Messages = {
     noStaminaHint: '1시간마다 1 회복, 또는 내일까지 기다리세요. 복습은 무료예요.',
   },
   hud: {
-    wordSet: 'Set',
+    wordSet: '세트',
     wordSetCount: (current) => `${current}`,
     wordSetOf: (current, _total) => `${current}`,
     score: '점수',
@@ -380,7 +380,7 @@ export const ko: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `야, 오늘 새 이모지 ${n}개나 쓸어갔네!`,
-        subtitle: `${n}개가 단어장에서 몰래 웃는 중… Matchingo도 박수 👏`,
+        subtitle: `${n}개가 단어장에서 몰래 웃는 중… LingoMatch도 박수 👏`,
         primaryCta: '더 잡아! 도전 😎',
         secondaryCta: '잠깐 쉴게 ☕',
       },
@@ -415,7 +415,7 @@ export const ko: Messages = {
         secondaryCta: '좀 재워둘게 😴',
       },
       {
-        title: `${n}개 입금. 오늘 KPI 달성!`,
+        title: `${n}개 기록 완료. 오늘의 목표 달성!`,
         subtitle: '직장인 모드: 부정 소멸. 바쁜 척할 시간 🤡',
         primaryCta: '한 판 더 미친 듯이 🤪',
         secondaryCta: '퇴근, 도망 🏃',

@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const de: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: 'UI 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: 'Schließen',
@@ -68,7 +68,7 @@ export const de: Messages = {
           set_hunter: `Schaff ${next} Sets, um Set-Pionier freizuschalten.`,
           day_nail: `Halte ${next} Tage durch für Kalender-Stammgast.`,
           combo_king: `Schaffe eine ${next}-Set-Serie für Combo-Stehaufmännchen.`,
-          dex_collector: `Meistere ${next} Emojis für Dex-Maniac.`,
+          dex_collector: `Meistere ${next} Emojis für Emoji-Sammler.`,
           review_brain: `Schließe ${next} Wiederholungen ab, um Gedächtnis-Schmied freizuschalten.`,
           category_fan: 'Komm in Abenteuer weiter für Themen-Entdecker.',
         } as const
@@ -79,7 +79,7 @@ export const de: Messages = {
           set_hunter: `Du hast ${value} Sets geschafft — Set-Pionier freigeschaltet!`,
           day_nail: `Längste Tages-Serie: ${value}. Du bist Kalender-Stammgast!`,
           combo_king: `${value}-Set-Serie — Combo-Stehaufmännchen!`,
-          dex_collector: `${value} Emojis gemeistert — Dex-Maniac!`,
+          dex_collector: `${value} Emojis gemeistert — Emoji-Sammler!`,
           review_brain: `${value} Wiederholungen abgeschlossen — Gedächtnis-Schmied freigeschaltet!`,
           category_fan: 'Kategorien freigeschaltet — Themen-Entdecker, los!',
         } as const
@@ -90,7 +90,7 @@ export const de: Messages = {
           set_hunter: 'Set-Pionier',
           day_nail: 'Kalender-Stammgast',
           combo_king: 'Combo-Stehaufmännchen',
-          dex_collector: 'Dex-Maniac',
+          dex_collector: 'Emoji-Sammler',
           review_brain: 'Gedächtnis-Schmied',
           category_fan: 'Themen-Entdecker',
         } as const
@@ -110,7 +110,7 @@ export const de: Messages = {
     openLearned: 'Gelerntes ansehen',
     openWords: 'Wortliste durchsuchen',
     aboutTitle: 'Über die App',
-    description: 'Jedes Match bringt ein bisschen Englisch.\nEntdecke Englisch mit Emojis!',
+    description: 'Mit LingoMatch wird jedes Match zu einem kleinen Englisch-Erfolg.\nEntdecke Englisch mit Emojis!',
     version: 'Version',
     termsOfService: 'Nutzungsbedingungen',
     privacyPolicy: 'Datenschutz',
@@ -191,8 +191,8 @@ export const de: Messages = {
     errorEmailInUse: 'E-Mail bereits registriert. Bitte anmelden.',
     errorWeakPassword: 'Passwort muss mindestens 6 Zeichen haben',
     errorTooManyRequests: 'Zu viele Versuche. Später erneut versuchen.',
-    errorNotConfigured: 'Firebase nicht konfiguriert. Siehe docs/auth-setup.md',
-    errorProviderDisabled: 'Diese Anmeldemethode ist in Firebase nicht aktiviert',
+    errorNotConfigured: 'Die Anmeldung ist vorübergehend nicht verfügbar. Bitte später erneut versuchen.',
+    errorProviderDisabled: 'Diese Anmeldemethode ist derzeit nicht verfügbar. Bitte wähle eine andere Option.',
     errorRequiresRecentLogin: 'Bitte erneut anmelden, bevor du das Konto löschst',
     errorNetwork: 'Netzwerkfehler. Verbindung prüfen und erneut versuchen.',
     errorUnknown: 'Anmeldung fehlgeschlagen. Bitte erneut versuchen.',
@@ -257,7 +257,7 @@ export const de: Messages = {
     insufficientPoolHint: 'Modus öffnen und eine andere Kategorie wählen.',
     locked: 'Gesperrt',
     lockedReviewHint: 'Schaffe Abenteuer-Runde 1, um Wiederholen freizuschalten.',
-    lockedCategoryHint: 'Schaffe Abenteuer-Runde 5, um Kategorie freizuschalten.',
+    lockedCategoryHint: 'Schaffe Abenteuer-Runde 3, um Kategorie freizuschalten.',
     noStamina: 'Keine Energie',
     forcedReviewTitle: 'Wiederholungs-Check',
     forcedReviewSubtitle: 'Alle 3 neuen Sets — Gedächtnis festigen',
@@ -276,7 +276,7 @@ export const de: Messages = {
     noStaminaHint: '1 Punkt jede Stunde, oder bis morgen warten. Wiederholen ist gratis.',
   },
   hud: {
-    wordSet: 'Set',
+    wordSet: 'Gruppe',
     wordSetCount: (current) => `${current}`,
     wordSetOf: (current, _total) => `${current}`,
     score: 'Punkte',
@@ -332,7 +332,7 @@ export const de: Messages = {
       {
         title: 'Na gut, du gewinnst. Frei… für heute 💥',
         subtitle: 'Brett leer, aber die Emojis beobachten dich.',
-        primaryCta: 'Streak reiten! 🚀',
+        primaryCta: 'Serie fortsetzen! 🚀',
         secondaryCta: 'Schule aus — abhauen 🏃',
       },
       {
@@ -380,7 +380,7 @@ export const de: Messages = {
     learnedCelebrateCards: (n) => [
       {
         title: `Na — ${n} neue Emojis heute geschnappt!`,
-        subtitle: `${n} Emojis kichern in deinem Wortschatz… Matchingo würde klatschen 👏`,
+        subtitle: `${n} Emojis kichern in deinem Wortschatz… LingoMatch würde klatschen 👏`,
         primaryCta: 'Mehr fangen — ich fordere dich 😎',
         secondaryCta: 'Kurz Pause ☕',
       },
@@ -415,7 +415,7 @@ export const de: Messages = {
         secondaryCta: 'Lass sie schlafen 😴',
       },
       {
-        title: `${n} Emojis gebucht. Tages-KPI zerstört!`,
+        title: `${n} Emojis verbucht. Tagesziel übertroffen!`,
         subtitle: 'Arbeiter-Modus: schlechte Vibes weg. Zeit, beschäftigt zu wirken 🤡',
         primaryCta: 'Noch eine chaotische Runde 🤪',
         secondaryCta: 'Feierabend — fliehen 🏃',

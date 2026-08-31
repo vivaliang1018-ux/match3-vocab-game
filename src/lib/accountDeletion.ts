@@ -19,6 +19,7 @@ import { clearAdventureSetHistory } from './adventureSetHistory';
 import { clearFirstTimeGuideState } from './firstTimeGuide';
 import { clearSayBlastStats } from './sayBlastStats';
 import { clearPlayerSummary } from './playerSummary';
+import { clearCategoryCycleProgress } from './categoryCycleProgress';
 
 /**
  * Permanently delete the signed-in account: cloud progress, Auth user, then local user bucket.
@@ -68,6 +69,7 @@ export async function deleteAccountUser(): Promise<void> {
   clearFirstTimeGuideState(uid);
   clearSayBlastStats(uid);
   clearPlayerSummary(uid);
+  clearCategoryCycleProgress(uid);
   clearAvatarPreset(uid);
 
   if (Capacitor.isNativePlatform()) {

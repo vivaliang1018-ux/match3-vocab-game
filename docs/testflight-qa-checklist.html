@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TestFlight QA 清单 — Matchingo</title>
+  <title>TestFlight QA 清单 — LingoMatch</title>
   <style>
     :root { --bg:#f0f9ff; --card:#fff; --text:#0c4a6e; --muted:#0369a1; --border:rgba(14,116,144,.15); --ok:#16a34a; }
     * { box-sizing:border-box; }
@@ -28,7 +28,7 @@
   <main>
     <div class="card">
       <h1>TestFlight QA 测试清单</h1>
-      <p><strong>应用：</strong>Matchingo · <strong>Bundle ID：</strong>com.matchingo.game</p>
+      <p><strong>应用：</strong>LingoMatch · <strong>Bundle ID：</strong>com.matchingo.game</p>
       <p>
         <label>测试设备 <input type="text" placeholder="例如 iPhone 15 / iOS 18" /></label><br />
         <label>Build 号 <input type="text" placeholder="TestFlight 里的构建版本" /></label><br />
@@ -77,6 +77,7 @@
       <tr><td>3.4</td><td>选择题：选对单词</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>3.5</td><td>换题时布局不抖动</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>3.6</td><td>上一步/下一步始终可见</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>3.6a</td><td>返回已完成的选图题后，点击任意图片都会显示并朗读该选项的英文名称，且不改变原答题结果</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>3.7</td><td>换题时朗读不被打断</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>3.8</td><td>「再听一次」只播英文</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>3.9</td><td>答错有反馈，可重试</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
@@ -86,23 +87,24 @@
 
     <div class="card"><h2>4. 游戏模式</h2>
       <h3>4a 闯关</h3><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
-        <tr><td>4.1</td><td>开局 20 步；HUD「当前组」= 已通关+1；体力显示 心 + n/5</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.1</td><td>开局 20 步；HUD「当前组」= 已通关+1；体力显示 心 + n/5；包括首次冒险在内，第一次有效消除扣 1 体力</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.2</td><td>普通三消 −1；四消及以上净 0（−1+1）</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.3</td><td>≤6 步未完成词多掉落</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.4</td><td>复活赛：6 词×2，失误 3 次失败</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.4a</td><td>若复活赛早于复习模式出现，首个倒计时目标暂停并显示交换手势；完成后，之后进入复习不重复教学</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.5</td><td>每 3 组强制复习（从这 3 组词中随机抽 6 个，非仅最新一组）；中途离开保留「待完成复习」</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.6</td><td>放弃小测确认重来，不算通关</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.7</td><td>无体力死机页 + 去复习 CTA</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       </tbody></table>
       <h3>4b 分类 / 4c 复习 / 4d 切换</h3><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
-        <tr><td>4.8–4.11</td><td>分类解锁后出现；选主题；免费无限步</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+        <tr><td>4.8–4.11</td><td>完成第 3 次冒险和强制复习后，先完成「已学」手势及三步教学，再提示模式按钮和分类模式；首次推荐「工具与居家用品」而非「情感表达」；选主题；免费无限步</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.12–4.16</td><td>复习限时目标、空库 CTA、艾宾浩斯进退、待完成复习横幅</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
         <tr><td>4.17–4.19</td><td>模式切换；换一组词预览免费 / 首步扣体力；重排免费；强制复习可挂起</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       </tbody></table>
     </div>
 
     <div class="card"><h2>5–7. 已学 / 我的 / 音频</h2><table><thead><tr><th>#</th><th>测试项</th><th class="pass-col">通过</th><th>备注</th></tr></thead><tbody>
-      <tr><td>5.x</td><td>已学列表、详情、发音、词库浏览</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
+      <tr><td>5.x</td><td>第三次强制复习后手势指向「已学」；首次进入依次解释单词收藏、记忆护盾和复习时机；再检查列表、详情、发音、词库浏览</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>6.x</td><td>访客存档、即将推出文案、音效/语言、隐私政策链接</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
       <tr><td>7.x</td><td>BGM/SFX、静音键、蓝牙、测验朗读不重叠</td><td class="pass-col"><input type="checkbox" /></td><td></td></tr>
     </tbody></table></div>

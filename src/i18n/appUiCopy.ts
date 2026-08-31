@@ -85,6 +85,7 @@ export type AppUiCopy = {
   mode: {
     moodDescription: string;
     moodDailyLimitReached: string;
+    sayBlastNeedsWords: string;
   };
   resultGoals: {
     reviewChoice: string;
@@ -117,6 +118,7 @@ const en: AppUiCopy = {
   mode: {
     moodDescription: 'One color theme each day · up to 3 boards',
     moodDailyLimitReached: 'Mood Board limit reached for today — come back tomorrow',
+    sayBlastNeedsWords: 'Complete the first Adventure set to learn 6 words',
   },
   resultGoals: { reviewChoice: 'Keep reviewing or return to new words', categoryUnlock: n => `${n} more ${n === 1 ? 'set' : 'sets'} → 🧩 Category Mode`, strengthen: 'Strengthen these words in Memory Challenge', discoverSix: 'Discover the next 6 emoji names', forcedReview: 'Three sets complete — try Memory Challenge', anotherTheme: 'Try another theme or six more words' },
   rescue: { wrong: n => `Wrong match! ${n} ${n === 1 ? 'chance' : 'chances'} left`, failed: 'Oh no 😅 Challenge failed', offerTitle: 'So close! Here’s a chance to save it 💗', offerBody: n => `${n > 0 ? `${n} ${n === 1 ? 'word' : 'words'} left. ` : ''}Match the prompted emoji before time runs out to revive.`, save: 'Save it!', retryTitle: 'Rescue failed 😵‍💫', retryBody: 'Try the set again with 8 bonus moves!', continueMoves: 'Continue · +8 moves' },
@@ -133,6 +135,7 @@ const zhCN: AppUiCopy = {
   mode: {
     moodDescription: '每天固定一个色系 · 最多 3 盘',
     moodDailyLimitReached: '今日心情棋盘次数已用完，明天再来吧',
+    sayBlastNeedsWords: '完成第 1 组闯关，学会 6 个单词后开始',
   },
   resultGoals: { reviewChoice: '选择继续复习，或回到新词闯关', categoryUnlock: n => `再完成 ${n} 组 → 🧩 分类模式`, strengthen: '现在用刚学过的词完成记忆挑战', discoverSix: '继续发现下一组 6 个新词', forcedReview: '已完成三组闯关，来试试记忆挑战', anotherTheme: '换一个主题，或继续新的六个词' },
   rescue: { wrong: n => `答错了！还剩 ${n} 次机会`, failed: '哎呀 😅 闯关失败', offerTitle: '差一点！给你机会救回来 💗', offerBody: n => `${n > 0 ? `还有 ${n} 个词差一点。` : ''}根据提示，在限时内匹配 Emoji，成功即可复活。`, save: '救回来！', retryTitle: '复活失败 😵‍💫', retryBody: '重新挑战，并获得 8 步助力！', continueMoves: '继续闯关 · +8 步' },
@@ -149,6 +152,7 @@ const es: AppUiCopy = {
   mode: {
     moodDescription: 'Un tema de color al día · hasta 3 tableros',
     moodDailyLimitReached: 'Límite diario del tablero de colores alcanzado — vuelve mañana',
+    sayBlastNeedsWords: 'Completa el primer set de Aventura para aprender 6 palabras',
   },
   resultGoals: { reviewChoice: 'Sigue repasando o vuelve a las palabras nuevas', categoryUnlock: n => `${n} ${n === 1 ? 'set más' : 'sets más'} → 🧩 Modo por categorías`, strengthen: 'Refuerza estas palabras en el desafío de memoria', discoverSix: 'Descubre los nombres de los próximos 6 Emojis', forcedReview: 'Tres sets completados: prueba el desafío de memoria', anotherTheme: 'Prueba otro tema u otras seis palabras' },
   rescue: { wrong: n => `¡Combinación incorrecta! Queda${n === 1 ? '' : 'n'} ${n} ${n === 1 ? 'intento' : 'intentos'}`, failed: 'Oh, no 😅 Desafío fallido', offerTitle: '¡Por poco! Tienes una oportunidad para salvarlo 💗', offerBody: n => `${n > 0 ? `Queda${n === 1 ? '' : 'n'} ${n} ${n === 1 ? 'palabra' : 'palabras'}. ` : ''}Combina el Emoji indicado antes de que se acabe el tiempo para revivir.`, save: '¡Salvar!', retryTitle: 'El rescate ha fallado 😵‍💫', retryBody: '¡Repite el set con 8 movimientos extra!', continueMoves: 'Continuar · +8 movimientos' },
@@ -165,6 +169,7 @@ const fr: AppUiCopy = {
   mode: {
     moodDescription: 'Un thème de couleur par jour · jusqu’à 3 plateaux',
     moodDailyLimitReached: 'Limite quotidienne du tableau de couleurs atteinte — reviens demain',
+    sayBlastNeedsWords: 'Termine la première série Aventure pour apprendre 6 mots',
   },
   resultGoals: { reviewChoice: 'Continue à réviser ou retourne aux nouveaux mots', categoryUnlock: n => `Encore ${n} ${n === 1 ? 'série' : 'séries'} → 🧩 Mode Catégorie`, strengthen: 'Renforce ces mots dans le défi de mémoire', discoverSix: 'Découvre le nom des 6 prochains Emojis', forcedReview: 'Trois séries terminées : essaie le défi de mémoire', anotherTheme: 'Essaie un autre thème ou six nouveaux mots' },
   rescue: { wrong: n => `Mauvaise association ! Il reste ${n} ${n === 1 ? 'essai' : 'essais'}`, failed: 'Oh non 😅 Défi échoué', offerTitle: 'Presque ! Tu as une chance de le sauver 💗', offerBody: n => `${n > 0 ? `Il reste ${n} ${n === 1 ? 'mot' : 'mots'}. ` : ''}Associe l’Emoji indiqué avant la fin du temps pour revenir en jeu.`, save: 'Le sauver !', retryTitle: 'Sauvetage échoué 😵‍💫', retryBody: 'Recommence la série avec 8 coups supplémentaires !', continueMoves: 'Continuer · +8 coups' },
@@ -181,6 +186,7 @@ const de: AppUiCopy = {
   mode: {
     moodDescription: 'Jeden Tag ein Farbthema · bis zu 3 Spielfelder',
     moodDailyLimitReached: 'Tageslimit der Farbtafel erreicht — komm morgen wieder',
+    sayBlastNeedsWords: 'Schließe das erste Abenteuer-Set ab und lerne 6 Wörter',
   },
   resultGoals: { reviewChoice: 'Weiter wiederholen oder zu neuen Wörtern zurückkehren', categoryUnlock: n => `Noch ${n} ${n === 1 ? 'Set' : 'Sets'} → 🧩 Kategoriemodus`, strengthen: 'Stärke diese Wörter in der Gedächtnis-Challenge', discoverSix: 'Entdecke die Namen der nächsten 6 Emojis', forcedReview: 'Drei Sets geschafft – probiere die Gedächtnis-Challenge', anotherTheme: 'Probiere ein anderes Thema oder sechs weitere Wörter' },
   rescue: { wrong: n => `Falsches Match! Noch ${n} ${n === 1 ? 'Versuch' : 'Versuche'}`, failed: 'Oh nein 😅 Challenge fehlgeschlagen', offerTitle: 'Fast geschafft! Du kannst es noch retten 💗', offerBody: n => `${n > 0 ? `Noch ${n} ${n === 1 ? 'Wort' : 'Wörter'}. ` : ''}Verbinde das angezeigte Emoji rechtzeitig, um zurückzukehren.`, save: 'Retten!', retryTitle: 'Rettung fehlgeschlagen 😵‍💫', retryBody: 'Versuche das Set erneut mit 8 Bonuszügen!', continueMoves: 'Weiter · +8 Züge' },
@@ -197,6 +203,7 @@ const ja: AppUiCopy = {
   mode: {
     moodDescription: '毎日1つのカラーテーマ · 最大3ボード',
     moodDailyLimitReached: '今日のカラーボード上限に達しました。また明日',
+    sayBlastNeedsWords: '最初の冒険セットを完了して6語学ぼう',
   },
   resultGoals: { reviewChoice: '復習を続けるか、新しい単語の冒険に戻りましょう', categoryUnlock: n => `あと${n}セット → 🧩 カテゴリーモード`, strengthen: '記憶チャレンジで今覚えた単語を強化しましょう', discoverSix: '次の6個の絵文字名を発見しましょう', forcedReview: '3セット完了 — 記憶チャレンジに挑戦しましょう', anotherTheme: '別のテーマまたは新しい6語に挑戦しましょう' },
   rescue: { wrong: n => `間違いです！残り${n}回`, failed: '残念 😅 チャレンジ失敗', offerTitle: 'あと少し！復活のチャンスです 💗', offerBody: n => `${n > 0 ? `残り${n}語です。` : ''}時間内に指定された絵文字をそろえると復活できます。`, save: '復活する！', retryTitle: '復活失敗 😵‍💫', retryBody: 'ボーナス8手でもう一度挑戦！', continueMoves: '続ける · +8手' },
@@ -213,6 +220,7 @@ const ko: AppUiCopy = {
   mode: {
     moodDescription: '매일 하나의 색상 테마 · 최대 3보드',
     moodDailyLimitReached: '오늘의 컬러 보드 한도에 도달했어요. 내일 다시 오세요',
+    sayBlastNeedsWords: '첫 모험 세트를 완료하고 단어 6개를 배워 보세요',
   },
   resultGoals: { reviewChoice: '복습을 계속하거나 새로운 단어 모험으로 돌아가세요', categoryUnlock: n => `${n}세트 더 완료 → 🧩 카테고리 모드`, strengthen: '기억력 도전에서 방금 배운 단어를 강화하세요', discoverSix: '다음 이모지 이름 6개를 발견하세요', forcedReview: '3세트 완료 — 기억력 도전에 도전하세요', anotherTheme: '다른 테마나 새로운 단어 6개에 도전하세요' },
   rescue: { wrong: n => `틀렸어요! 기회가 ${n}번 남았어요`, failed: '이런 😅 도전 실패', offerTitle: '아깝네요! 되살릴 기회가 있어요 💗', offerBody: n => `${n > 0 ? `${n}개 단어가 남았어요. ` : ''}시간이 끝나기 전에 제시된 이모지를 맞추면 부활할 수 있어요.`, save: '되살리기!', retryTitle: '부활 실패 😵‍💫', retryBody: '보너스 이동 8회로 세트에 다시 도전하세요!', continueMoves: '계속하기 · +8회' },

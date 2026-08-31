@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.matchingo.game',
-  appName: 'Matchingo',
+  appName: 'LingoMatch',
   webDir: 'dist',
   plugins: {
     StatusBar: {

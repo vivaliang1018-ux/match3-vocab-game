@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { assetUrl } from '../../lib/assetUrl';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
 import { MOTION_MODAL_CARD, MOTION_VIGNETTE } from '../../lib/motionChoreography';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
+import { useModalDialog } from './useModalDialog';
 
 export type AchievementId = 'sets' | 'day' | 'combo';
 
@@ -27,6 +29,7 @@ export function AchievementDetailSheet({
 }: AchievementDetailSheetProps) {
   const { t } = useI18n();
   const hapticOpenIdRef = useRef<AchievementId | null>(null);
+  const dialogRef = useModalDialog({ open: Boolean(achievement), onClose });
 
   useEffect(() => {
     if (!achievement) {
@@ -39,36 +42,40 @@ export function AchievementDetailSheet({
     triggerGameHaptic('achievementOpen');
   }, [achievement]);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {achievement && (
         <motion.div
+          ref={dialogRef}
           key={`achievement-${achievement.id}`}
           initial="hidden"
           animate="visible"
           exit="exit"
           variants={MOTION_VIGNETTE}
-          className="pointer-events-auto fixed inset-0 z-[200] flex flex-col bg-gradient-to-b from-sky-50 via-white to-rose-50"
+          className="candy-reward-screen"
           role="dialog"
           aria-modal="true"
           aria-label={achievement.label}
+          tabIndex={-1}
         >
-          <div className="flex items-center justify-between px-4 pb-2 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="candy-reward-header">
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-sky-800/70 transition hover:bg-sky-100"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-sky-800/70 transition hover:bg-sky-100"
               aria-label={t.common.close}
             >
               <X size={22} strokeWidth={2.5} />
             </button>
-            <div className="text-[11px] font-black uppercase tracking-wide text-sky-800/50">
+            <div className="candy-reward-kicker">
               {t.profile.recordsTitle}
             </div>
-            <div className="w-10" aria-hidden />
+            <div className="w-11" aria-hidden />
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 pb-4">
+          <div className="candy-reward-body">
             <motion.div
               variants={MOTION_MODAL_CARD}
               className="relative flex flex-col items-center"
@@ -91,7 +98,7 @@ export function AchievementDetailSheet({
             </motion.div>
           </div>
 
-          <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-2">
+          <div className="candy-reward-footer">
             <motion.button
               type="button"
               whileTap={MOTION_PRESS_TAP}
@@ -103,6 +110,7 @@ export function AchievementDetailSheet({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

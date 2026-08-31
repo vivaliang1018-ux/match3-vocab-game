@@ -24,6 +24,20 @@ import {
 } from '../lib/memoryCloudSync';
 import { THIINGS_100 } from '../data/thiings100';
 import { EMOJI_NOUN_CATEGORIES } from '../data/emojiNouns';
+import {
+  EMOJI_LEARNING_BROWSE_SECTIONS,
+  EMOJI_LEARNING_CATEGORIES,
+  EMOJI_LEARNING_ITEMS_BY_CATEGORY,
+  getEmojiLearningBrowseSection,
+} from '../lib/emojiLearningCategories';
+import {
+  categoryCycleEntry,
+  completeCategoryCycleBoard,
+  loadCategoryCycleProgress,
+  pickCategoryCycleItems,
+  saveCategoryCycleProgress,
+  type CategoryCycleProgress,
+} from '../lib/categoryCycleProgress';
 import { GamePanel } from './mobile/GamePanel';
 import { MobileTabBar } from './mobile/MobileTabBar';
 import { LearnedPanel } from './mobile/LearnedPanel';
@@ -84,6 +98,7 @@ import {
   createBalancedOpeningGrid,
   ensureTimedTargetPlayable,
   findBestHintMove,
+  findHintMoveForItem,
   hasSwapMatchForItem,
   pickSmartRefillItemId,
 } from '../lib/gridMatch';
@@ -948,10 +963,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const progressUserId = user?.uid ?? null;
   const progressUserIdRef = useRef<string | null>(progressUserId);
   progressUserIdRef.current = progressUserId;
-  const isFirstLearningAdventure = React.useCallback(
-    () => loadModeUnlocks(progressUserIdRef.current).adventureClears === 0,
-    [],
-  );
   const [firstTimeGuide, setFirstTimeGuide] = useState<FirstTimeGuideState>(() =>
     loadFirstTimeGuideState(progressUserId),
   );
@@ -988,6 +999,20 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     );
   }, [initialEntry, progressUserId, updateFirstTimeGuide]);
 
+  useEffect(() => {
+    if (initialEntry !== 'say-blast') return;
+    // The stamina-shortage route opens Say & Blast directly from Home. Keep
+    // that route in the same guide lifecycle as choosing it in the mode menu.
+    updateFirstTimeGuide((current) => ({
+      ...current,
+      hasVisitedSayAndBlast: true,
+      stage:
+        current.stage === 'sayAndBlast'
+          ? 'awaitingSayAndBlastCompletion'
+          : current.stage,
+    }));
+  }, [initialEntry, progressUserId, updateFirstTimeGuide]);
+
   const allPool = useMemo<WordItem[]>(() => {
     const emojiItems: WordItem[] = EMOJI_NOUN_CATEGORIES.flatMap((cat) =>
       cat.items.map((it) => ({
@@ -1005,20 +1030,47 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     return [...emojiItems, ...thiingsItems];
   }, []);
 
+  const [categoryCycleProgress, setCategoryCycleProgress] =
+    useState<CategoryCycleProgress>(() => loadCategoryCycleProgress(progressUserId));
+  const categoryCycleProgressRef = useRef(categoryCycleProgress);
+  categoryCycleProgressRef.current = categoryCycleProgress;
+
+  useEffect(() => {
+    const next = loadCategoryCycleProgress(progressUserId);
+    categoryCycleProgressRef.current = next;
+    setCategoryCycleProgress(next);
+  }, [progressUserId]);
+
   const categoryPools = useMemo(
     () =>
-      EMOJI_NOUN_CATEGORIES.map((cat) => ({
-        id: cat.id,
-        label: cat.label,
-        subtitle: cat.subtitle,
-        items: cat.items.map<WordItem>((it) => ({
-          id: `emoji-${cat.id}-${it.id}`,
-          word: it.word,
-          cn: it.cn,
-          emoji: it.emoji,
-        })),
-      })),
-    [],
+      EMOJI_LEARNING_CATEGORIES.map((category) => {
+        const learningItems =
+          EMOJI_LEARNING_ITEMS_BY_CATEGORY.get(category.id) ?? [];
+        const items = learningItems.map<WordItem>((entry) => ({
+          id: `emoji-${entry.sourceCategoryId}-${entry.item.id}`,
+          word: entry.item.word,
+          cn: entry.item.cn,
+          emoji: entry.item.emoji,
+        }));
+        const cycle = categoryCycleEntry(
+          categoryCycleProgress,
+          category.id,
+          items.map((item) => item.id),
+        );
+        return {
+          id: category.id,
+          label: locale === 'zh-CN' ? category.titleCn : category.title,
+          subtitle: category.title,
+          description:
+            locale === 'zh-CN' ? category.purposeCn : category.title,
+          emoji: category.emoji,
+          browseSectionId: getEmojiLearningBrowseSection(category.id).id,
+          cycle: cycle.cycle,
+          clearedInCycle: cycle.clearedItemIds.length,
+          items,
+        };
+      }),
+    [categoryCycleProgress, locale],
   );
   const [moodPaletteId, setMoodPaletteId] = useState<MoodPaletteId>(() =>
     moodPaletteForDay(),
@@ -1033,24 +1085,47 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     [allPool, moodPaletteId, t],
   );
   const thiingsPool = useMemo(
-    () =>
-      THIINGS_100.length
-        ? {
+    () => {
+      if (!THIINGS_100.length) return null;
+      const items = THIINGS_100.map<WordItem>((t) => ({
+        id: `thiings-${t.id}`,
+        word: t.word,
+        imgSrc: t.imgSrc,
+      }));
+      const cycle = categoryCycleEntry(
+        categoryCycleProgress,
+        'thiings',
+        items.map((item) => item.id),
+      );
+      return {
             id: 'thiings',
             label: 'Thiings',
             subtitle: 'Image Pack',
-            items: THIINGS_100.map<WordItem>((t) => ({
-              id: `thiings-${t.id}`,
-              word: t.word,
-              imgSrc: t.imgSrc,
-            })),
-          }
-        : null,
-    [],
+            description: 'Image Pack',
+            emoji: '🖼️',
+            browseSectionId: 'extras',
+            cycle: cycle.cycle,
+            clearedInCycle: cycle.clearedItemIds.length,
+            items,
+          };
+    },
+    [categoryCycleProgress],
   );
   const challengePools = useMemo(
     () => (thiingsPool ? [...categoryPools, thiingsPool] : categoryPools),
     [categoryPools, thiingsPool],
+  );
+  const categoryBrowseSections = useMemo(
+    () => [
+      ...EMOJI_LEARNING_BROWSE_SECTIONS.map((section) => ({
+        id: section.id,
+        label: locale === 'zh-CN' ? section.titleCn : section.title,
+      })),
+      ...(thiingsPool
+        ? [{ id: 'extras', label: locale === 'zh-CN' ? '更多内容' : 'More' }]
+        : []),
+    ],
+    [locale, thiingsPool],
   );
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>(() => {
     if (initialEntry === 'review') return 'review';
@@ -1059,8 +1134,10 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     }
     return 'random';
   });
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
-    categoryPools[0]?.id ?? 'smileys-emotion',
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(() =>
+    categoryPools.some((pool) => pool.id === 'tools-and-home-items')
+      ? 'tools-and-home-items'
+      : categoryPools[0]?.id ?? 'emotional-expression',
   );
   const activeCategory = useMemo(
     () => challengePools.find((c) => c.id === selectedCategoryId) ?? challengePools[0],
@@ -1180,6 +1257,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const staminaGateResumeRef = useRef<StaminaGateResume | null>(null);
   const [reviewPaused, setReviewPaused] = useState(false);
   const [modePickerOpen, setModePickerOpen] = useState(false);
+  const [categoryHubRequestKey, setCategoryHubRequestKey] = useState(0);
   const [staminaState, setStaminaState] = useState<StaminaState>(() => loadStaminaState());
   const staminaStateRef = useRef(staminaState);
   staminaStateRef.current = staminaState;
@@ -1249,6 +1327,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       setModeUnlocks(merged.modeUnlocks);
       playerSummaryRef.current = merged.playerSummary;
       setPlayerSummary(merged.playerSummary);
+      categoryCycleProgressRef.current = merged.categoryCycles;
+      setCategoryCycleProgress(merged.categoryCycles);
       setCoreCloudReadyUid(progressUserId);
     });
     return () => {
@@ -1262,8 +1342,16 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       learnedIds: roundLearnedIds,
       modeUnlocks,
       playerSummary,
+      categoryCycles: categoryCycleProgress,
     });
-  }, [coreCloudReadyUid, modeUnlocks, playerSummary, progressUserId, roundLearnedIds]);
+  }, [
+    categoryCycleProgress,
+    coreCloudReadyUid,
+    modeUnlocks,
+    playerSummary,
+    progressUserId,
+    roundLearnedIds,
+  ]);
 
   const funTargetItem = useMemo(() => {
     const timedHunt = reviveActive || challengeMode === 'review';
@@ -1394,7 +1482,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const [promptSignInOpen, setPromptSignInOpen] = useState(false);
   const [promptSignInMode, setPromptSignInMode] = useState<'signIn' | 'signUp'>('signIn');
   const [accountSaveConfirmation, setAccountSaveConfirmation] = useState(false);
-  const accountOverlayOpen = accountPromptKind !== null || promptSignInOpen;
+  const accountOverlayOpen =
+    accountPromptKind !== null || promptSignInOpen;
   const promptAuthStartedRef = useRef(false);
   const ttsUnlockRef = useRef(false);
 
@@ -1698,21 +1787,34 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return;
     }
     if (firstSwapTutorialResolvingRef.current) return;
-    const fixedMove = reviewTutorialActive
+    const fixedMove = reviewTutorialActive && !reviveActive
       ? REVIEW_TUTORIAL_MOVE
       : fixedMatchTutorialStage
       ? FIXED_MATCH_TUTORIAL_MOVES[fixedMatchTutorialStage]
       : null;
-    const fallbackMove = fixedMove ? null : findHintMove(grid);
+    const timedTutorialMove =
+      reviewTutorialActive && reviveActive && funTargetId
+        ? findHintMoveForItem(grid, funTargetId)
+        : null;
+    const fallbackMove = fixedMove || timedTutorialMove ? null : findHintMove(grid);
     setFirstSwapTutorialMove(fixedMove ?? (fallbackMove
       ? { source: fallbackMove.a, target: fallbackMove.b }
-      : null));
+      : timedTutorialMove
+        ? { source: timedTutorialMove.a, target: timedTutorialMove.b }
+        : null));
     setHintMove(null);
     if (hintTimerRef.current) {
       window.clearTimeout(hintTimerRef.current);
       hintTimerRef.current = null;
     }
-  }, [firstSwapTutorialEligible, fixedMatchTutorialStage, grid, reviewTutorialActive]);
+  }, [
+    firstSwapTutorialEligible,
+    fixedMatchTutorialStage,
+    funTargetId,
+    grid,
+    reviewTutorialActive,
+    reviveActive,
+  ]);
 
   useEffect(() => {
     if (
@@ -1755,15 +1857,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         tabScrollTopsRef.current[activeTab] = scrollContainerRef.current.scrollTop;
       }
       if (tab === 'learned') {
-        updateFirstTimeGuide((current) =>
-          current.stage === 'learned'
-            ? { ...current, stage: 'completed' }
-            : current,
-        );
+        // The Learned page owns this guide step. It advances only after the
+        // player completes or skips the page tour, not merely on tab entry.
       }
       setActiveTab(tab);
     },
-    [activeTab, updateFirstTimeGuide],
+    [activeTab],
   );
 
   useLayoutEffect(() => {
@@ -1952,7 +2051,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     updateFirstTimeGuide((current) => ({
       ...current,
       hasSeenStaminaShortage: true,
-      stage: current.stage === 'moodBoard' ? current.stage : 'sayAndBlast',
+      stage:
+        current.stage === 'moodBoard' || current.stage === 'completed'
+          ? current.stage
+          : current.hasVisitedSayAndBlast
+            ? 'moodBoard'
+            : 'sayAndBlast',
     }));
     adventureStaminaOwedRef.current = false;
     adventureRoundFreeRef.current = false;
@@ -1976,10 +2080,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   /** Spend stamina on first move of an adventure board; false → dead-machined. */
   const chargeAdventureStaminaIfNeeded = React.useCallback((): boolean => {
     if (challengeModeRef.current !== 'random' || reviveActiveRef.current) return true;
-    if (isFirstLearningAdventure()) {
-      adventureStaminaOwedRef.current = false;
-      return true;
-    }
     if (!adventureStaminaOwedRef.current) return true;
     if (!applySpendStamina(1)) {
       lockAdventureDead();
@@ -1987,7 +2087,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     }
     adventureStaminaOwedRef.current = false;
     return true;
-  }, [applySpendStamina, isFirstLearningAdventure, lockAdventureDead]);
+  }, [applySpendStamina, lockAdventureDead]);
 
   /** Arm timed target hunt (revive challenge or review mode). */
   const armTimedTarget = React.useCallback(
@@ -2042,7 +2142,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const retryAdventureBoard = React.useCallback(
     (items: WordItem[], free: boolean) => {
       if (challengeMode === 'random') {
-        if (free || isFirstLearningAdventure()) {
+        if (free) {
           adventureStaminaOwedRef.current = false;
           clearStaminaHudHold();
         } else if (tickStamina(staminaStateRef.current).value <= 0) {
@@ -2087,7 +2187,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       clearStaminaHudHold,
       holdStaminaHudForBoard,
       resetRescueLifecycle,
-      isFirstLearningAdventure,
       lockAdventureDead,
       level,
     ],
@@ -2187,6 +2286,9 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     reviveWrongsRef.current = 0;
     reviveCorrectsRef.current = 0;
     reviveWordHitsRef.current = {};
+    setReviewTutorialActive(
+      !firstTimeGuideRef.current.hasCompletedReviewTutorial,
+    );
     setHintMove(null);
     if (hintTimerRef.current) {
       window.clearTimeout(hintTimerRef.current);
@@ -2383,7 +2485,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
               : activeCategory?.items ?? [];
 
       if (targetMode === 'random') {
-        const free = adventureRoundFreeRef.current || isFirstLearningAdventure();
+        const free = adventureRoundFreeRef.current;
         adventureRoundFreeRef.current = false;
         if (free) {
           adventureStaminaOwedRef.current = false;
@@ -2415,6 +2517,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
               new Set(roundLearnedIdsRef.current),
               excludeIds,
             )
+          : targetMode === 'category'
+            ? pickCategoryCycleItems(
+                targetPool,
+                ADVENTURE_WORDS_PER_SET,
+                categoryCycleEntry(
+                  categoryCycleProgressRef.current,
+                  selectedCategoryId,
+                  targetPool.map((item) => item.id),
+                ),
+                excludeIds,
+              )
           : pickChallengeItems(targetPool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
               strategy: targetMode === 'review' ? 'memory' : 'random',
               ...(excludeIds && excludeIds.size > 0 ? { excludeIds } : {}),
@@ -2479,12 +2592,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       clearStaminaHudHold,
       holdStaminaHudForBoard,
       lockAdventureDead,
-      isFirstLearningAdventure,
       level,
       moodPaletteId,
       reviewPool,
       clearReviveState,
       resetRescueLifecycle,
+      selectedCategoryId,
     ],
   );
 
@@ -2738,7 +2851,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       if (refreshedStamina !== staminaStateRef.current) {
         persistStamina(refreshedStamina);
       }
-      if (!isFirstLearningAdventure() && refreshedStamina.value <= 0) {
+      if (refreshedStamina.value <= 0) {
         staminaGateResumeRef.current = {
           hitCount: {},
           advanceLevel: false,
@@ -2794,7 +2907,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       }
       if (savedAdventure) clearAdventureSnapshot();
       // Adventure: no stamina → dead machine, never open a free board.
-      if (!isFirstLearningAdventure() && tickStamina(staminaStateRef.current).value <= 0) {
+      if (tickStamina(staminaStateRef.current).value <= 0) {
         staminaGateResumeRef.current = {
           hitCount: {},
           advanceLevel: false,
@@ -2829,7 +2942,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       allPool,
       clearAdventureSnapshot,
       lockAdventureDead,
-      isFirstLearningAdventure,
       startNextRound,
       modeUnlocks.pendingForcedReview,
       moodPaletteId,
@@ -2876,6 +2988,9 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     reviewRoundBoardMistakeIdsRef.current = new Set();
 
     if (forcedReviewActiveRef.current || challengeMode === 'review') {
+      const completedMandatoryReview =
+        (forcedReviewActiveRef.current || modeUnlocks.pendingForcedReview) &&
+        modeUnlocks.adventureClears >= 3;
       const summaryContext: SummaryContext = {
           adventureClears: modeUnlocks.adventureClears,
           masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
@@ -2901,6 +3016,13 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       setChallengeMode('review');
       setForcedReviewActive(false);
       forcedReviewActiveRef.current = false;
+      if (completedMandatoryReview) {
+        updateFirstTimeGuide((current) =>
+          current.hasCompletedLearnedTour
+            ? current
+            : { ...current, stage: 'learned' },
+        );
+      }
       setRoundResult({
         kind: 'review',
         items: quizItemsSnapshot,
@@ -2929,14 +3051,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       let nextUnlocks: ModeUnlockState = { ...prevUnlocks, adventureClears };
       saveModeUnlocks(nextUnlocks, progressUserIdRef.current);
       setModeUnlocks(nextUnlocks);
-      if (prevUnlocks.adventureClears === 0 && adventureClears === 1) {
-        updateFirstTimeGuide((current) =>
-          current.stage === 'none'
-            ? { ...current, stage: 'learned' }
-            : current,
-        );
-      }
-
       const previousContext: SummaryContext = {
         adventureClears: prevUnlocks.adventureClears,
         masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
@@ -2988,15 +3102,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         shouldForceReviewAfterClear(adventureClears) &&
         isReviewUnlocked(adventureClears) &&
         reviewPool.length >= ADVENTURE_WORDS_PER_SET;
-      const nextGoal = adventureClears === 2
+      const nextGoal = adventureClears < 3
         ? ''
-        : adventureClears < 3
-          ? ''
-        : adventureClears < 5
-          ? ui.resultGoals.categoryUnlock(5 - adventureClears)
-          : forcedReviewNext
-            ? ui.resultGoals.strengthen
-            : ui.resultGoals.discoverSix;
+        : forcedReviewNext
+          ? ui.resultGoals.strengthen
+          : ui.resultGoals.discoverSix;
       setRoundResult({
         kind: 'learned',
         items: quizItemsSnapshot,
@@ -3018,6 +3128,23 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     }
 
     if (challengeMode === 'category' || challengeMode === 'mood') {
+      const categoryCompletion =
+        challengeMode === 'category' && activeCategory
+          ? completeCategoryCycleBoard(
+              categoryCycleProgressRef.current,
+              selectedCategoryId,
+              activeCategory.items.map((item) => item.id),
+              quizItemsSnapshot.map((item) => item.id),
+            )
+          : null;
+      if (categoryCompletion) {
+        categoryCycleProgressRef.current = categoryCompletion.progress;
+        setCategoryCycleProgress(categoryCompletion.progress);
+        saveCategoryCycleProgress(
+          categoryCompletion.progress,
+          progressUserIdRef.current,
+        );
+      }
       const summaryContext: SummaryContext = {
           adventureClears: modeUnlocks.adventureClears,
           masteredCount: masteredEmojiCount(wordMemoryRef.current, allPool),
@@ -3046,6 +3173,16 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         unlocks: [],
         awardIds: newlyClaimableAwardIds(summaryContext, previousSummary, summaryContext, nextSummary),
         perfectQuiz: mistakenItemIds.length === 0,
+        categoryProgress: categoryCompletion
+          ? {
+              title: activeCategory?.label ?? t.modes.category,
+              previousCycle: categoryCompletion.completion.previousCycle,
+              cycle: categoryCompletion.completion.cycle,
+              completedCycle: categoryCompletion.completion.completedCycle,
+              clearedInCycle: categoryCompletion.completion.clearedInCycle,
+              total: categoryCompletion.completion.total,
+            }
+          : undefined,
         nextGoal: moodExhausted
           ? ui.mode.moodDailyLimitReached
           : ui.resultGoals.anotherTheme,
@@ -3067,6 +3204,9 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     updateFirstTimeGuide,
     ui,
     authConfigured,
+    activeCategory,
+    selectedCategoryId,
+    t.modes.category,
   ]);
 
   // Review boards resolve directly into their result. Adventure/category/mood
@@ -3086,13 +3226,26 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       if (destination) setActiveTab(destination);
     };
     setRoundResult(null);
-  }, [beginForcedReview, finishQuizAndAdvance, onHome, roundResult]);
+  }, [
+    beginForcedReview,
+    finishQuizAndAdvance,
+    onHome,
+    roundResult,
+  ]);
 
   const handleRoundResultExitComplete = React.useCallback(() => {
     const continueAfterExit = roundResultExitContinuationRef.current;
     roundResultExitContinuationRef.current = null;
     continueAfterExit?.();
   }, []);
+
+  const returnToCategoryHub = React.useCallback(() => {
+    if (!roundResult?.categoryProgress) return;
+    roundResultExitContinuationRef.current = () => {
+      setCategoryHubRequestKey((key) => key + 1);
+    };
+    setRoundResult(null);
+  }, [roundResult]);
 
   const handleClaimRoundAward = React.useCallback((awardId: AwardTrackId) => {
     const summary = playerSummaryRef.current;
@@ -3272,10 +3425,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return;
     }
     if (challengeMode === 'random') {
-      if (isFirstLearningAdventure()) {
-        adventureStaminaOwedRef.current = false;
-        clearStaminaHudHold();
-      } else if (tickStamina(staminaStateRef.current).value <= 0) {
+      if (tickStamina(staminaStateRef.current).value <= 0) {
         lockAdventureDead();
         return;
       } else {
@@ -3305,6 +3455,16 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             ADVENTURE_WORDS_PER_SET,
             new Set(roundLearnedIdsRef.current),
           )
+        : challengeMode === 'category'
+          ? pickCategoryCycleItems(
+              pool,
+              ADVENTURE_WORDS_PER_SET,
+              categoryCycleEntry(
+                categoryCycleProgressRef.current,
+                selectedCategoryId,
+                pool.map((item) => item.id),
+              ),
+            )
         : pickChallengeItems(pool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
             strategy: challengeMode === 'review' ? 'memory' : 'random',
           });
@@ -3381,7 +3541,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     holdStaminaHudForBoard,
     resetRescueLifecycle,
     lockAdventureDead,
-    isFirstLearningAdventure,
+    selectedCategoryId,
   ]);
 
   useEffect(() => {
@@ -3412,11 +3572,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   }, []);
 
   useEffect(() => {
-    if (challengeMode !== 'review') {
+    if (challengeMode !== 'review' && !reviveActive) {
       setReviewPaused(false);
       setReviewTutorialActive(false);
     }
-  }, [challengeMode]);
+  }, [challengeMode, reviveActive]);
 
   // Timed-hunt countdown pauses whenever gameplay is covered or temporarily locked.
   const timedHuntActive =
@@ -3443,6 +3603,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     failSheetOpen ||
     reviveFlash !== null ||
     accountOverlayOpen ||
+    sayBlastOpen ||
     reviewTutorialActive ||
     modePickerOpen ||
     (challengeMode === 'review' && reviewPaused);
@@ -3467,6 +3628,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     if (!timedTargetPlayable) return;
     if (challengeMode === 'review' && reviewPaused) return;
     if (accountOverlayOpen) return;
+    if (sayBlastOpen) return;
     if (modePickerOpen) return;
     if (reviveFlash !== null) return;
     const item = itemById.get(funTargetId);
@@ -3490,6 +3652,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     refillActive,
     reviewPaused,
     reviveFlash,
+    sayBlastOpen,
     timedHuntActive,
     timedTargetPlayable,
   ]);
@@ -4265,6 +4428,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     failSheetOpen ||
     deadMachineOpen ||
     sayBlastOpen ||
+    promptSignInOpen ||
     forcedReviewActive ||
     modeUnlocks.pendingForcedReview;
 
@@ -4367,11 +4531,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const openSayBlast = React.useCallback((entry: 'game' | 'stamina-gate' = 'game') => {
     setSayBlastEntry(entry);
-    updateFirstTimeGuide((current) =>
-      current.stage === 'sayAndBlast'
-        ? { ...current, stage: 'awaitingSayAndBlastCompletion' }
-        : current,
-    );
+    updateFirstTimeGuide((current) => ({
+      ...current,
+      hasVisitedSayAndBlast: true,
+      stage:
+        current.stage === 'sayAndBlast'
+          ? 'awaitingSayAndBlastCompletion'
+          : current.stage,
+    }));
+    stopAllWordSpeech();
     onBgmPauseChange(true);
     setSayBlastOpen(true);
   }, [onBgmPauseChange, updateFirstTimeGuide]);
@@ -4420,17 +4588,26 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     reviveFlash === null &&
     !firstSwapTutorialEligible &&
     !firstSwapTutorialResolving;
-  const modeFeatureGuideTarget =
+  const modeFeatureGuideEligible =
     activeTab === 'game' &&
     !consentOpen &&
     !sayBlastOpen &&
     !quizOpen &&
     !roundCelebrate &&
     roundResult === null &&
-    (firstTimeGuide.stage === 'sayAndBlast' ||
-      firstTimeGuide.stage === 'moodBoard')
-      ? firstTimeGuide.stage
-      : null;
+    !forcedReviewActive &&
+    !modeUnlocks.pendingForcedReview &&
+    firstTimeGuide.stage !== 'learned';
+  const modeFeatureGuideTarget =
+    modeFeatureGuideEligible && categoryUnlocked &&
+    (firstTimeGuide.promptCounts.categoryModePicker < 2 ||
+      firstTimeGuide.promptCounts.category < 2)
+      ? 'category'
+      : modeFeatureGuideEligible &&
+          ((!firstTimeGuide.hasVisitedSayAndBlast && firstTimeGuide.stage === 'sayAndBlast') ||
+            (firstTimeGuide.stage === 'moodBoard' && modeUnlocks.adventureClears >= 3))
+        ? firstTimeGuide.stage
+        : null;
 
   return (
     <div
@@ -4527,15 +4704,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             onChallengeModeChange={handleChallengeModeChange}
             onOpenSayBlast={() => openSayBlast('game')}
             challengePools={challengePools}
+            categoryBrowseSections={categoryBrowseSections}
             selectedCategoryId={selectedCategoryId}
             onCategoryChange={setSelectedCategoryId}
+            categoryHubRequestKey={categoryHubRequestKey}
             onShuffleWords={() =>
               startNextRound(itemHitCount, new Set(gameItems.map((it) => it.id)))
             }
             categoryUnlocked={categoryUnlocked}
             moodUnlocked={modeUnlocks.adventureClears >= 3}
             moodCanStartNew={canPlayMoodToday()}
-            sayBlastUnlocked={firstTimeGuide.hasSeenStaminaShortage}
+            sayBlastReady={sayBlastPool.length >= ADVENTURE_WORDS_PER_SET}
             firstSwapTutorialMove={
               firstSwapTutorialEligible && !firstSwapTutorialResolving
                 ? firstSwapTutorialMove
@@ -4552,6 +4731,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
                 ? firstTimeGuide.promptCounts.sayAndBlastModePicker
                 : modeFeatureGuideTarget === 'moodBoard'
                   ? firstTimeGuide.promptCounts.moodBoardModePicker
+                  : modeFeatureGuideTarget === 'category'
+                    ? firstTimeGuide.promptCounts.categoryModePicker
                   : 0
             }
             featureGuidePlayCount={
@@ -4574,6 +4755,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
               dueReviewCount > 0
             }
             onGoReview={handleGoReview}
+            showFirstVisitGuide={
+              firstTimeGuide.stage === 'learned' &&
+              !firstTimeGuide.hasCompletedLearnedTour
+            }
+            onFirstVisitGuideComplete={() => {
+              updateFirstTimeGuide((current) => ({
+                ...current,
+                hasCompletedLearnedTour: true,
+                stage: current.hasVisitedSayAndBlast ? 'moodBoard' : 'sayAndBlast',
+              }));
+            }}
           />
         )}
         {activeTab === 'words' && (
@@ -4699,6 +4891,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         result={roundResult}
         onExitComplete={handleRoundResultExitComplete}
         onContinue={() => completeRoundResult(null)}
+        onReturnToCategory={returnToCategoryHub}
         onViewCollection={() => completeRoundResult('words')}
         canContinueReview={
           reviewPool.length >= ADVENTURE_WORDS_PER_SET && dueReviewCount > 0
@@ -4711,7 +4904,10 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       />
 
       <AccountPromptSheet
-        open={accountPromptKind !== null}
+        open={
+          accountPromptKind !== null &&
+          !promptSignInOpen
+        }
         kind={accountPromptKind ?? 'soft'}
         discoveredCount={roundLearnedIds.length}
         onCreateAccount={() => openPromptAuth('signUp')}

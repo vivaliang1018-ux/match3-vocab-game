@@ -1,21 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import {
   MOTION_SHEET_PANEL,
   MOTION_STAGGER_CONTAINER,
   MOTION_STAGGER_ITEM,
-  MOTION_STAGGER_TIGHT_CONTAINER,
-  MOTION_STAGGER_TIGHT_ITEM,
   MOTION_VIGNETTE,
 } from '../../lib/motionChoreography';
 import { RefreshCw, X } from 'lucide-react';
-import { categoryDisplayName, useI18n } from '../../i18n';
+import { useI18n } from '../../i18n';
 import type { ChallengeMode } from '../../types/game';
 import { cn } from '../../lib/utils';
 import type { FeatureGuideTarget } from '../../lib/firstTimeGuide';
 import { GuidedTapHint } from './GuidedTapHint';
 import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
+import { useModalDialog } from './useModalDialog';
 
 const MODE_EMOJI: Record<Exclude<ChallengeMode, 'review'>, string> = {
   random: '🏁',
@@ -24,20 +23,12 @@ const MODE_EMOJI: Record<Exclude<ChallengeMode, 'review'>, string> = {
 };
 const SAY_BLAST_MODE_ID = 'say-blast' as const;
 
-type ChallengePool = {
-  id: string;
-  label: string;
-  subtitle: string;
-};
-
 type ModePickerSheetProps = {
   open: boolean;
   onClose: () => void;
   challengeMode: ChallengeMode;
   onChallengeModeChange: (mode: ChallengeMode) => void;
-  challengePools: ChallengePool[];
-  selectedCategoryId: string;
-  onCategoryChange: (id: string) => void;
+  onOpenCategoryHub: () => void;
   onShuffleWords: () => void;
   onRestart: () => void;
   canPlay: boolean;
@@ -45,12 +36,13 @@ type ModePickerSheetProps = {
   moodUnlocked: boolean;
   /** False when today's Mood Board play limit is reached. */
   moodCanStartNew?: boolean;
-  sayBlastUnlocked: boolean;
+  /** Visible from the start; playable after the first six words are learned. */
+  sayBlastReady: boolean;
   onOpenSayBlast: () => void;
-  guideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard'> | null;
+  guideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard' | 'category'> | null;
   guidePlayCount?: number;
   onGuidePlaybackStart?: (
-    target: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard'>,
+    target: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard' | 'category'>,
   ) => void;
 };
 
@@ -59,25 +51,24 @@ export function ModePickerSheet({
   onClose,
   challengeMode,
   onChallengeModeChange,
-  challengePools,
-  selectedCategoryId,
-  onCategoryChange,
+  onOpenCategoryHub,
   onShuffleWords,
   onRestart,
   canPlay,
   categoryUnlocked,
   moodUnlocked,
   moodCanStartNew = true,
-  sayBlastUnlocked,
+  sayBlastReady,
   onOpenSayBlast,
   guideTarget = null,
   guidePlayCount = 0,
   onGuidePlaybackStart,
 }: ModePickerSheetProps) {
-  const { locale, t, ui } = useI18n();
-  const [pulseCategoryId, setPulseCategoryId] = useState<string | null>(null);
+  const { t, ui } = useI18n();
+  const dialogRef = useModalDialog({ open, onClose });
   const sayBlastButtonRef = useRef<HTMLButtonElement | null>(null);
   const moodBoardButtonRef = useRef<HTMLButtonElement | null>(null);
+  const categoryButtonRef = useRef<HTMLButtonElement | null>(null);
   const guidePlaying = useLimitedGuidePrompt({
     eligible: open && guideTarget !== null,
     persistedPlayCount: guidePlayCount,
@@ -85,8 +76,11 @@ export function ModePickerSheet({
       if (guideTarget) onGuidePlaybackStart?.(guideTarget);
     },
   });
-  const guideButtonRef =
-    guideTarget === 'sayAndBlast' ? sayBlastButtonRef : moodBoardButtonRef;
+  const guideButtonRef = guideTarget === 'sayAndBlast'
+    ? sayBlastButtonRef
+    : guideTarget === 'moodBoard'
+      ? moodBoardButtonRef
+      : categoryButtonRef;
   const canShuffleWords =
     canPlay && !(challengeMode === 'mood' && !moodCanStartNew);
 
@@ -107,47 +101,38 @@ export function ModePickerSheet({
         : ui.mode.moodDailyLimitReached,
       disabled: !moodCanStartNew && challengeMode !== 'mood',
     } as const] : []),
-    ...(sayBlastUnlocked ? [{
+    {
       id: SAY_BLAST_MODE_ID,
       label: t.modes.sayBlast,
       emoji: '🎤',
-      description: `${t.modes.sayBlastDesc} · 3★ +1 ❤️`,
-    } as const] : []),
+      description: sayBlastReady
+        ? `${t.modes.sayBlastDesc} · 3★ +1 ❤️`
+        : ui.mode.sayBlastNeedsWords,
+      disabled: !sayBlastReady,
+    },
     ...(categoryUnlocked
-      ? [{ id: 'category' as const, label: t.modes.category, emoji: MODE_EMOJI.category, description: t.modes.categoryDesc }]
+      ? [{
+          id: 'category' as const,
+          label: t.modes.category,
+          emoji: MODE_EMOJI.category,
+          description: t.modes.categoryDesc,
+        }]
       : []),
   ];
 
-  useEffect(() => {
-    if (!open) setPulseCategoryId(null);
-  }, [open]);
-
   const pickMode = (mode: ChallengeMode | typeof SAY_BLAST_MODE_ID) => {
     if (mode === SAY_BLAST_MODE_ID) {
-      setPulseCategoryId(null);
       onClose();
       onOpenSayBlast();
       return;
     }
     if (mode === 'mood' && !moodCanStartNew && challengeMode !== 'mood') return;
-    onChallengeModeChange(mode);
-    if (mode !== 'category') {
-      setPulseCategoryId(null);
+    if (mode === 'category') {
       onClose();
+      onOpenCategoryHub();
       return;
     }
-    const hintId =
-      challengePools.find((c) => c.id === selectedCategoryId)?.id ??
-      challengePools[0]?.id ??
-      null;
-    setPulseCategoryId(hintId);
-  };
-
-  const pickCategory = (id: string) => {
-    if (!categoryUnlocked) return;
-    setPulseCategoryId(null);
-    onCategoryChange(id);
-    onChallengeModeChange('category');
+    onChallengeModeChange(mode);
     onClose();
   };
 
@@ -166,6 +151,7 @@ export function ModePickerSheet({
       <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key="mode-picker"
           initial="hidden"
           animate="visible"
@@ -175,6 +161,7 @@ export function ModePickerSheet({
           role="dialog"
           aria-modal="true"
           aria-label={t.modes.pickerTitle}
+          tabIndex={-1}
           onClick={onClose}
         >
           <motion.div className="candy-sheet-backdrop" aria-hidden />
@@ -227,6 +214,8 @@ export function ModePickerSheet({
                           ? sayBlastButtonRef
                           : opt.id === 'mood'
                             ? moodBoardButtonRef
+                            : opt.id === 'category'
+                              ? categoryButtonRef
                             : undefined
                       }
                       type="button"
@@ -240,7 +229,8 @@ export function ModePickerSheet({
                         disabled && 'opacity-45',
                         guidePlaying &&
                           ((guideTarget === 'sayAndBlast' && opt.id === SAY_BLAST_MODE_ID) ||
-                            (guideTarget === 'moodBoard' && opt.id === 'mood')) &&
+                            (guideTarget === 'moodBoard' && opt.id === 'mood') ||
+                            (guideTarget === 'category' && opt.id === 'category')) &&
                           'first-time-guide-target-pulse',
                       )}
                       aria-label={opt.label}
@@ -255,52 +245,13 @@ export function ModePickerSheet({
                         {opt.emoji}
                       </span>
                       <div className="candy-sheet-mode-label">{opt.label}</div>
-                      <div className="mt-1 max-w-[13rem] text-[10px] font-bold leading-snug text-sky-800/70">
+                      <div className="mt-1 max-w-[13rem] text-xs font-bold leading-snug text-sky-800/70">
                         {opt.description}
                       </div>
                     </motion.button>
                   );
                 })}
               </motion.div>
-
-              {categoryUnlocked && (
-                <motion.div
-                  className="mt-3"
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.28, type: 'spring', stiffness: 340, damping: 28 }}
-                >
-                  <div className="candy-sheet-section-label">{t.modes.categoryThemes}</div>
-                  <motion.div
-                    className="candy-sheet-category-grid no-scrollbar"
-                    variants={MOTION_STAGGER_TIGHT_CONTAINER}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    {challengePools.map((cat) => {
-                      const selected =
-                        selectedCategoryId === cat.id && challengeMode === 'category';
-                      const pulsing = pulseCategoryId === cat.id;
-                      return (
-                        <motion.button
-                          key={cat.id}
-                          type="button"
-                          variants={MOTION_STAGGER_TIGHT_ITEM}
-                          whileTap={MOTION_PRESS_TAP}
-                          onClick={() => pickCategory(cat.id)}
-                          className={cn(
-                            'candy-sheet-category-btn',
-                            selected && 'candy-sheet-category-btn-active',
-                            pulsing && 'candy-sheet-category-btn-pulse',
-                          )}
-                        >
-                          {categoryDisplayName(cat, locale)}
-                        </motion.button>
-                      );
-                    })}
-                  </motion.div>
-                </motion.div>
-              )}
 
               <motion.div
                 className="mt-3 grid grid-cols-2 gap-2"

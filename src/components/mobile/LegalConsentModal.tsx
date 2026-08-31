@@ -5,6 +5,7 @@ import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { useI18n } from '../../i18n';
 import { assetUrl } from '../../lib/assetUrl';
 import { LegalDocSheet } from './LegalDocSheet';
+import { useModalDialog } from './useModalDialog';
 
 type LegalConsentModalProps = {
   open: boolean;
@@ -16,6 +17,10 @@ type DocKind = 'terms' | 'privacy';
 export function LegalConsentModal({ open, onAccept }: LegalConsentModalProps) {
   const { t } = useI18n();
   const [doc, setDoc] = useState<DocKind | null>(null);
+  const dialogRef = useModalDialog({
+    open: open && doc === null,
+    closeOnEscape: false,
+  });
 
   const termsHref = assetUrl('terms.html');
   const privacyHref = assetUrl('privacy.html');
@@ -31,17 +36,20 @@ export function LegalConsentModal({ open, onAccept }: LegalConsentModalProps) {
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key="legal-consent-modal"
           initial="hidden"
           animate="visible"
           exit="exit"
           variants={MOTION_VIGNETTE}
           className="fixed inset-0 z-[130] flex items-center justify-center px-6"
-          role="dialog"
-          aria-modal="true"
+          role={doc ? undefined : 'dialog'}
+          aria-modal={doc ? undefined : 'true'}
+          aria-hidden={doc ? true : undefined}
           aria-label={t.consent.dialogAria}
           aria-labelledby="legal-consent-title"
           aria-describedby="legal-consent-body"
+          tabIndex={doc ? undefined : -1}
         >
           <motion.div className="absolute inset-0 bg-black/50" aria-hidden />
           <motion.div

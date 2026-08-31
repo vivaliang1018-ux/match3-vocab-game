@@ -18,6 +18,11 @@ import { HudPlaque, HudStatNumber } from './HudPlaque';
 import { WordLinkChain } from './WordLinkChain';
 import { TimedTargetBanner } from './FunTargetBanner';
 import { ModePickerSheet } from './ModePickerSheet';
+import {
+  CategoryHubSheet,
+  type CategoryBrowseSection,
+  type CategoryChallengePool,
+} from './CategoryHubSheet';
 import { StepsHud } from './ScoreHud';
 import type { Cell, ChallengeMode, Tile, WordItem } from '../../types/game';
 import type { RefillBurst } from '../../lib/boardRefill';
@@ -26,6 +31,7 @@ import { STAMINA_MAX } from '../../lib/stamina';
 import type { FeatureGuideTarget } from '../../lib/firstTimeGuide';
 import { GuidedTapHint } from './GuidedTapHint';
 import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
+import { useModalDialog } from './useModalDialog';
 
 const GRID_SIZE = 7;
 const SWIPE_THRESHOLD_PX = 16;
@@ -338,12 +344,6 @@ function previewTutorialMatchCellKeys(
   return keys;
 }
 
-type ChallengePool = {
-  id: string;
-  label: string;
-  subtitle: string;
-};
-
 export type WordLinkPayload = {
   itemId: string;
   originCell: Cell;
@@ -404,14 +404,16 @@ type GamePanelProps = {
   onSwapCells: (from: Cell, to: Cell) => void;
   onChallengeModeChange: (mode: ChallengeMode) => void;
   onOpenSayBlast: () => void;
-  challengePools: ChallengePool[];
+  challengePools: CategoryChallengePool[];
+  categoryBrowseSections: CategoryBrowseSection[];
   selectedCategoryId: string;
   onCategoryChange: (id: string) => void;
+  categoryHubRequestKey?: number;
   onShuffleWords: () => void;
   categoryUnlocked: boolean;
   moodUnlocked: boolean;
   moodCanStartNew?: boolean;
-  sayBlastUnlocked: boolean;
+  sayBlastReady: boolean;
   boardIntroActive?: boolean;
   onBoardIntroComplete?: () => void;
   refillBurst?: RefillBurst | null;
@@ -420,7 +422,7 @@ type GamePanelProps = {
   freeMoveRuleHintMove?: { source: Cell; target: Cell } | null;
   fixedMatchTutorialStage?: 'three' | 'four' | 'cross' | null;
   reviewTutorialActive?: boolean;
-  featureGuideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard'> | null;
+  featureGuideTarget?: Extract<FeatureGuideTarget, 'sayAndBlast' | 'moodBoard' | 'category'> | null;
   featureGuideModePickerPlayCount?: number;
   featureGuidePlayCount?: number;
   onFeatureGuidePlaybackStart?: (target: FeatureGuideTarget) => void;
@@ -532,13 +534,15 @@ export function GamePanel({
   onChallengeModeChange,
   onOpenSayBlast,
   challengePools,
+  categoryBrowseSections,
   selectedCategoryId,
   onCategoryChange,
+  categoryHubRequestKey = 0,
   onShuffleWords,
   categoryUnlocked,
   moodUnlocked,
   moodCanStartNew = true,
-  sayBlastUnlocked,
+  sayBlastReady,
   boardIntroActive = false,
   onBoardIntroComplete,
   refillBurst = null,
@@ -554,16 +558,33 @@ export function GamePanel({
 }: GamePanelProps) {
   const { locale, t, ui } = useI18n();
   const [modePickerOpen, setModePickerOpen] = useState(false);
+  const [categoryHubOpen, setCategoryHubOpen] = useState(false);
   const [homeConfirmOpen, setHomeConfirmOpen] = useState(false);
+  const homeConfirmDialogRef = useModalDialog({
+    open: homeConfirmOpen,
+    onClose: () => setHomeConfirmOpen(false),
+  });
 
   useEffect(() => {
-    if (playBlockedReason === 'stamina') setModePickerOpen(false);
+    if (playBlockedReason === 'stamina') {
+      setModePickerOpen(false);
+      setCategoryHubOpen(false);
+    }
   }, [playBlockedReason]);
 
   useEffect(() => {
-    onModePickerOpenChange?.(modePickerOpen);
+    onModePickerOpenChange?.(modePickerOpen || categoryHubOpen);
     return () => onModePickerOpenChange?.(false);
-  }, [modePickerOpen, onModePickerOpenChange]);
+  }, [categoryHubOpen, modePickerOpen, onModePickerOpenChange]);
+
+  useEffect(() => {
+    if (categoryHubRequestKey > 0) {
+      setModePickerOpen(false);
+      setCategoryHubOpen(true);
+    }
+  }, [categoryHubRequestKey]);
+  const activeCategoryPool =
+    challengePools.find((pool) => pool.id === selectedCategoryId) ?? challengePools[0] ?? null;
   const pointerStartRef = useRef<PointerStart | null>(null);
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [swapAnimationTileIds, setSwapAnimationTileIds] = useState<Set<string>>(
@@ -589,12 +610,14 @@ export function GamePanel({
   const showShelfCascade = hideTileEmojisForIntro && !shelfCascadeDone;
   const modePickerGuideTarget: Extract<
     FeatureGuideTarget,
-    'sayAndBlastModePicker' | 'moodBoardModePicker'
+    'sayAndBlastModePicker' | 'moodBoardModePicker' | 'categoryModePicker'
   > | null =
     featureGuideTarget === 'sayAndBlast'
       ? 'sayAndBlastModePicker'
       : featureGuideTarget === 'moodBoard'
         ? 'moodBoardModePicker'
+        : featureGuideTarget === 'category'
+          ? 'categoryModePicker'
         : null;
   const modePickerGuidePlaying = useLimitedGuidePrompt({
     eligible: modePickerGuideTarget !== null && !modePickerOpen,
@@ -1062,7 +1085,7 @@ export function GamePanel({
       <div className="relative z-10 flex shrink-0 items-stretch gap-1.5 pt-2.5">
         <HudPlaque
           className="min-w-0 flex-1 self-start overflow-visible"
-          label={challengeMode === 'review' ? modeLabel : t.hud.wordSet}
+          label={challengeMode === 'review' || challengeMode === 'category' ? modeLabel : t.hud.wordSet}
           value={
             <div className="relative min-w-0">
               <div className="flex flex-wrap items-end gap-x-2.5 gap-y-1">
@@ -1071,14 +1094,25 @@ export function GamePanel({
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   transition={MOTION_SPRING_SNAPPY}
                 >
-                  <HudStatNumber>
-                    {challengeMode === 'review' ? (
-                      <span aria-hidden>🧠</span>
-                    ) : (
-                      t.hud.wordSetCount(clearedSets + 1)
-                    )}
-                  </HudStatNumber>
+                  {challengeMode === 'category' && activeCategoryPool ? (
+                    <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-sky-700 ring-1 ring-sky-200/80">
+                      Round {activeCategoryPool.cycle}
+                    </span>
+                  ) : (
+                    <HudStatNumber>
+                      {challengeMode === 'review' ? (
+                        <span aria-hidden>🧠</span>
+                      ) : (
+                        t.hud.wordSetCount(clearedSets + 1)
+                      )}
+                    </HudStatNumber>
+                  )}
                 </motion.div>
+                {challengeMode === 'category' && activeCategoryPool ? (
+                  <span className="mb-0.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black tabular-nums text-sky-700 ring-1 ring-sky-200/80">
+                    {activeCategoryPool.clearedInCycle}/{activeCategoryPool.items.length}
+                  </span>
+                ) : null}
                 {challengeMode === 'random' ? (
                 <span
                   className="mb-0.5 inline-flex items-center gap-1 self-center rounded-full bg-rose-50/90 px-1.5 py-0.5 ring-1 ring-rose-200/70"
@@ -1607,24 +1641,40 @@ export function GamePanel({
         challengeMode={challengeMode}
         onChallengeModeChange={onChallengeModeChange}
         onOpenSayBlast={onOpenSayBlast}
-        challengePools={challengePools}
-        selectedCategoryId={selectedCategoryId}
-        onCategoryChange={onCategoryChange}
+        onOpenCategoryHub={() => setCategoryHubOpen(true)}
         onShuffleWords={onShuffleWords}
         onRestart={onRestart}
         canPlay={canPlay}
         categoryUnlocked={categoryUnlocked}
         moodUnlocked={moodUnlocked}
         moodCanStartNew={moodCanStartNew}
-        sayBlastUnlocked={sayBlastUnlocked}
+        sayBlastReady={sayBlastReady}
         guideTarget={featureGuideTarget}
         guidePlayCount={featureGuidePlayCount}
         onGuidePlaybackStart={onFeatureGuidePlaybackStart}
       />
 
+      <CategoryHubSheet
+        open={categoryHubOpen}
+        onClose={() => setCategoryHubOpen(false)}
+        onBackToModes={() => {
+          setCategoryHubOpen(false);
+          setModePickerOpen(true);
+        }}
+        pools={challengePools}
+        sections={categoryBrowseSections}
+        selectedCategoryId={selectedCategoryId}
+        onSelectCategory={(id) => {
+          onCategoryChange(id);
+          onChallengeModeChange('category');
+          setCategoryHubOpen(false);
+        }}
+      />
+
       <AnimatePresence>
         {homeConfirmOpen && (
           <motion.div
+            ref={homeConfirmDialogRef}
             key="home-confirm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -1634,21 +1684,22 @@ export function GamePanel({
             role="alertdialog"
             aria-modal="true"
             aria-label={t.gameSettings.homeConfirmTitle}
+            tabIndex={-1}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 8 }}
               transition={MOTION_SPRING_SNAPPY}
-              className="w-full max-w-sm rounded-[24px] border border-white/90 bg-white px-5 py-6 text-center shadow-xl"
+              className="candy-modal-surface"
             >
-              <div className="text-lg font-black text-sky-950">
+              <div className="candy-modal-title">
                 {t.gameSettings.homeConfirmTitle}
               </div>
-              <div className="mt-2 text-sm font-semibold leading-snug text-sky-800/85">
+              <div className="candy-modal-body">
                 {t.gameSettings.homeConfirmBody}
               </div>
-              <div className="mt-4 flex flex-col gap-2">
+              <div className="candy-modal-actions">
                 <motion.button
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
@@ -1661,7 +1712,7 @@ export function GamePanel({
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
                   onClick={onHome}
-                  className="candy-sheet-action-btn candy-sheet-action-btn-blue w-full"
+                  className="candy-sheet-action-btn candy-sheet-action-btn-danger w-full"
                 >
                   {t.gameSettings.homeConfirmLeave}
                 </motion.button>

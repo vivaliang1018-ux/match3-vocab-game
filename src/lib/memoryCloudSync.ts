@@ -22,6 +22,13 @@ import {
   type PlayerSummary,
 } from './playerSummary';
 import { loadRoundLearnedIds, saveRoundLearnedIds } from './roundLearned';
+import {
+  loadCategoryCycleProgress,
+  mergeCategoryCycleProgress,
+  parseCategoryCycleProgress,
+  saveCategoryCycleProgress,
+  type CategoryCycleProgress,
+} from './categoryCycleProgress';
 
 /** Firestore: users/{uid}/match3/state */
 const MATCH3_COLLECTION = 'match3';
@@ -32,6 +39,7 @@ type CloudMemoryDoc = {
   learnedIds?: unknown;
   modeUnlocks?: unknown;
   playerSummary?: unknown;
+  categoryCycles?: unknown;
   updatedAtMs?: number;
 };
 
@@ -39,6 +47,7 @@ export type CoreProgressSnapshot = {
   learnedIds: string[];
   modeUnlocks: ModeUnlockState;
   playerSummary: PlayerSummary;
+  categoryCycles: CategoryCycleProgress;
 };
 
 function isWordMemory(value: unknown): value is WordMemory {
@@ -108,6 +117,10 @@ function mergeCoreProgress(local: CoreProgressSnapshot, cloud: CoreProgressSnaps
         local.modeUnlocks.pendingForcedReview || cloud.modeUnlocks.pendingForcedReview,
     },
     playerSummary: mergePlayerSummaries(local.playerSummary, cloud.playerSummary),
+    categoryCycles: mergeCategoryCycleProgress(
+      local.categoryCycles,
+      cloud.categoryCycles,
+    ),
   };
 }
 
@@ -116,6 +129,7 @@ export async function hydrateCoreProgressWithCloud(uid: string): Promise<CorePro
     learnedIds: loadRoundLearnedIds(uid),
     modeUnlocks: loadModeUnlocks(uid),
     playerSummary: loadPlayerSummary(uid),
+    categoryCycles: loadCategoryCycleProgress(uid),
   };
   if (!isFirebaseConfigured()) return initialLocal;
   try {
@@ -127,6 +141,7 @@ export async function hydrateCoreProgressWithCloud(uid: string): Promise<CorePro
       learnedIds: loadRoundLearnedIds(uid),
       modeUnlocks: loadModeUnlocks(uid),
       playerSummary: loadPlayerSummary(uid),
+      categoryCycles: loadCategoryCycleProgress(uid),
     };
     if (!snap.exists()) {
       persistCoreProgress(uid, latestLocal, { flushCloud: true });
@@ -137,11 +152,13 @@ export async function hydrateCoreProgressWithCloud(uid: string): Promise<CorePro
       learnedIds: parseLearnedIds(data.learnedIds),
       modeUnlocks: parseModeUnlocks(data.modeUnlocks),
       playerSummary: parsePlayerSummary(data.playerSummary),
+      categoryCycles: parseCategoryCycleProgress(data.categoryCycles),
     };
     const merged = mergeCoreProgress(latestLocal, cloud);
     saveRoundLearnedIds(merged.learnedIds, uid);
     saveModeUnlocks(merged.modeUnlocks, uid);
     savePlayerSummary(merged.playerSummary, uid);
+    saveCategoryCycleProgress(merged.categoryCycles, uid);
     persistCoreProgress(uid, merged, { flushCloud: true });
     return merged;
   } catch (error) {
@@ -150,6 +167,7 @@ export async function hydrateCoreProgressWithCloud(uid: string): Promise<CorePro
       learnedIds: loadRoundLearnedIds(uid),
       modeUnlocks: loadModeUnlocks(uid),
       playerSummary: loadPlayerSummary(uid),
+      categoryCycles: loadCategoryCycleProgress(uid),
     };
   }
 }
@@ -248,6 +266,7 @@ export function persistCoreProgress(
         learnedIds: progress.learnedIds,
         modeUnlocks: progress.modeUnlocks,
         playerSummary: progress.playerSummary,
+        categoryCycles: progress.categoryCycles,
         updatedAtMs: Date.now(),
         updatedAt: serverTimestamp(),
       },

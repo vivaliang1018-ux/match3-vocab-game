@@ -6,6 +6,7 @@ import {
 } from './progressScope';
 
 const STORAGE_KEY = 'match3-mode-unlocks-v1';
+export const CATEGORY_UNLOCK_CLEARS = 3;
 
 export type ModeUnlockState = {
   /** Adventure rounds fully cleared (board + quiz). */
@@ -76,5 +77,5 @@ export function isReviewUnlocked(clears: number): boolean {
 }
 
 export function isCategoryUnlocked(clears: number): boolean {
-  return clears >= 5;
+  return clears >= CATEGORY_UNLOCK_CLEARS;
 }

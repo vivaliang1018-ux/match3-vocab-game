@@ -17,6 +17,7 @@
     "ios": "npm run build:ios && npx cap open ios",
     "cap:sync": "npx cap sync",
     "emoji:generate": "tsx scripts/generate-emoji-nouns.ts",
+    "category:audit": "tsx scripts/audit-emoji-learning-categories.ts",
     "thiings:generate": "tsx scripts/generate-thiings-dataset.ts",
     "voice:audit": "tsx scripts/audit-emoji-voice.ts",
     "voice:normalize": "tsx scripts/normalize-emoji-voice.ts",

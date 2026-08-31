@@ -5,6 +5,7 @@ import { Flame, LockKeyhole, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { MOTION_SHEET_PANEL, MOTION_VIGNETTE } from '../../lib/motionChoreography';
+import { useModalDialog } from './useModalDialog';
 
 export type AccountPromptKind = 'soft' | 'streak';
 
@@ -27,6 +28,7 @@ export function AccountPromptSheet({
 }: AccountPromptSheetProps) {
   const { t, ui } = useI18n();
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useModalDialog({ open, onClose: onDismiss });
 
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
@@ -43,6 +45,7 @@ export function AccountPromptSheet({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           initial="hidden"
           animate="visible"
           exit="exit"
@@ -51,6 +54,7 @@ export function AccountPromptSheet({
           role="dialog"
           aria-modal="true"
           aria-label={title}
+          tabIndex={-1}
           onClick={onDismiss}
         >
           <motion.div className="auth-sheet-backdrop" aria-hidden />

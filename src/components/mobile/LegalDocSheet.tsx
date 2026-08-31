@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { useModalDialog } from './useModalDialog';
 
 type LegalDocSheetProps = {
   open: boolean;
@@ -12,11 +14,15 @@ type LegalDocSheetProps = {
 /** Full-screen in-app viewer for bundled legal HTML (works on Capacitor iOS). */
 export function LegalDocSheet({ open, title, src, onClose }: LegalDocSheetProps) {
   const { t } = useI18n();
+  const dialogRef = useModalDialog({ open, onClose });
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key="legal-doc-sheet"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -25,6 +31,7 @@ export function LegalDocSheet({ open, title, src, onClose }: LegalDocSheetProps)
           role="dialog"
           aria-modal="true"
           aria-label={title}
+          tabIndex={-1}
         >
           <div className="legal-doc-sheet-bar">
             <span className="legal-doc-sheet-title">{title}</span>
@@ -40,6 +47,7 @@ export function LegalDocSheet({ open, title, src, onClose }: LegalDocSheetProps)
           <iframe className="legal-doc-sheet-frame" src={src} title={title} />
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

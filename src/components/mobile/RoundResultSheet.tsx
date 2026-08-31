@@ -6,6 +6,7 @@ import { assetUrl } from '../../lib/assetUrl';
 import { AWARD_TRACKS, type AwardTrackId } from '../../lib/playerSummary';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
 import type { WordItem } from '../../types/game';
+import { useModalDialog } from './useModalDialog';
 
 export type RoundResult = {
   kind: 'learned' | 'review';
@@ -18,6 +19,14 @@ export type RoundResult = {
   unlocks: Array<'review' | 'category'>;
   awardIds: AwardTrackId[];
   perfectQuiz?: boolean;
+  categoryProgress?: {
+    title: string;
+    previousCycle: number;
+    cycle: number;
+    completedCycle: boolean;
+    clearedInCycle: number;
+    total: number;
+  };
   nextGoal: string;
   primaryActionLabel?: string;
   followUp: 'advance' | 'forced-review' | 'review-choices' | 'home';
@@ -27,6 +36,7 @@ type RoundResultSheetProps = {
   result: RoundResult | null;
   onExitComplete: () => void;
   onContinue: () => void;
+  onReturnToCategory: () => void;
   onViewCollection: () => void;
   canContinueReview: boolean;
   canGoAdventure: boolean;
@@ -40,6 +50,7 @@ export function RoundResultSheet({
   result,
   onExitComplete,
   onContinue,
+  onReturnToCategory,
   onViewCollection,
   canContinueReview,
   canGoAdventure,
@@ -48,10 +59,14 @@ export function RoundResultSheet({
   onRest,
   onClaimAward,
 }: RoundResultSheetProps) {
-  const { t, ui } = useI18n();
+  const { locale, t, ui } = useI18n();
   const reduceMotion = useReducedMotion();
   const [claimedIds, setClaimedIds] = useState<Set<AwardTrackId>>(() => new Set());
   const [revealPhase, setRevealPhase] = useState<'mystery' | 'revealing' | 'revealed'>('mystery');
+  const dialogRef = useModalDialog({
+    open: Boolean(result),
+    closeOnEscape: false,
+  });
   useEffect(() => {
     setClaimedIds(new Set());
     setRevealPhase('mystery');
@@ -110,6 +125,7 @@ export function RoundResultSheet({
     <AnimatePresence onExitComplete={onExitComplete}>
       {result && (
         <motion.div
+          ref={dialogRef}
           className="fixed inset-0 z-[160] flex items-center justify-center bg-sky-950/45 px-5 py-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -117,9 +133,10 @@ export function RoundResultSheet({
           role="dialog"
           aria-modal="true"
           aria-label={ui.roundResult.aria}
+          tabIndex={-1}
         >
           <motion.div
-            className="max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-[30px] border-4 border-white bg-gradient-to-b from-white to-sky-50 p-5 text-center shadow-2xl"
+            className="candy-modal-surface candy-modal-surface-wide max-h-[calc(100dvh-2rem)] overflow-y-auto"
             initial={{ y: 36, scale: 0.9 }}
             animate={{ y: 0, scale: 1 }}
             exit={{ y: 24, scale: 0.94 }}
@@ -264,7 +281,11 @@ export function RoundResultSheet({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
               >
             <h2 className="text-2xl font-black text-sky-950">
-              {result.kind === 'review'
+              {result.categoryProgress
+                ? locale === 'zh-CN'
+                  ? `${result.categoryProgress.title}训练完成`
+                  : `${result.categoryProgress.title} complete`
+                : result.kind === 'review'
                 ? ui.roundResult.strengthened
                 : ui.roundResult.discovered(result.items.length)}
             </h2>
@@ -289,6 +310,38 @@ export function RoundResultSheet({
             {primaryUnlock && (
               <div className="mt-3 rounded-2xl bg-violet-100 px-3 py-2.5 text-sm font-black text-violet-800">
                 {unlockIcons[primaryUnlock]} {unlockLabels[primaryUnlock]}
+              </div>
+            )}
+            {result.categoryProgress && (
+              <div className="mt-3 rounded-2xl bg-sky-50 px-4 py-3 text-left text-sky-950">
+                <div className="text-xs font-black uppercase tracking-[0.08em] text-sky-600">
+                  {result.categoryProgress.completedCycle
+                    ? locale === 'zh-CN'
+                      ? `第 ${result.categoryProgress.previousCycle} 轮全部通过`
+                      : `Cycle ${result.categoryProgress.previousCycle} complete`
+                    : locale === 'zh-CN'
+                      ? `第 ${result.categoryProgress.cycle} 轮进度`
+                      : `Cycle ${result.categoryProgress.cycle} progress`}
+                </div>
+                <div className="mt-1 text-lg font-black">
+                  {result.categoryProgress.clearedInCycle}/{result.categoryProgress.total}
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-sky-100">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-sky-500"
+                    style={{
+                      width: `${Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          (result.categoryProgress.clearedInCycle /
+                            Math.max(1, result.categoryProgress.total)) *
+                            100,
+                        ),
+                      )}%`,
+                    }}
+                  />
+                </div>
               </div>
             )}
             {result.followUp !== 'review-choices' && result.nextGoal ? (
@@ -318,7 +371,7 @@ export function RoundResultSheet({
                     type="button"
                     whileTap={MOTION_PRESS_TAP}
                     onClick={onGoAdventure}
-                    className="candy-sheet-action-btn candy-sheet-action-btn-blue w-full"
+                    className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
                   >
                     {t.modes.reviewContinueAdventure}
                   </motion.button>
@@ -331,9 +384,30 @@ export function RoundResultSheet({
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
                   onClick={onRest}
-                  className="rounded-full px-3 py-2 text-sm font-bold text-sky-800/80"
+                  className="candy-sheet-action-btn candy-sheet-action-btn-quiet w-full"
                 >
                   {t.modes.reviewContinueRest}
+                </motion.button>
+              </div>
+            ) : result.categoryProgress ? (
+              <div className="mt-4 flex w-full flex-col gap-2">
+                <motion.button
+                  type="button"
+                  whileTap={MOTION_PRESS_TAP}
+                  onClick={onContinue}
+                  className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
+                >
+                  {locale === 'zh-CN'
+                    ? `继续探索${result.categoryProgress.title}`
+                    : `Continue ${result.categoryProgress.title}`}
+                </motion.button>
+                <motion.button
+                  type="button"
+                  whileTap={MOTION_PRESS_TAP}
+                  onClick={onReturnToCategory}
+                  className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
+                >
+                  {locale === 'zh-CN' ? '返回分类首页' : 'Back to categories'}
                 </motion.button>
               </div>
             ) : (

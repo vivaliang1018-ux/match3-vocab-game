@@ -6,6 +6,7 @@ import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { MOTION_SHEET_PANEL, MOTION_VIGNETTE } from '../../lib/motionChoreography';
 import { useAuth } from '../../auth/AuthProvider';
 import { useI18n } from '../../i18n';
+import { useModalDialog } from './useModalDialog';
 
 type SignInSheetProps = {
   open: boolean;
@@ -49,6 +50,7 @@ export function SignInSheet({ open, onClose, initialMode = 'signIn' }: SignInShe
   const [statusError, setStatusError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const wasOpen = useRef(false);
+  const dialogRef = useModalDialog({ open, onClose });
 
   useEffect(() => {
     setMounted(true);
@@ -120,6 +122,7 @@ export function SignInSheet({ open, onClose, initialMode = 'signIn' }: SignInShe
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
           key="sign-in-sheet"
           initial="hidden"
           animate="visible"
@@ -129,6 +132,7 @@ export function SignInSheet({ open, onClose, initialMode = 'signIn' }: SignInShe
           role="dialog"
           aria-modal="true"
           aria-label={t.auth.dialogAria}
+          tabIndex={-1}
           onClick={onClose}
         >
           <motion.div className="auth-sheet-backdrop" aria-hidden />

@@ -1,6 +1,6 @@
 # TestFlight QA Checklist
 
-**App:** Matchingo
+**App:** LingoMatch
 **Bundle ID:** `com.matchingo.game`  
 **Build type:** Release (Archive → TestFlight, not Debug simulator)  
 **Tester device:** iPhone _____ / iOS _____  
@@ -61,6 +61,7 @@
 | 3.4 | Pick phase: choose correct word from options | | |
 | 3.5 | Question change does not jitter layout | | |
 | 3.6 | Prev / next buttons always visible (disabled when unusable) | | |
+| 3.6a | Return to a completed Pick question: tapping any image reveals and speaks that option's English name without changing the recorded answer | | |
 | 3.7 | Speech does not interrupt mid-word on question change | | |
 | 3.8 |「再听一次」replays English only | | |
 | 3.9 | Wrong answer shows feedback; can retry | | |
@@ -75,10 +76,11 @@
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.1 | Starts with 20 moves; HUD shows 当前组 (= cleared+1) and stamina as hearts + n/5 | | |
+| 4.1 | Starts with 20 moves; HUD shows 当前组 (= cleared+1) and stamina as hearts + n/5; the first matching move spends 1 stamina, including the player's first-ever Adventure | | |
 | 4.2 | Normal 3-match costs 1 move; 4+/line clear nets 0 (−1+1) | | |
 | 4.3 | At ≤6 moves, unfinished words drop more often | | |
 | 4.4 | Out of moves → revive: 6 words ×2 hits, 3 misses = fail | | |
+| 4.4a | If Revive appears before Review, its first timed target pauses and shows the same guided swap hand; completing it prevents the tutorial from repeating in Review | | |
 | 4.5 | Every 3 cleared sets → mandatory review from a random mix of those 3 sets (not only the latest); leaving keeps 「待完成复习」 | | |
 | 4.6 | Quiz skip confirms restart and does not count as cleared | | |
 | 4.7 | No stamina → dead-machine sheet with Review CTA | | |
@@ -87,8 +89,9 @@
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.8 | Hidden until 5 adventure clears; then appears in mode picker | | |
+| 4.8 | Hidden until 3 adventure clears; after mandatory review, Learned guide/tour runs first; only after it completes does the hand point to the mode picker and then Category mode | | |
 | 4.9 | Category list shows; picking one starts that pool | | |
+| 4.9a | First Category entry recommends Tools and Home Items (🔧), not Emotional Expression | | |
 | 4.10 | Board uses only emojis from selected category | | |
 | 4.11 | Free play (no moves / stamina) | | |
 
@@ -117,7 +120,7 @@
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 5.1 | Learned tab shows collected emojis | | |
+| 5.1 | After the third-clear mandatory review, the hand points to Learned; first entry shows the 3-step collection, memory-shield, and review-timing tour | | |
 | 5.2 | Tap learned word opens detail modal | | |
 | 5.3 | Play pronunciation from modal | | |
 | 5.4 | Words / Emoji tab browses full pool | | |
@@ -201,7 +204,7 @@
 |---|------|-------|-------|
 | 11.1 | Built with Release / Archive (not Debug) | | |
 | 11.2 | App icon correct on home screen | | |
-| 11.3 | Display name「Matchingo」correct | | |
+| 11.3 | Display name「LingoMatch」correct | | |
 | 11.4 | No debug overlays or console-only UI | | |
 | 11.5 | Privacy policy URL ready for App Store Connect | | |
 

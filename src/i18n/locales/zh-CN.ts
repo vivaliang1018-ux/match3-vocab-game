@@ -2,8 +2,8 @@ import type { Messages } from '../types';
 
 export const zhCN: Messages = {
   meta: {
-    appTitle: 'Matchingo',
-    uiVersion: '界面版本 2026.07.16-burst',
+    appTitle: 'LingoMatch',
+    uiVersion: '1.0',
   },
   common: {
     close: '关闭',
@@ -50,9 +50,9 @@ export const zhCN: Messages = {
     recordStory: (id, value) =>
       (
         {
-          sets: `你已经正式完成了 ${value} 组 Adventure 词组。`,
-          day: `你已连续学习 ${value} 天。Adventure、Review、Forced Review 或 Category 的有效学习都计入连续天数。`,
-          combo: `你已连续赢下 ${value} 组 Adventure。Rescue 成功并通过最终 Quiz 也计入；正式失败会中断连胜。`,
+          sets: `你已经正式完成了 ${value} 组冒险词组。`,
+          day: `你已连续学习 ${value} 天。闯关、记忆挑战、强制复习或分类模式中的有效学习都会计入连续天数。`,
+          combo: `你已连续赢下 ${value} 组冒险。成功复活并通过最终测验也会计入；正式失败会中断连胜。`,
         } as const
       )[id],
     awardMaxed: '满级啦',
@@ -110,7 +110,7 @@ export const zhCN: Messages = {
     openLearned: '查看已学',
     openWords: '浏览全部 emoji',
     aboutTitle: '关于应用',
-    description: '让每一次消除，都带来一点英语收获。\n用 emoji 探索英语世界吧！',
+    description: '在 LingoMatch，让每一次消除都带来一点英语收获。\n用 Emoji 探索英语世界吧！',
     version: '版本',
     termsOfService: '服务条款',
     privacyPolicy: '隐私政策',
@@ -191,8 +191,8 @@ export const zhCN: Messages = {
     errorEmailInUse: '该邮箱已注册，请直接登录',
     errorWeakPassword: '密码至少 6 位',
     errorTooManyRequests: '尝试次数过多，请稍后再试',
-    errorNotConfigured: 'Firebase 未配置，请查看 docs/auth-setup.md',
-    errorProviderDisabled: '请先在 Firebase 控制台启用「电子邮件/密码」登录',
+    errorNotConfigured: '登录服务暂时不可用，请稍后重试',
+    errorProviderDisabled: '此登录方式暂时不可用，请选择其他方式',
     errorRequiresRecentLogin: '请先重新登录后再删除账号',
     errorNetwork: '网络连接失败，请检查网络后重试',
     errorUnknown: '登录失败，请稍后再试',
@@ -257,7 +257,7 @@ export const zhCN: Messages = {
     goAdventureCta: '去闯关学词',
     locked: '未解锁',
     lockedReviewHint: '先通关第 1 组闯关，即可解锁记忆挑战。',
-    lockedCategoryHint: '通关第 5 组闯关后，即可解锁分类。',
+    lockedCategoryHint: '通关第 3 组闯关后，即可解锁分类。',
     noStamina: '体力用完啦',
     noStaminaHint: '每 1 小时恢复 1 点，或等明天补给。也可以先去复习。',
     forcedReviewTitle: '记忆挑战',
@@ -296,7 +296,7 @@ export const zhCN: Messages = {
     reviveSuccessSubtitle: '直接进入这 6 个词的最终小测',
     reviveFailTitle: '本关挑战失败',
     reviveFailSubtitle: '别灰心，攒够体力再来一次',
-    reviveRetryTitle: 'Rescue 未通过',
+    reviveRetryTitle: '复活挑战未通过',
     reviveRetrySubtitle: '本组进度已恢复，增加 8 步继续闯关',
     reviveExit: '放弃',
     reviveExitAria: '放弃复活赛',

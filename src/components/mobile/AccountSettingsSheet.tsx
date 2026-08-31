@@ -14,6 +14,7 @@ import {
   setAvatarPresetId,
 } from '../../lib/accountProfile';
 import { cn } from '../../lib/utils';
+import { useModalDialog } from './useModalDialog';
 
 type AccountSettingsSheetProps = {
   open: boolean;
@@ -49,6 +50,7 @@ export function AccountSettingsSheet({ open, onClose, onDeleted }: AccountSettin
   const [confirmPassword, setConfirmPassword] = useState('');
   const [securityError, setSecurityError] = useState<string | null>(null);
   const [securityOk, setSecurityOk] = useState<string | null>(null);
+  const dialogRef = useModalDialog({ open: open && Boolean(user), onClose });
 
   useEffect(() => {
     setMounted(true);
@@ -106,6 +108,7 @@ export function AccountSettingsSheet({ open, onClose, onDeleted }: AccountSettin
     <AnimatePresence>
       {open && user && (
         <motion.div
+          ref={dialogRef}
           key="account-settings-sheet"
           initial="hidden"
           animate="visible"
@@ -115,6 +118,7 @@ export function AccountSettingsSheet({ open, onClose, onDeleted }: AccountSettin
           role="dialog"
           aria-modal="true"
           aria-label={t.profile.accountSettingsTitle}
+          tabIndex={-1}
           onClick={onClose}
         >
           <motion.div className="auth-sheet-backdrop" aria-hidden />
