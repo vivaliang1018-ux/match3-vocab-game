@@ -17,6 +17,40 @@ ios/DerivedData
 /tmp/
 *.local
 
+# Machine-specific configuration and signing credentials (keep examples).
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.p8
+*.p12
+*.mobileprovision
+*.xcarchive/
+*.ipa
+xcuserdata/
+
+# Separate products / working assets: retain on disk, do not mix into this
+# overseas iOS/Web application's source commit. Back these up separately.
+/miniapp/
+/marketing/
+/tools/
+/audio-work/
+/release-artifacts/
+/spanish-missing-words.txt
+/spanish-missing-words.txt.*.bak
+
+# Generated audit imagery and local listening pages; reports remain versioned.
+/docs/**/*.png
+/docs/**/*.jpg
+/docs/**/*.jpeg
+/docs/**/*.heic
+/public/qa/
+/public/japanese-audio-sample-preview.html
+/public/korean-audio-review.html
+/public/spanish-janice-review.html
+/public/spanish-janice-review-data.json
+/public/spanish-laughter-replacements-review.html
+
 # Local audit and generated review artifacts
 /audit-screenshots/
 /outputs/

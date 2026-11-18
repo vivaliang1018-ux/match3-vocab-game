@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { createPortal } from 'react-dom';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import {
   MOTION_CARD_POP,
@@ -9,7 +8,8 @@ import {
   MOTION_STAGGER_ITEM,
   MOTION_VIGNETTE,
 } from '../../lib/motionChoreography';
-import { Check, ChevronLeft, ChevronRight, Eye, Link2, Volume2, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Eye, Link2, Volume2 } from 'lucide-react';
+import { saveQuizProgress, type PendingQuiz, type QuizProgress } from '../../lib/pendingQuiz';
 import { useI18n } from '../../i18n';
 import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import {
@@ -35,8 +35,7 @@ type RoundQuizSheetProps = {
   quizKind: QuizKind;
   /** Passed the quiz — count as learned / clear. */
   onComplete: (mistakenItemIds: string[]) => void;
-  /** Confirmed abandon — restart set, do not count as learned. */
-  onAbandon: () => void;
+  checkpoint: PendingQuiz | null;
 };
 
 type RoundQuizSheetInnerProps = Omit<RoundQuizSheetProps, 'open'>;
@@ -62,14 +61,14 @@ function ItemVisual({ item, size = 'md' }: { item: WordItem; size?: 'sm' | 'md' 
       <img
         src={item.imgSrc}
         alt={item.word}
-        className={cn(box, 'object-contain')}
+        className={cn('candy-quiz-item-visual', box, 'object-contain')}
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
       />
     );
   }
-  return <span className={cn('grid place-items-center', box)}>{item.emoji ?? '·'}</span>;
+  return <span className={cn('candy-quiz-item-visual grid place-items-center', box)}>{item.emoji ?? '·'}</span>;
 }
 
 function RoundQuizSheetInner({
@@ -77,24 +76,27 @@ function RoundQuizSheetInner({
   distractorPool,
   quizKind,
   onComplete,
-  onAbandon,
+  checkpoint,
 }: RoundQuizSheetInnerProps) {
   const { locale, t } = useI18n();
-  const pickOrder = useMemo(() => shuffleItems(items), [items]);
-  const emojiColumn = useMemo(() => shuffleItems(items), [items]);
+  const resume = useRef(checkpoint?.progress).current;
+  const pickOrder = useMemo(() => resume ? resume.orderIds.map(id => items.find(item => item.id === id)!) : shuffleItems(items), [items, resume]);
+  const emojiColumn = useMemo(() => resume ? resume.emojiIds.map(id => items.find(item => item.id === id)!) : shuffleItems(items), [items, resume]);
   const choicePool = distractorPool && distractorPool.length > 0 ? distractorPool : items;
 
   const [phase] = useState<Phase>(quizKind);
-  const [connectedIds, setConnectedIds] = useState<Set<string>>(() => new Set());
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(() => new Set(resume?.connectedIds));
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null);
   const [poppingPairId, setPoppingPairId] = useState<string | null>(null);
   const [wrongFlash, setWrongFlash] = useState(false);
-  const [pickIndex, setPickIndex] = useState(0);
-  const [furthestPickIndex, setFurthestPickIndex] = useState(0);
-  const pickChoicesByIndexRef = useRef<WordItem[][]>([]);
+  const [pickIndex, setPickIndex] = useState(resume?.pickIndex ?? 0);
+  const [furthestPickIndex, setFurthestPickIndex] = useState(resume?.answeredCount ?? 0);
+  const pickChoicesByIndexRef = useRef<WordItem[][]>(resume?.choiceIds.map(row => row.map(id =>
+    [...items, ...choicePool].find(item => item.id === id)).filter((item): item is WordItem => Boolean(item))) ?? []);
   const [pickChoicesList, setPickChoicesList] = useState<WordItem[]>(() => {
-    const first = pickQuizChoices(pickOrder[0] ?? items[0], items, choicePool);
-    pickChoicesByIndexRef.current = [first];
+    if (pickChoicesByIndexRef.current[pickIndex]?.length === 4) return pickChoicesByIndexRef.current[pickIndex];
+    const first = pickQuizChoices(pickOrder[pickIndex] ?? items[0], items, choicePool);
+    pickChoicesByIndexRef.current[pickIndex] = first;
     return first;
   });
   const [peekCn, setPeekCn] = useState(false);
@@ -102,25 +104,38 @@ function RoundQuizSheetInner({
   const [tryAgainOpen, setTryAgainOpen] = useState(false);
   const [tryAgainLabel, setTryAgainLabel] = useState('');
   const [answerPending, setAnswerPending] = useState(false);
-  const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
   const quizDialogRef = useModalDialog({
-    open: !abandonConfirmOpen,
+    open: true,
     closeOnEscape: false,
-  });
-  const abandonDialogRef = useModalDialog({
-    open: abandonConfirmOpen,
-    onClose: () => setAbandonConfirmOpen(false),
   });
   const tryAgainTimerRef = useRef<number | null>(null);
   const answerFlowIdRef = useRef(0);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
 
-  const mistakenItemIdsRef = useRef<Set<string>>(new Set());
+  const mistakenItemIdsRef = useRef<Set<string>>(new Set(resume?.mistakenIds));
+  const progressRef = useRef<QuizProgress>(resume ?? {
+    orderIds: pickOrder.map(item => item.id), emojiIds: emojiColumn.map(item => item.id),
+    connectedIds: [], pickIndex: 0, answeredCount: 0, choiceIds: [], mistakenIds: [], completed: false,
+  });
+  const persist = useCallback((change: Partial<QuizProgress> = {}) => {
+    const progress = { ...progressRef.current, ...change,
+      choiceIds: pickChoicesByIndexRef.current.map(row => row.map(item => item.id)),
+      mistakenIds: [...mistakenItemIdsRef.current] };
+    progressRef.current = progress;
+    if (checkpoint) saveQuizProgress(checkpoint, progress);
+  }, [checkpoint]);
+  useLayoutEffect(() => { persist(); }, [persist]);
+  const completionReported = useRef(false);
   const finishQuiz = useCallback(
-    () => onComplete([...mistakenItemIdsRef.current]),
+    () => {
+      if (completionReported.current) return;
+      completionReported.current = true;
+      onComplete([...mistakenItemIdsRef.current]);
+    },
     [onComplete],
   );
+  useEffect(() => { if (resume?.completed) finishQuiz(); }, [resume, finishQuiz]);
   const speechTaskRef = useRef<Promise<boolean> | null>(null);
   const pickSpeechQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const pickSpeechRunRef = useRef(0);
@@ -249,8 +264,13 @@ function RoundQuizSheetInner({
       if (!current) break;
       pickChoicesByIndexRef.current.push(pickQuizChoices(current, items, choicePool));
     }
+    const cached = pickChoicesByIndexRef.current[pickIndex];
+    if (pickOrder[pickIndex] && (cached?.length !== 4 || !cached.some(item => item.id === pickOrder[pickIndex].id))) {
+      pickChoicesByIndexRef.current[pickIndex] = pickQuizChoices(pickOrder[pickIndex], items, choicePool);
+    }
     setPickChoicesList(pickChoicesByIndexRef.current[pickIndex] ?? []);
-  }, [phase, pickIndex, pickOrder, items, choicePool]);
+    persist();
+  }, [phase, pickIndex, pickOrder, items, choicePool, persist]);
 
   useLayoutEffect(() => {
     if (phase !== 'pick') return;
@@ -274,6 +294,7 @@ function RoundQuizSheetInner({
       triggerGameHaptic('quizCorrect');
       setPoppingPairId(itemId);
       const nextCount = connectedIds.size + 1;
+      persist({ connectedIds: [...connectedIds, itemId], completed: nextCount >= items.length });
       const speechTask = speechTaskRef.current;
       const flowId = ++answerFlowIdRef.current;
       setAnswerPending(true);
@@ -294,6 +315,7 @@ function RoundQuizSheetInner({
 
     triggerGameHaptic('quizWrong');
     mistakenItemIdsRef.current.add(selectedWordId);
+    persist();
     showTryAgain();
   };
 
@@ -311,6 +333,7 @@ function RoundQuizSheetInner({
     if (choice.id !== current.id) {
       triggerGameHaptic('quizWrong');
       mistakenItemIdsRef.current.add(current.id);
+      persist();
       showTryAgain(
         choice.word,
         () => queuePickSpeech(choice.word, { quickStart: true }),
@@ -321,6 +344,7 @@ function RoundQuizSheetInner({
     const speechTask = speechTaskRef.current;
     const flowId = ++answerFlowIdRef.current;
     const nextIndex = pickIndex + 1;
+    persist({ answeredCount: nextIndex, pickIndex: Math.min(nextIndex, items.length - 1), completed: nextIndex >= items.length });
     setAnswerPending(true);
     void (async () => {
       if (speechTask) await speechTask.catch(() => false);
@@ -339,31 +363,20 @@ function RoundQuizSheetInner({
     if (answerPending || pickIndex <= 0) return;
     dismissTryAgain();
     setPickIndex((i) => i - 1);
+    persist({ pickIndex: pickIndex - 1 });
   };
 
   const goToNextPick = () => {
     if (answerPending || pickIndex >= furthestPickIndex) return;
     dismissTryAgain();
     setPickIndex((i) => i + 1);
-  };
-
-  const handleExit = () => {
-    setAbandonConfirmOpen(true);
-  };
-
-  const confirmAbandon = () => {
-    answerFlowIdRef.current += 1;
-    pickSpeechRunRef.current += 1;
-    speechTaskRef.current = null;
-    stopAllWordSpeech();
-    if (tryAgainTimerRef.current) window.clearTimeout(tryAgainTimerRef.current);
-    setAbandonConfirmOpen(false);
-    onAbandon();
+    persist({ pickIndex: pickIndex + 1 });
   };
 
   const currentPick = pickOrder[pickIndex];
+  // Source-language translations are hints: reveal only after an explicit tap.
   const currentTranslation = currentPick
-    ? getEmojiLearningTranslation(currentPick, locale)
+    ? currentPick.sourceWord?.trim() || getEmojiLearningTranslation(currentPick, locale)
     : null;
   const isPickReview = phase === 'pick' && pickIndex < furthestPickIndex;
   const canGoPrevPick = phase === 'pick' && pickIndex > 0 && !answerPending;
@@ -379,11 +392,10 @@ function RoundQuizSheetInner({
       animate="visible"
       exit="exit"
       className="candy-quiz-overlay"
-      role={abandonConfirmOpen ? undefined : 'dialog'}
-      aria-modal={abandonConfirmOpen ? undefined : 'true'}
-      aria-hidden={abandonConfirmOpen ? true : undefined}
+      role="dialog"
+      aria-modal="true"
       aria-label={t.quiz.dialogAria}
-      tabIndex={abandonConfirmOpen ? undefined : -1}
+      tabIndex={-1}
     >
       <SkySparkleBackground variant="game" />
       <div className="candy-quiz-panel">
@@ -411,18 +423,6 @@ function RoundQuizSheetInner({
             <p className="candy-quiz-hint">
               {phase === 'connect' ? t.quiz.connectHint : t.quiz.pickHint}
             </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            <motion.button
-              type="button"
-              onClick={handleExit}
-              className="candy-quiz-exit"
-              aria-label={t.quiz.exitAria}
-              whileTap={MOTION_PRESS_TAP}
-            >
-              <X size={14} aria-hidden />
-              {t.quiz.exit}
-            </motion.button>
           </div>
         </motion.div>
 
@@ -669,51 +669,6 @@ function RoundQuizSheetInner({
         )}
       </AnimatePresence>
 
-      {typeof document !== 'undefined' && createPortal(<AnimatePresence>
-        {abandonConfirmOpen && (
-          <motion.div
-            ref={abandonDialogRef}
-            key="abandon-confirm"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            variants={MOTION_VIGNETTE}
-            className="fixed inset-0 z-[150] flex items-center justify-center bg-black/45 px-6"
-            role="alertdialog"
-            aria-modal="true"
-            aria-label={t.quiz.abandonConfirmTitle}
-            tabIndex={-1}
-          >
-            <motion.div
-              variants={MOTION_CARD_POP}
-              className="candy-modal-surface"
-            >
-              <div className="candy-modal-title">{t.quiz.abandonConfirmTitle}</div>
-              <div className="candy-modal-body">
-                {t.quiz.abandonConfirmBody}
-              </div>
-              <div className="candy-modal-actions">
-                <motion.button
-                  type="button"
-                  whileTap={MOTION_PRESS_TAP}
-                  onClick={() => setAbandonConfirmOpen(false)}
-                  className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
-                >
-                  {t.quiz.abandonConfirmStay}
-                </motion.button>
-                <motion.button
-                  type="button"
-                  whileTap={MOTION_PRESS_TAP}
-                  onClick={confirmAbandon}
-                  className="candy-sheet-action-btn candy-sheet-action-btn-danger w-full"
-                >
-                  {t.quiz.abandonConfirmLeave}
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>, document.body)}
     </motion.div>
   );
 }

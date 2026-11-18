@@ -12,6 +12,15 @@ import {
   type MembershipPlan,
   type MembershipOfferings,
 } from './membershipOfferings';
+import {
+  buyStoreProduct,
+  isStoreKitReady,
+  listenForStoreChanges,
+  loadStoreEntitlements,
+  loadStoreProducts,
+  restoreStorePurchases,
+  storeProductIds,
+} from './storekit';
 
 export type { MembershipPlan } from './membershipOfferings';
 
@@ -46,6 +55,12 @@ type MembershipContextValue = {
   paywallOpen: boolean;
   paywallSource: MembershipPaywallSource;
   offerings: MembershipOfferings;
+  storeSupported: boolean;
+  storeReady: boolean;
+  storeBusy: boolean;
+  storeError: string | null;
+  purchasePlan: (plan: MembershipPlan) => Promise<'purchased' | 'pending' | 'cancelled'>;
+  restorePurchases: () => Promise<boolean>;
   startTrial: () => void;
   markTrialWelcomeSeen: () => void;
   continueWithFree: () => void;
@@ -74,6 +89,7 @@ function loadState(): StoredMembershipState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_STATE };
     const parsed = JSON.parse(raw) as Partial<StoredMembershipState>;
+    const developmentPlan = (parsed as { developmentPlan?: unknown }).developmentPlan;
     const trialStartedAtMs = finiteTimestamp(parsed.trialStartedAtMs);
     const trialEndsAtMs = finiteTimestamp(parsed.trialEndsAtMs);
     return {
@@ -86,8 +102,8 @@ function loadState(): StoredMembershipState {
       trialWelcomeSeen: Boolean(parsed.trialWelcomeSeen),
       expirationChoiceSeen: Boolean(parsed.expirationChoiceSeen),
       developmentPlan:
-        parsed.developmentPlan === 'monthly' || parsed.developmentPlan === 'annual'
-          ? parsed.developmentPlan
+        developmentPlan === 'lifetime' || developmentPlan === 'monthly' || developmentPlan === 'annual'
+          ? 'lifetime'
           : null,
     };
   } catch {
@@ -112,6 +128,98 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallSource, setPaywallSource] =
     useState<MembershipPaywallSource>('profile');
+  const [offerings, setOfferings] = useState<MembershipOfferings>(FALLBACK_MEMBERSHIP_OFFERINGS);
+  const [storeReady, setStoreReady] = useState(false);
+  const [storeBusy, setStoreBusy] = useState(false);
+  const [storeError, setStoreError] = useState<string | null>(null);
+  const [storeEntitled, setStoreEntitled] = useState(false);
+
+  const refreshEntitlements = useCallback(async () => {
+    if (!isStoreKitReady()) return;
+    const ids = await loadStoreEntitlements();
+    setStoreEntitled(ids.includes(storeProductIds.lifetime));
+  }, []);
+
+  useEffect(() => {
+    if (!isStoreKitReady()) return;
+    let disposed = false;
+    let listener: { remove: () => Promise<void> } | null = null;
+    const refreshProducts = async () => {
+      try {
+        const products = await loadStoreProducts();
+        if (disposed) return;
+        const lifetime = products.find((product) => product.id === storeProductIds.lifetime);
+        if (!lifetime) throw new Error('store-products-unavailable');
+        setOfferings({
+          lifetime: { plan: 'lifetime', productId: lifetime.id, displayPrice: lifetime.displayPrice },
+        });
+        setStoreReady(true);
+        setStoreError(null);
+      } catch (error) {
+        if (!disposed) setStoreError(error instanceof Error ? error.message : 'store-unavailable');
+      }
+    };
+    // A product-catalog outage must not hide an already verified purchase.
+    void refreshEntitlements().catch((error) => {
+      if (!disposed) setStoreError(error instanceof Error ? error.message : 'store-unavailable');
+    });
+    void refreshProducts();
+    void listenForStoreChanges(() => { void refreshEntitlements().catch(() => undefined); })
+      .then((handle) => {
+        if (disposed) void handle?.remove();
+        else listener = handle;
+      })
+      .catch(() => undefined);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshEntitlements().catch(() => undefined);
+        void refreshProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      void listener?.remove();
+    };
+  }, [refreshEntitlements]);
+
+  const purchasePlan = useCallback(async (plan: MembershipPlan) => {
+    if (!storeReady) throw new Error('store-unavailable');
+    setStoreBusy(true);
+    setStoreError(null);
+    try {
+      const result = await buyStoreProduct(offerings[plan].productId);
+      if (result.status === 'purchased') {
+        await refreshEntitlements();
+        setPaywallOpen(false);
+      }
+      return result.status;
+    } catch (error) {
+      setStoreError(error instanceof Error ? error.message : 'purchase-failed');
+      throw error;
+    } finally {
+      setStoreBusy(false);
+    }
+  }, [offerings, refreshEntitlements, storeReady]);
+
+  const restorePurchases = useCallback(async () => {
+    if (!isStoreKitReady()) throw new Error('store-unavailable');
+    setStoreBusy(true);
+    setStoreError(null);
+    try {
+      const ids = await restoreStorePurchases();
+      const entitled = ids.includes(storeProductIds.lifetime);
+      setStoreEntitled(entitled);
+      if (entitled) setPaywallOpen(false);
+      return entitled;
+    } catch (error) {
+      setStoreError(error instanceof Error ? error.message : 'restore-failed');
+      throw error;
+    } finally {
+      setStoreBusy(false);
+    }
+  }, []);
 
   const updateStored = useCallback(
     (update: (current: StoredMembershipState) => StoredMembershipState) => {
@@ -138,12 +246,16 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const status = useMemo<MembershipStatus>(() => {
+    if (storeEntitled) return 'premium';
     if (import.meta.env.DEV && stored.developmentPlan) return 'premium';
+    // A client-written seven-day timestamp is not a paid App Store entitlement.
+    // Keep the old prototype trial for local development only.
+    if (!import.meta.env.DEV) return 'free';
     if (stored.trialStartedAtMs === null || stored.trialEndsAtMs === null) {
       return 'not-started';
     }
     return now < stored.trialEndsAtMs ? 'trial' : 'free';
-  }, [now, stored.developmentPlan, stored.trialEndsAtMs, stored.trialStartedAtMs]);
+  }, [now, storeEntitled, stored.developmentPlan, stored.trialEndsAtMs, stored.trialStartedAtMs]);
 
   const startTrial = useCallback(() => {
     updateStored((current) => {
@@ -206,10 +318,8 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
   const value = useMemo<MembershipContextValue>(
     () => ({
       status,
-      // Treat the few milliseconds before startTrial runs as entitled so the
-      // first game frame never flashes a locked tab.
-      hasPremiumAccess:
-        status === 'not-started' || status === 'trial' || status === 'premium',
+      // An unstarted trial is free. Never grant paid limits before entitlement.
+      hasPremiumAccess: status === 'trial' || status === 'premium',
       trialStartedAtMs: stored.trialStartedAtMs,
       trialEndsAtMs: stored.trialEndsAtMs,
       trialRemainingMs,
@@ -217,7 +327,13 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       shouldShowExpirationChoice,
       paywallOpen,
       paywallSource,
-      offerings: FALLBACK_MEMBERSHIP_OFFERINGS,
+      offerings,
+      storeSupported: isStoreKitReady(),
+      storeReady,
+      storeBusy,
+      storeError,
+      purchasePlan,
+      restorePurchases,
       startTrial,
       markTrialWelcomeSeen,
       continueWithFree,
@@ -231,8 +347,14 @@ export function MembershipProvider({ children }: { children: ReactNode }) {
       continueWithFree,
       markTrialWelcomeSeen,
       openPaywall,
+      offerings,
       paywallOpen,
       paywallSource,
+      purchasePlan,
+      restorePurchases,
+      storeReady,
+      storeBusy,
+      storeError,
       shouldShowExpirationChoice,
       shouldShowTrialWelcome,
       startTrial,

@@ -1,0 +1,786 @@
+[
+  {
+    "id": "face-with-monocle",
+    "emoji": "🧐",
+    "course": "zh-CN-es",
+    "target": "cara con monóculo",
+    "before": "侦探脸",
+    "after": "戴单片眼镜的脸"
+  },
+  {
+    "id": "face-with-monocle",
+    "emoji": "🧐",
+    "course": "zh-CN-ja",
+    "target": "モノクルを付けた顔",
+    "before": "侦探脸",
+    "after": "戴单片眼镜的脸"
+  },
+  {
+    "id": "face-with-monocle",
+    "emoji": "🧐",
+    "course": "zh-CN-ko",
+    "target": "단안경을 쓴 얼굴",
+    "before": "侦探脸",
+    "after": "戴单片眼镜的脸"
+  },
+  {
+    "id": "tired-face-2",
+    "emoji": "😫",
+    "course": "zh-CN-es",
+    "target": "cara cansada",
+    "before": "痛苦",
+    "after": "疲惫的脸"
+  },
+  {
+    "id": "tired-face-2",
+    "emoji": "😫",
+    "course": "zh-CN-ko",
+    "target": "피곤한 얼굴",
+    "before": "痛苦",
+    "after": "疲惫的脸"
+  },
+  {
+    "id": "palms-up-together",
+    "emoji": "🤲",
+    "course": "fr-en",
+    "target": "Palms Up Together",
+    "before": "paume contre paume doigts vers le haut",
+    "after": "deux mains réunies, paumes vers le haut"
+  },
+  {
+    "id": "palms-up-together",
+    "emoji": "🤲",
+    "course": "fr-es",
+    "target": "palmas hacia arriba juntas",
+    "before": "paume contre paume doigts vers le haut",
+    "after": "deux mains réunies, paumes vers le haut"
+  },
+  {
+    "id": "palms-up-together",
+    "emoji": "🤲",
+    "course": "fr-ja",
+    "target": "手のひらを揃えた両手",
+    "before": "paume contre paume doigts vers le haut",
+    "after": "deux mains côte à côte"
+  },
+  {
+    "id": "palms-up-together",
+    "emoji": "🤲",
+    "course": "fr-ko",
+    "target": "내민 두 손",
+    "before": "paume contre paume doigts vers le haut",
+    "after": "deux mains tendues"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "zh-CN-es",
+    "target": "pintarse las uñas",
+    "before": "指甲油",
+    "after": "涂指甲油"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "zh-CN-ja",
+    "target": "マニキュアを塗る手",
+    "before": "指甲油",
+    "after": "正在涂指甲油的手"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "en-es",
+    "target": "pintarse las uñas",
+    "before": "Nail Polish",
+    "after": "Painting one’s nails"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "en-ja",
+    "target": "マニキュアを塗る手",
+    "before": "Nail Polish",
+    "after": "A hand having nail polish applied"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "es-ja",
+    "target": "マニキュアを塗る手",
+    "before": "pintarse las uñas",
+    "after": "una mano a la que se le está aplicando esmalte"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "ja-es",
+    "target": "pintarse las uñas",
+    "before": "マニキュアを塗る手",
+    "after": "爪にマニキュアを塗る"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "ko-es",
+    "target": "pintarse las uñas",
+    "before": "매니큐어",
+    "after": "매니큐어 바르기"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "ko-ja",
+    "target": "マニキュアを塗る手",
+    "before": "매니큐어",
+    "after": "매니큐어를 바르고 있는 손"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "fr-es",
+    "target": "pintarse las uñas",
+    "before": "vernis à ongles",
+    "after": "se vernir les ongles"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "fr-ja",
+    "target": "マニキュアを塗る手",
+    "before": "vernis à ongles",
+    "after": "une main sur laquelle on applique du vernis à ongles"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "de-es",
+    "target": "pintarse las uñas",
+    "before": "Nagellack",
+    "after": "Sich die Nägel lackieren"
+  },
+  {
+    "id": "nail-polish",
+    "emoji": "💅",
+    "course": "de-ja",
+    "target": "マニキュアを塗る手",
+    "before": "Nagellack",
+    "after": "Eine Hand, deren Nägel lackiert werden"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "zh-CN-ko",
+    "target": "승마",
+    "before": "赛马",
+    "after": "骑马"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "en-ko",
+    "target": "승마",
+    "before": "Horse Racing",
+    "after": "Horse riding"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "es-ko",
+    "target": "승마",
+    "before": "carrera de caballos",
+    "after": "equitación"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "ja-ko",
+    "target": "승마",
+    "before": "競馬",
+    "after": "乗馬"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "fr-ko",
+    "target": "승마",
+    "before": "course hippique",
+    "after": "équitation"
+  },
+  {
+    "id": "horse-racing",
+    "emoji": "🏇",
+    "course": "de-ko",
+    "target": "승마",
+    "before": "Pferderennen",
+    "after": "Reiten"
+  },
+  {
+    "id": "snowboarder",
+    "emoji": "🏂",
+    "course": "zh-CN-es",
+    "target": "practicante de snowboard",
+    "before": "滑雪板",
+    "after": "单板滑雪者"
+  },
+  {
+    "id": "snowboarder",
+    "emoji": "🏂",
+    "course": "zh-CN-ja",
+    "target": "スノーボーダー",
+    "before": "滑雪板",
+    "after": "单板滑雪者"
+  },
+  {
+    "id": "snowboarder",
+    "emoji": "🏂",
+    "course": "zh-CN-ko",
+    "target": "스노보드 타는 사람",
+    "before": "滑雪板",
+    "after": "单板滑雪者"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "zh-CN-en",
+    "target": "Fencing",
+    "before": "击剑的人",
+    "after": "击剑运动"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "en-es",
+    "target": "persona haciendo esgrima",
+    "before": "Fencing",
+    "after": "Fencer"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "en-ja",
+    "target": "フェンシングをする人",
+    "before": "Fencing",
+    "after": "Fencer"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "en-ko",
+    "target": "펜싱하는 사람",
+    "before": "Fencing",
+    "after": "Fencer"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "es-en",
+    "target": "Fencing",
+    "before": "persona haciendo esgrima",
+    "after": "esgrima"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "ja-en",
+    "target": "Fencing",
+    "before": "フェンシングをする人",
+    "after": "フェンシング"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "ko-en",
+    "target": "Fencing",
+    "before": "펜싱하는 사람",
+    "after": "펜싱"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "fr-en",
+    "target": "Fencing",
+    "before": "escrimeur",
+    "after": "escrime"
+  },
+  {
+    "id": "fencing",
+    "emoji": "🤺",
+    "course": "de-en",
+    "target": "Fencing",
+    "before": "Fechter(in)",
+    "after": "Fechten"
+  },
+  {
+    "id": "paw-prints",
+    "emoji": "🐾",
+    "course": "es-en",
+    "target": "Paw Prints",
+    "before": "huellas de pezuñas",
+    "after": "huellas de patas"
+  },
+  {
+    "id": "paw-prints",
+    "emoji": "🐾",
+    "course": "ko-en",
+    "target": "Paw Prints",
+    "before": "곰발바닥",
+    "after": "발자국"
+  },
+  {
+    "id": "blowfish",
+    "emoji": "🐡",
+    "course": "fr-en",
+    "target": "Blowfish",
+    "before": "poisson-lune",
+    "after": "poisson-globe"
+  },
+  {
+    "id": "blowfish",
+    "emoji": "🐡",
+    "course": "fr-es",
+    "target": "pez globo",
+    "before": "poisson-lune",
+    "after": "poisson-globe"
+  },
+  {
+    "id": "blowfish",
+    "emoji": "🐡",
+    "course": "fr-ja",
+    "target": "フグ",
+    "before": "poisson-lune",
+    "after": "poisson-globe"
+  },
+  {
+    "id": "blowfish",
+    "emoji": "🐡",
+    "course": "fr-ko",
+    "target": "복어",
+    "before": "poisson-lune",
+    "after": "poisson-globe"
+  },
+  {
+    "id": "root-vegetable",
+    "emoji": "🫜",
+    "course": "es-en",
+    "target": "Root Vegetable",
+    "before": "túberculo comestible",
+    "after": "tubérculo comestible"
+  },
+  {
+    "id": "root-vegetable",
+    "emoji": "🫜",
+    "course": "es-ja",
+    "target": "根菜",
+    "before": "túberculo comestible",
+    "after": "tubérculo comestible"
+  },
+  {
+    "id": "root-vegetable",
+    "emoji": "🫜",
+    "course": "es-ko",
+    "target": "뿌리채소",
+    "before": "túberculo comestible",
+    "after": "tubérculo comestible"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "fr-en",
+    "target": "Fish Cake with Swirl",
+    "before": "croquette de poisson",
+    "after": "gâteau de pâte de poisson japonais à motif en spirale"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "fr-es",
+    "target": "pastel de pescado japonés",
+    "before": "croquette de poisson",
+    "after": "gâteau de pâte de poisson japonais"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "fr-ja",
+    "target": "なると",
+    "before": "croquette de poisson",
+    "after": "gâteau de pâte de poisson japonais à motif en spirale"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "fr-ko",
+    "target": "어묵",
+    "before": "croquette de poisson",
+    "after": "préparation à base de pâte de poisson"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "de-en",
+    "target": "Fish Cake with Swirl",
+    "before": "Fischfrikadelle",
+    "after": "Japanischer Fischkuchen mit Spiralmuster"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "de-es",
+    "target": "pastel de pescado japonés",
+    "before": "Fischfrikadelle",
+    "after": "Japanischer Fischkuchen"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "de-ja",
+    "target": "なると",
+    "before": "Fischfrikadelle",
+    "after": "Japanischer Fischkuchen mit Spiralmuster"
+  },
+  {
+    "id": "fish-cake-with-swirl",
+    "emoji": "🍥",
+    "course": "de-ko",
+    "target": "어묵",
+    "before": "Fischfrikadelle",
+    "after": "Fischkuchen"
+  },
+  {
+    "id": "shortcake",
+    "emoji": "🍰",
+    "course": "fr-ja",
+    "target": "ショートケーキ",
+    "before": "gâteau sablé",
+    "after": "gâteau à la crème chantilly"
+  },
+  {
+    "id": "snowman-without-snow",
+    "emoji": "⛄️",
+    "course": "zh-CN-es",
+    "target": "muñeco de nieve",
+    "before": "无雪雪人",
+    "after": "雪人"
+  },
+  {
+    "id": "snowman-without-snow",
+    "emoji": "⛄️",
+    "course": "zh-CN-ko",
+    "target": "스노우맨",
+    "before": "无雪雪人",
+    "after": "雪人"
+  },
+  {
+    "id": "comet",
+    "emoji": "☄️",
+    "course": "es-en",
+    "target": "Comet",
+    "before": "meteorito",
+    "after": "cometa"
+  },
+  {
+    "id": "comet",
+    "emoji": "☄️",
+    "course": "es-ja",
+    "target": "彗星",
+    "before": "meteorito",
+    "after": "cometa"
+  },
+  {
+    "id": "desert-island",
+    "emoji": "🏝️",
+    "course": "ko-en",
+    "target": "Desert Island",
+    "before": "사막 섬",
+    "after": "무인도"
+  },
+  {
+    "id": "desert-island",
+    "emoji": "🏝️",
+    "course": "ko-es",
+    "target": "isla desierta",
+    "before": "사막 섬",
+    "after": "무인도"
+  },
+  {
+    "id": "desert-island",
+    "emoji": "🏝️",
+    "course": "ko-ja",
+    "target": "無人島",
+    "before": "사막 섬",
+    "after": "무인도"
+  },
+  {
+    "id": "timer-clock",
+    "emoji": "⏲",
+    "course": "de-en",
+    "target": "Timer Clock",
+    "before": "Zeitschaltuhr",
+    "after": "Timer"
+  },
+  {
+    "id": "timer-clock",
+    "emoji": "⏲",
+    "course": "de-es",
+    "target": "temporizador",
+    "before": "Zeitschaltuhr",
+    "after": "Timer"
+  },
+  {
+    "id": "timer-clock",
+    "emoji": "⏲",
+    "course": "de-ja",
+    "target": "タイマー",
+    "before": "Zeitschaltuhr",
+    "after": "Timer"
+  },
+  {
+    "id": "timer-clock",
+    "emoji": "⏲",
+    "course": "de-ko",
+    "target": "타이머 시계",
+    "before": "Zeitschaltuhr",
+    "after": "Timer"
+  },
+  {
+    "id": "clamp",
+    "emoji": "🗜️",
+    "course": "ko-en",
+    "target": "Clamp",
+    "before": "압축기",
+    "after": "클램프"
+  },
+  {
+    "id": "paper-lantern",
+    "emoji": "🏮",
+    "course": "zh-CN-es",
+    "target": "lámpara japonesa",
+    "before": "御手玉",
+    "after": "日式灯笼"
+  },
+  {
+    "id": "envelope-with-arrow",
+    "emoji": "📩",
+    "course": "zh-CN-ko",
+    "target": "보낸 편지",
+    "before": "拆信",
+    "after": "已寄出的信"
+  },
+  {
+    "id": "envelope-with-arrow",
+    "emoji": "📩",
+    "course": "ja-ko",
+    "target": "보낸 편지",
+    "before": "メール受信",
+    "after": "送った手紙"
+  },
+  {
+    "id": "closed-mailbox-with-lowered-flag",
+    "emoji": "📪",
+    "course": "zh-CN-es",
+    "target": "buzón cerrado vacío",
+    "before": "lowered 邮箱",
+    "after": "空的关闭信箱"
+  },
+  {
+    "id": "closed-mailbox-with-lowered-flag",
+    "emoji": "📪",
+    "course": "zh-CN-ja",
+    "target": "手紙が入っていない閉じた郵便受け",
+    "before": "lowered 邮箱",
+    "after": "空的关闭信箱"
+  },
+  {
+    "id": "closed-mailbox-with-lowered-flag",
+    "emoji": "📪",
+    "course": "zh-CN-ko",
+    "target": "깃발 내려간 닫힌 우편함",
+    "before": "lowered 邮箱",
+    "after": "旗子放下的关闭信箱"
+  },
+  {
+    "id": "page-with-curl",
+    "emoji": "📃",
+    "course": "zh-CN-en",
+    "target": "Page with Curl",
+    "before": "卷纸",
+    "after": "卷边纸页"
+  },
+  {
+    "id": "page-with-curl",
+    "emoji": "📃",
+    "course": "zh-CN-es",
+    "target": "página doblada",
+    "before": "卷纸",
+    "after": "卷边纸页"
+  },
+  {
+    "id": "page-with-curl",
+    "emoji": "📃",
+    "course": "zh-CN-ja",
+    "target": "巻きページ",
+    "before": "卷纸",
+    "after": "卷边纸页"
+  },
+  {
+    "id": "page-with-curl",
+    "emoji": "📃",
+    "course": "zh-CN-ko",
+    "target": "안으로 말린 문서",
+    "before": "卷纸",
+    "after": "卷边纸页"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "zh-CN-es",
+    "target": "persona haciendo malabares",
+    "before": "杂耍",
+    "after": "杂耍者"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "zh-CN-ja",
+    "target": "ジャグリングをする人",
+    "before": "杂耍",
+    "after": "杂耍者"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "zh-CN-ko",
+    "target": "저글링하는 사람",
+    "before": "杂耍",
+    "after": "杂耍者"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "en-es",
+    "target": "persona haciendo malabares",
+    "before": "Juggling",
+    "after": "Juggler"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "en-ja",
+    "target": "ジャグリングをする人",
+    "before": "Juggling",
+    "after": "Juggler"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "en-ko",
+    "target": "저글링하는 사람",
+    "before": "Juggling",
+    "after": "Juggler"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "es-en",
+    "target": "Juggling",
+    "before": "persona haciendo malabares",
+    "after": "hacer malabares"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "ja-en",
+    "target": "Juggling",
+    "before": "ジャグリングをする人",
+    "after": "ジャグリングをすること"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "ko-en",
+    "target": "Juggling",
+    "before": "저글링하는 사람",
+    "after": "저글링하기"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "fr-en",
+    "target": "Juggling",
+    "before": "personne qui jongle",
+    "after": "jonglage"
+  },
+  {
+    "id": "juggling",
+    "emoji": "🤹",
+    "course": "de-en",
+    "target": "Juggling",
+    "before": "Jongleur(in)",
+    "after": "Jonglieren"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "zh-CN-es",
+    "target": "cine",
+    "before": "影院标志",
+    "after": "电影院；电影"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "zh-CN-ko",
+    "target": "영화",
+    "before": "影院标志",
+    "after": "电影"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "en-es",
+    "target": "cine",
+    "before": "Cinema Light",
+    "after": "Cinema"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "en-ko",
+    "target": "영화",
+    "before": "Cinema Light",
+    "after": "Movie"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "es-ko",
+    "target": "영화",
+    "before": "cine",
+    "after": "película"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "fr-ko",
+    "target": "영화",
+    "before": "cinéma",
+    "after": "film"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "de-es",
+    "target": "cine",
+    "before": "Kinosymbol",
+    "after": "Kino"
+  },
+  {
+    "id": "cinema-light",
+    "emoji": "🎦",
+    "course": "de-ko",
+    "target": "영화",
+    "before": "Kinosymbol",
+    "after": "Film"
+  }
+]

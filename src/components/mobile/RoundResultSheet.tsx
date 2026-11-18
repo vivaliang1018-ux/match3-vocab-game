@@ -1,12 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useI18n } from '../../i18n';
+import { CATEGORY_UI_COPY } from '../../lib/learningCategoryPresentation';
+import { MEMBERSHIP_COPY } from '../../membership/membershipCopy';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
 import { assetUrl } from '../../lib/assetUrl';
 import { AWARD_TRACKS, type AwardTrackId } from '../../lib/playerSummary';
 import { triggerGameHaptic } from '../../lib/gameHaptics';
 import type { WordItem } from '../../types/game';
 import { useModalDialog } from './useModalDialog';
+import { LearningReminderCard, type LearningReminderCardHandle } from './LearningReminderCard';
+import type { LearningReminderResult } from '../../lib/learningNotificationsV2';
 
 export type RoundResult = {
   kind: 'learned' | 'review';
@@ -29,7 +33,7 @@ export type RoundResult = {
   };
   nextGoal: string;
   primaryActionLabel?: string;
-  followUp: 'advance' | 'forced-review' | 'review-choices' | 'home';
+  followUp: 'advance' | 'forced-review' | 'review-choices' | 'home' | 'mood-limit';
 };
 
 type RoundResultSheetProps = {
@@ -40,10 +44,15 @@ type RoundResultSheetProps = {
   onViewCollection: () => void;
   canContinueReview: boolean;
   canGoAdventure: boolean;
+  hasPremiumAccess: boolean;
+  lifetimeDisplayPrice: string | null;
   onContinueReview: () => void;
   onGoAdventure: () => void;
+  onUnlockPlus: () => void;
+  onReturnHome: () => void;
   onRest: () => void;
   onClaimAward: (awardId: AwardTrackId) => void;
+  onEnableReminders: () => Promise<LearningReminderResult>;
 };
 
 export function RoundResultSheet({
@@ -54,15 +63,27 @@ export function RoundResultSheet({
   onViewCollection,
   canContinueReview,
   canGoAdventure,
+  hasPremiumAccess,
+  lifetimeDisplayPrice,
   onContinueReview,
   onGoAdventure,
+  onUnlockPlus,
+  onReturnHome,
   onRest,
   onClaimAward,
+  onEnableReminders,
 }: RoundResultSheetProps) {
   const { locale, t, ui } = useI18n();
+  const categoryCopy = CATEGORY_UI_COPY[locale];
+  const membershipCopy = MEMBERSHIP_COPY[locale];
   const reduceMotion = useReducedMotion();
   const [claimedIds, setClaimedIds] = useState<Set<AwardTrackId>>(() => new Set());
   const [revealPhase, setRevealPhase] = useState<'mystery' | 'revealing' | 'revealed'>('mystery');
+  const reminderCardRef = useRef<LearningReminderCardHandle | null>(null);
+  const continueAfterReminder = (action: () => void) => {
+    if (reminderCardRef.current) reminderCardRef.current.continueWith(action);
+    else action();
+  };
   const dialogRef = useModalDialog({
     open: Boolean(result),
     closeOnEscape: false,
@@ -282,9 +303,7 @@ export function RoundResultSheet({
               >
             <h2 className="text-2xl font-black text-sky-950">
               {result.categoryProgress
-                ? locale === 'zh-CN'
-                  ? `${result.categoryProgress.title}训练完成`
-                  : `${result.categoryProgress.title} complete`
+                ? categoryCopy.trainingComplete(result.categoryProgress.title)
                 : result.kind === 'review'
                 ? ui.roundResult.strengthened
                 : ui.roundResult.discovered(result.items.length)}
@@ -316,12 +335,8 @@ export function RoundResultSheet({
               <div className="mt-3 rounded-2xl bg-sky-50 px-4 py-3 text-left text-sky-950">
                 <div className="text-xs font-black uppercase tracking-[0.08em] text-sky-600">
                   {result.categoryProgress.completedCycle
-                    ? locale === 'zh-CN'
-                      ? `第 ${result.categoryProgress.previousCycle} 轮全部通过`
-                      : `Cycle ${result.categoryProgress.previousCycle} complete`
-                    : locale === 'zh-CN'
-                      ? `第 ${result.categoryProgress.cycle} 轮进度`
-                      : `Cycle ${result.categoryProgress.cycle} progress`}
+                    ? categoryCopy.cycleComplete(result.categoryProgress.previousCycle)
+                    : categoryCopy.cycleLabel(result.categoryProgress.cycle)}
                 </div>
                 <div className="mt-1 text-lg font-black">
                   {result.categoryProgress.clearedInCycle}/{result.categoryProgress.total}
@@ -350,6 +365,10 @@ export function RoundResultSheet({
               </div>
             ) : null}
 
+            {result.kind === 'learned' && result.items.length > 0 && (
+              <LearningReminderCard ref={reminderCardRef} key={result.items.map(item => item.id).join('|')} count={result.items.length} locale={locale} onEnable={onEnableReminders} />
+            )}
+
             {result.followUp === 'review-choices' ? (
               <div className="mt-4 flex w-full flex-col gap-2">
                 {canContinueReview ? (
@@ -370,7 +389,7 @@ export function RoundResultSheet({
                   <motion.button
                     type="button"
                     whileTap={MOTION_PRESS_TAP}
-                    onClick={onGoAdventure}
+                    onClick={() => continueAfterReminder(onGoAdventure)}
                     className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
                   >
                     {t.modes.reviewContinueAdventure}
@@ -383,10 +402,57 @@ export function RoundResultSheet({
                 <motion.button
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
-                  onClick={onRest}
+                    onClick={() => continueAfterReminder(onRest)}
                   className="candy-sheet-action-btn candy-sheet-action-btn-quiet w-full"
                 >
                   {t.modes.reviewContinueRest}
+                </motion.button>
+              </div>
+            ) : result.followUp === 'mood-limit' ? (
+              <div className="mt-4 flex w-full flex-col gap-2">
+                {!hasPremiumAccess && (
+                  <>
+                    <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-100 px-4 py-3 text-sm font-black text-amber-950">
+                      👑 {membershipCopy.benefits[1]}
+                    </div>
+                    <motion.button
+                      type="button"
+                      whileTap={MOTION_PRESS_TAP}
+                      onClick={() => continueAfterReminder(onUnlockPlus)}
+                      className="candy-sheet-action-btn w-full border-2 border-amber-300 bg-gradient-to-b from-yellow-200 to-amber-300 text-amber-950 shadow-[0_5px_0_#b7791f]"
+                    >
+                      👑 {membershipCopy.lifetime}
+                      {lifetimeDisplayPrice ? ` · ${lifetimeDisplayPrice}` : ''}
+                    </motion.button>
+                  </>
+                )}
+                {canGoAdventure && (
+                  <motion.button
+                    type="button"
+                    whileTap={MOTION_PRESS_TAP}
+                    onClick={() => continueAfterReminder(onGoAdventure)}
+                    className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
+                  >
+                    {t.modes.reviewContinueAdventure}
+                  </motion.button>
+                )}
+                {canContinueReview && (
+                  <motion.button
+                    type="button"
+                    whileTap={MOTION_PRESS_TAP}
+                    onClick={() => continueAfterReminder(onContinueReview)}
+                    className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
+                  >
+                    {t.modes.reviewContinueReview}
+                  </motion.button>
+                )}
+                <motion.button
+                  type="button"
+                  whileTap={MOTION_PRESS_TAP}
+                  onClick={() => continueAfterReminder(onReturnHome)}
+                  className="candy-sheet-action-btn candy-sheet-action-btn-quiet w-full"
+                >
+                  {t.gameSettings.home}
                 </motion.button>
               </div>
             ) : result.categoryProgress ? (
@@ -394,27 +460,25 @@ export function RoundResultSheet({
                 <motion.button
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
-                  onClick={onContinue}
+                  onClick={() => continueAfterReminder(onContinue)}
                   className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
                 >
-                  {locale === 'zh-CN'
-                    ? `继续探索${result.categoryProgress.title}`
-                    : `Continue ${result.categoryProgress.title}`}
+                  {categoryCopy.continueCategory(result.categoryProgress.title)}
                 </motion.button>
                 <motion.button
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
-                  onClick={onReturnToCategory}
+                  onClick={() => continueAfterReminder(onReturnToCategory)}
                   className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
                 >
-                  {locale === 'zh-CN' ? '返回分类首页' : 'Back to categories'}
+                  {categoryCopy.backToCategories}
                 </motion.button>
               </div>
             ) : (
               <motion.button
                 type="button"
                 whileTap={MOTION_PRESS_TAP}
-                onClick={onContinue}
+                onClick={() => continueAfterReminder(onContinue)}
                 className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
               >
                 {result.followUp === 'forced-review'
@@ -426,7 +490,7 @@ export function RoundResultSheet({
             )}
             <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2">
               {result.kind === 'learned' && (
-                <button type="button" onClick={onViewCollection} className="text-xs font-black text-sky-700 underline decoration-sky-300 underline-offset-4">
+                <button type="button" onClick={() => continueAfterReminder(onViewCollection)} className="text-xs font-black text-sky-700 underline decoration-sky-300 underline-offset-4">
                   {ui.roundResult.viewCollection}
                 </button>
               )}

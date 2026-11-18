@@ -4,8 +4,11 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
+import type { CourseId } from '../courseConfig';
 
 const STORAGE_KEY = 'match3-mode-unlocks-v1';
+const courseStorageKey = (courseId: CourseId = getActiveCourseId()) => `${STORAGE_KEY}:${courseId}`;
 export const CATEGORY_UNLOCK_CLEARS = 3;
 
 export type ModeUnlockState = {
@@ -44,8 +47,9 @@ function parseModeUnlocks(raw: string): ModeUnlockState {
   }
 }
 
-export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
-  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+export function loadModeUnlocks(userUid?: string | null, courseId?: CourseId): ModeUnlockState {
+  const key = courseStorageKey(courseId);
+  claimGuestProgress(key, userUid, (accountRaw, guestRaw) => {
     const account = parseModeUnlocks(accountRaw);
     const guest = parseModeUnlocks(guestRaw);
     return JSON.stringify({
@@ -56,7 +60,7 @@ export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
     });
   });
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    const raw = readScopedProgress(key, userUid);
     if (!raw) return { ...DEFAULT_UNLOCKS };
     return parseModeUnlocks(raw);
   } catch {
@@ -64,12 +68,12 @@ export function loadModeUnlocks(userUid?: string | null): ModeUnlockState {
   }
 }
 
-export function saveModeUnlocks(state: ModeUnlockState, userUid?: string | null): void {
-  writeScopedProgress(STORAGE_KEY, JSON.stringify(state), userUid);
+export function saveModeUnlocks(state: ModeUnlockState, userUid?: string | null, courseId?: CourseId): void {
+  writeScopedProgress(courseStorageKey(courseId), JSON.stringify(state), userUid);
 }
 
-export function clearModeUnlocks(userUid?: string | null): void {
-  clearScopedProgress(STORAGE_KEY, userUid);
+export function clearModeUnlocks(userUid?: string | null, courseId?: CourseId): void {
+  clearScopedProgress(courseStorageKey(courseId), userUid);
 }
 
 export function isReviewUnlocked(clears: number): boolean {

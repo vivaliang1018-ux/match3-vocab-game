@@ -16,7 +16,8 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise)
     ]
 
-    private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+    private var recognitionLocaleIdentifier = "en-US"
     private var audioEngine: AVAudioEngine?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
@@ -33,10 +34,12 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc override func checkPermissions(_ call: CAPPluginCall) {
+        configureRecognizer(localeIdentifier: call.getString("locale") ?? recognitionLocaleIdentifier)
         call.resolve(permissionPayload())
     }
 
     @objc override func requestPermissions(_ call: CAPPluginCall) {
+        configureRecognizer(localeIdentifier: call.getString("locale") ?? recognitionLocaleIdentifier)
         SFSpeechRecognizer.requestAuthorization { [weak self] _ in
             guard let self else { return }
             self.requestMicrophonePermission { _ in
@@ -48,6 +51,7 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func start(_ call: CAPPluginCall) {
+        configureRecognizer(localeIdentifier: call.getString("locale") ?? recognitionLocaleIdentifier)
         guard SFSpeechRecognizer.authorizationStatus() == .authorized else {
             call.reject("speech-permission-denied")
             return
@@ -58,10 +62,6 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         guard recognizer?.isAvailable == true else {
             call.reject("speech-recognizer-unavailable")
-            return
-        }
-        guard recognizer?.supportsOnDeviceRecognition == true else {
-            call.reject("on-device-speech-unavailable")
             return
         }
 
@@ -174,8 +174,20 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
         return [
             "speechRecognition": speech,
             "microphone": microphone,
+            "locale": recognitionLocaleIdentifier,
+            "localeSupported": recognizer != nil,
+            "recognizerAvailable": recognizer?.isAvailable == true,
             "onDeviceRecognitionSupported": recognizer?.supportsOnDeviceRecognition == true
         ]
+    }
+
+    private func configureRecognizer(localeIdentifier: String) {
+        let trimmed = localeIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        let requested = trimmed.isEmpty ? "en-US" : trimmed
+        guard requested != recognitionLocaleIdentifier || recognizer == nil else { return }
+        stopRecognition(deactivateSession: true)
+        recognitionLocaleIdentifier = requested
+        recognizer = SFSpeechRecognizer(locale: Locale(identifier: requested))
     }
 
     private func requestMicrophonePermission(_ completion: @escaping (Bool) -> Void) {
@@ -246,19 +258,14 @@ final class AppleSpeechRecognitionPlugin: CAPPlugin, CAPBridgedPlugin {
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognizer is unavailable."]
             )
         }
-        guard recognizer.supportsOnDeviceRecognition else {
-            throw NSError(
-                domain: "LingoMatchSpeech",
-                code: 4,
-                userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is unavailable."]
-            )
-        }
 
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.taskHint = .search
         request.contextualStrings = contextualWords
-        request.requiresOnDeviceRecognition = true
+        // Prefer local processing; use Apple's service for locales without
+        // on-device support. This requires a network connection.
+        request.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
 
         recognitionRequest = request
         cycleId += 1

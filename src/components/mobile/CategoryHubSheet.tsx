@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, Play, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { CATEGORY_UI_COPY } from '../../lib/learningCategoryPresentation';
 import {
   MOTION_SHEET_PANEL,
   MOTION_STAGGER_TIGHT_CONTAINER,
@@ -48,6 +49,7 @@ export function CategoryHubSheet({
   onSelectCategory,
 }: CategoryHubSheetProps) {
   const { locale, t } = useI18n();
+  const copy = CATEGORY_UI_COPY[locale];
   const dialogRef = useModalDialog({ open, onClose });
   const selectedPool = pools.find((pool) => pool.id === selectedCategoryId) ?? pools[0] ?? null;
   const selectedPoolIsFresh =
@@ -59,9 +61,7 @@ export function CategoryHubSheet({
     }))
     .filter((section) => section.pools.length > 0);
   const progressLabel = (pool: CategoryChallengePool) =>
-    locale === 'zh-CN'
-      ? `第 ${pool.cycle} 轮 · ${pool.clearedInCycle}/${pool.items.length}`
-      : `Cycle ${pool.cycle} · ${pool.clearedInCycle}/${pool.items.length}`;
+    copy.cycleProgress(pool.cycle, pool.clearedInCycle, pool.items.length);
 
   return (
     <AnimatePresence>
@@ -76,7 +76,7 @@ export function CategoryHubSheet({
           className="candy-sheet-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label={locale === 'zh-CN' ? '分类探索' : 'Explore categories'}
+          aria-label={copy.explore}
           tabIndex={-1}
           onClick={onClose}
         >
@@ -92,19 +92,17 @@ export function CategoryHubSheet({
                 type="button"
                 onClick={onBackToModes}
                 className="candy-sheet-close"
-                aria-label={locale === 'zh-CN' ? '返回模式选择' : 'Back to modes'}
+                aria-label={copy.backToModes}
                 whileTap={MOTION_PRESS_TAP}
               >
                 <ArrowLeft size={17} strokeWidth={2.75} aria-hidden />
               </motion.button>
               <div className="min-w-0 flex-1 text-center">
                 <h2 className="candy-sheet-title">
-                  {locale === 'zh-CN' ? '想认识什么？' : 'What do you want to explore?'}
+                  {copy.title}
                 </h2>
                 <p className="mt-1 text-[11px] font-bold text-sky-800/65">
-                  {locale === 'zh-CN'
-                    ? '选择一个主题，集中认识其中的词'
-                    : 'Choose a theme and focus on its words'}
+                  {copy.subtitle}
                 </p>
               </div>
               <motion.button
@@ -131,9 +129,7 @@ export function CategoryHubSheet({
                   </span>
                   <span className="min-w-0 flex-1 text-left">
                     <small>
-                      {selectedPoolIsFresh
-                        ? locale === 'zh-CN' ? '推荐主题' : 'Recommended theme'
-                        : locale === 'zh-CN' ? '继续探索' : 'Continue exploring'}
+                      {selectedPoolIsFresh ? copy.recommended : copy.continueExploring}
                     </small>
                     <strong>{selectedPool.label}</strong>
                     <span>{progressLabel(selectedPool)}</span>

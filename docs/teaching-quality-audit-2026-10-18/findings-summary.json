@@ -1,0 +1,21 @@
+{
+  "records": 124,
+  "uniqueEmojiItems": 101,
+  "byStatus": {
+    "已确认文本问题": 66,
+    "疑似／专业判断待母语复核": 39,
+    "地区差异／可保留": 18,
+    "无法验证语音": 1
+  },
+  "bySeverity": {
+    "P0": 17,
+    "P1": 72,
+    "P2": 35
+  },
+  "confirmedTextBySeverity": {
+    "P0": 17,
+    "P1": 48,
+    "P2": 1
+  },
+  "note": "Counts are issue/review records, not automatically failed course pairs. Region/retain and audio-pending entries are not confirmed errors."
+}

@@ -20,6 +20,9 @@ import { clearFirstTimeGuideState } from './firstTimeGuide';
 import { clearSayBlastStats } from './sayBlastStats';
 import { clearPlayerSummary } from './playerSummary';
 import { clearCategoryCycleProgress } from './categoryCycleProgress';
+import { clearStaminaState } from './stamina';
+import { clearMoodDailyState } from './moodBoard';
+import { COURSES } from '../courseConfig';
 
 /**
  * Permanently delete the signed-in account: cloud progress, Auth user, then local user bucket.
@@ -47,6 +50,10 @@ export async function deleteAccountUser(): Promise<void> {
   // Firestore operation fails, abort so the user can retry with an account that
   // still has permission to remove its own data.
   const { deleteCloudWordMemories } = await import('./memoryCloudSync');
+  if (import.meta.env.VITE_CLOUD_DAILY_QUOTA === '1') {
+    const { deleteCloudDailyQuotas } = await import('./dailyQuotaCloud');
+    await deleteCloudDailyQuotas(uid);
+  }
   await deleteCloudWordMemories(uid);
   await revokePreparedAppleToken(appleRevocation);
 
@@ -62,14 +69,18 @@ export async function deleteAccountUser(): Promise<void> {
     throw error;
   }
 
-  clearWordMemoriesForScope(scope);
-  clearRoundLearnedIds(uid);
-  clearModeUnlocks(uid);
+  for (const course of COURSES) {
+    clearWordMemoriesForScope(scope, course.id);
+    clearRoundLearnedIds(uid, course.id);
+    clearModeUnlocks(uid, course.id);
+    clearPlayerSummary(uid, course.id);
+    clearCategoryCycleProgress(uid, course.id);
+  }
   clearAdventureSetHistory(uid);
   clearFirstTimeGuideState(uid);
   clearSayBlastStats(uid);
-  clearPlayerSummary(uid);
-  clearCategoryCycleProgress(uid);
+  clearStaminaState(uid);
+  clearMoodDailyState(uid);
   clearAvatarPreset(uid);
 
   if (Capacitor.isNativePlatform()) {

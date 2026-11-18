@@ -1,0 +1,74 @@
+{
+  "raccoon": [
+    "韩国国立国语院：너구리 = raccoon dog",
+    "https://krdict.korean.go.kr/eng/dicMarinerSearch/search?mainSearchWord=%EB%84%88"
+  ],
+  "ecology": [
+    "韩国国立生态院：너구리 与 raccoon dog",
+    "https://www.nie.re.kr/nie/cmmn/file/fileDown.do?atchFileId=6399676c89184992aa032d1ecf1ac112&fileSn=1"
+  ],
+  "eagle": [
+    "韩国国家档案馆／江华自然史博物馆：Eagle 与 Vulture 分类",
+    "https://www.archives.go.kr/next/newmanager/publishmentSubscriptionDetail.do?gubun_flg=&keyword=&page=201&prt_seq=197885"
+  ],
+  "eagleUsage": [
+    "美国 Defense Language Institute 原始韩语教材：독수리 列有 eagle、vulture",
+    "https://files.eric.ed.gov/fulltext/ED031710.pdf"
+  ],
+  "shortcake": [
+    "Cambridge：shortcake 的美英地区用法",
+    "https://dictionary.cambridge.org/us/dictionary/english/shortcake"
+  ],
+  "mermaid": [
+    "Cambridge：mermaid",
+    "https://dictionary.cambridge.org/us/dictionary/english/mermaid"
+  ],
+  "island": [
+    "Cambridge：desert island",
+    "https://dictionary.cambridge.org/us/dictionary/english/desert-island"
+  ],
+  "vest": [
+    "韩国国立国语院：구명조끼（水中浮力救生衣）",
+    "https://krdict.korean.go.kr/kor/dicSearch/SearchView?ParaWordNo=34991"
+  ],
+  "compressor": [
+    "韩国国立国语院：air compressor／공기 압축기",
+    "https://kli.korean.go.kr/term/trgtWord/indexTrgtWord.do?trgtWordNo=200899"
+  ],
+  "globe": [
+    "Larousse：tétrodon／poisson-globe",
+    "https://www.larousse.fr/encyclopedie/images/T%C3%A9trodon/1012186"
+  ],
+  "sunfish": [
+    "法国科学院词典：poisson-lune／môle",
+    "https://dictionnaire-academie.fr/article/A9P3123-A"
+  ],
+  "campanilla": [
+    "ASALE：campanilla 的一种地域植物义",
+    "https://www.asale.org/damer/campanilla"
+  ],
+  "seal": [
+    "韩国国立生态院：物种表分别列出 물범、물개",
+    "https://www.nie.re.kr/nie/pgm/edSpecies/list.do?menuNo=200121"
+  ],
+  "unicode": [
+    "Unicode 图符资料：仅用于视觉身份佐证，不作为词义唯一依据",
+    "https://www.unicode.org/Public/UCD/latest/charts/nameslist/1f300/"
+  ],
+  "cakeSpelling": [
+    "韩国国立国语院：케이크 vs 케익",
+    "https://www.korean.go.kr/front/onlineQna/onlineQnaView.do?mn_id=216&pageIndex=1&qna_seq=321881&searchCondition=&searchKeyword="
+  ],
+  "chocolateSpelling": [
+    "韩国国立国语院：chocolate 的规范音译 초콜릿",
+    "https://www.korean.go.kr/front/mcfaq/mcfaqView.do?mcfaq_seq=9133&mn_id=62&pageIndex=18"
+  ],
+  "flatbreadDictionary": [
+    "Oxford：flatbread 的无酵薄面饼释义",
+    "https://www.oxfordlearnersdictionaries.com/us/definition/english/flatbread"
+  ],
+  "flatbreadReview": [
+    "IRTA 研究综述：发酵与无酵 flatbread 类别",
+    "https://repositori.irta.cat/bitstream/handle/20.500.12327/1666/Boukid_Flatbread_2022.pdf?isAllowed=y&sequence=1"
+  ]
+}

@@ -92,6 +92,14 @@ export function ModePickerSheet({
     disabled?: boolean;
   }[] = [
     { id: 'random', label: t.modes.random, emoji: MODE_EMOJI.random, description: t.modes.randomDesc },
+    ...(categoryUnlocked
+      ? [{
+          id: 'category' as const,
+          label: t.modes.category,
+          emoji: MODE_EMOJI.category,
+          description: t.modes.categoryDesc,
+        }]
+      : []),
     ...(moodUnlocked ? [{
       id: 'mood',
       label: t.modes.moodBoard,
@@ -106,18 +114,10 @@ export function ModePickerSheet({
       label: t.modes.sayBlast,
       emoji: '🎤',
       description: sayBlastReady
-        ? `${t.modes.sayBlastDesc} · 3★ +1 ❤️`
+        ? `${t.modes.sayBlastDesc} · ${ui.deadMachine.earnStaminaHint}`
         : ui.mode.sayBlastNeedsWords,
       disabled: !sayBlastReady,
     },
-    ...(categoryUnlocked
-      ? [{
-          id: 'category' as const,
-          label: t.modes.category,
-          emoji: MODE_EMOJI.category,
-          description: t.modes.categoryDesc,
-        }]
-      : []),
   ];
 
   const pickMode = (mode: ChallengeMode | typeof SAY_BLAST_MODE_ID) => {

@@ -1,0 +1,10 @@
+{
+  "severity": "P1",
+  "evidence": "code-logic-only",
+  "observedOnDevice": false,
+  "condition": "Recorded playback fails AND active target language has no system voice",
+  "file": "src/lib/wordSpeech.ts",
+  "function": "pickEnglishVoice / speak",
+  "risk": "English or first available voice may be selected with its language for non-English target text.",
+  "action": "No product modification; await approval and real-device reproduction."
+}

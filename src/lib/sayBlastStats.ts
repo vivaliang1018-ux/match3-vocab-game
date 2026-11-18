@@ -4,8 +4,10 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
 
 const STORAGE_KEY = 'match3-say-blast-stats-v1';
+const courseStorageKey = () => `${STORAGE_KEY}:${getActiveCourseId()}`;
 
 export const SAY_BLAST_ATTEMPT_MILESTONES = [5, 10, 20, 50, 100] as const;
 
@@ -47,14 +49,15 @@ function saveSayBlastStats(
   stats: SayBlastStats,
   userUid?: string | null,
 ): SayBlastStats {
-  writeScopedProgress(STORAGE_KEY, JSON.stringify(stats), userUid);
+  writeScopedProgress(courseStorageKey(), JSON.stringify(stats), userUid);
   return stats;
 }
 
 export function loadSayBlastStats(userUid?: string | null): SayBlastStats {
-  claimGuestProgress(STORAGE_KEY, userUid);
+  const key = courseStorageKey();
+  claimGuestProgress(key, userUid);
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    const raw = readScopedProgress(key, userUid);
     if (!raw) return { ...DEFAULT_STATS };
     const parsed = JSON.parse(raw) as Partial<SayBlastStats>;
     return {

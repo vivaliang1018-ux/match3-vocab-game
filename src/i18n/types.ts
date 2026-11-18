@@ -294,17 +294,20 @@ export type Messages = {
     reviveSuccessSubtitle: string;
     reviveFailTitle: string;
     reviveFailSubtitle: string;
-    reviveRetryTitle: string;
-    reviveRetrySubtitle: string;
+    reviveFailRemaining: (n: number) => string;
+    reviveFailSaved: string;
     reviveExit: string;
     reviveExitAria: string;
     outOfMovesTitle: string;
     outOfMovesSubtitle: string;
     retrySameSet: string;
-    waitStamina: string;
+    retrySameSetWithStamina: string;
+    rechargeToRetry: string;
+    returnHome: string;
     deadTitle: string;
     deadSubtitle: string;
     deadWait: string;
+    deadWaitRemaining: (hours: number, minutes: number) => string;
     deadGoReview: string;
   };
   consent: {

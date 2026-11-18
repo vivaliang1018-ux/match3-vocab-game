@@ -96,6 +96,9 @@ export function pickSmartRefillItemId(
 
 type Match = { cells: Cell[]; itemId: string };
 
+/** Public read-only match result for other clients (including the mini-program). */
+export type GridMatch = Match;
+
 function findRawMatches(grid: Tile[][]): Match[] {
   const matches: Match[] = [];
   for (let r = 0; r < GRID_SIZE; r++) {
@@ -127,6 +130,16 @@ function findRawMatches(grid: Tile[][]): Match[] {
     }
   }
   return matches;
+}
+
+/** Find every horizontal/vertical 3+ match without mutating the board. */
+export function findGridMatches(grid: Tile[][]): GridMatch[] {
+  return findRawMatches(grid);
+}
+
+/** Swap two tiles immutably; callers can then resolve matches and refill. */
+export function swapGridTiles(grid: Tile[][], a: Cell, b: Cell): Tile[][] {
+  return swapGrid(grid, a, b);
 }
 
 function findLongRuns(grid: Tile[][]): Match[] {
@@ -162,6 +175,11 @@ export function findBestHintMove(grid: Tile[][]): { a: Cell; b: Cell } | null {
     }
   }
   return fallback;
+}
+
+/** True when at least one adjacent swap produces a legal 3+ match. */
+export function hasAvailableMove(grid: Tile[][]): boolean {
+  return findBestHintMove(grid) !== null;
 }
 
 function restoreCells(grid: Tile[][], backup: { r: number; c: number; itemId: string }[]) {

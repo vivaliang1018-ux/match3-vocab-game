@@ -7,13 +7,24 @@ import { useModalDialog } from './useModalDialog';
 type AdventureFailSheetProps = {
   open: boolean;
   canRetry: boolean;
+  unlimitedRetry: boolean;
+  remainingWords: number;
   onRetry: () => void;
-  onClose: () => void;
+  onRecharge: () => void;
+  onGoHome: () => void;
 };
 
-export function AdventureFailSheet({ open, canRetry, onRetry, onClose }: AdventureFailSheetProps) {
+export function AdventureFailSheet({
+  open,
+  canRetry,
+  unlimitedRetry,
+  remainingWords,
+  onRetry,
+  onRecharge,
+  onGoHome,
+}: AdventureFailSheetProps) {
   const { t } = useI18n();
-  const dialogRef = useModalDialog({ open, onClose });
+  const dialogRef = useModalDialog({ open, onClose: onGoHome });
 
   return (
     <AnimatePresence>
@@ -25,7 +36,7 @@ export function AdventureFailSheet({ open, canRetry, onRetry, onClose }: Adventu
           animate="visible"
           exit="exit"
           variants={MOTION_VIGNETTE}
-          className="candy-celebration-overlay z-[160]"
+          className="candy-celebration-overlay candy-celebration-overlay-actionable z-[160]"
           role="dialog"
           aria-modal="true"
           aria-label={t.adventure.reviveFailTitle}
@@ -38,6 +49,14 @@ export function AdventureFailSheet({ open, canRetry, onRetry, onClose }: Adventu
             </div>
             <div className="candy-modal-title">{t.adventure.reviveFailTitle}</div>
             <div className="candy-modal-body mt-0">{t.adventure.reviveFailSubtitle}</div>
+            {remainingWords > 0 && (
+              <div className="rounded-full bg-amber-50 px-4 py-2 text-sm font-black text-amber-800 ring-1 ring-amber-200">
+                {t.adventure.reviveFailRemaining(remainingWords)}
+              </div>
+            )}
+            <div className="max-w-sm text-center text-sm font-bold leading-relaxed text-sky-800/80">
+              {t.adventure.reviveFailSaved}
+            </div>
             <div className="candy-modal-actions mt-2">
               {canRetry ? (
                 <motion.button
@@ -46,20 +65,27 @@ export function AdventureFailSheet({ open, canRetry, onRetry, onClose }: Adventu
                   onClick={onRetry}
                   className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
                 >
-                  {t.adventure.retrySameSet}
+                  {unlimitedRetry
+                    ? t.adventure.retrySameSet
+                    : t.adventure.retrySameSetWithStamina}
                 </motion.button>
               ) : (
-                <div className="rounded-2xl bg-sky-50 px-3 py-2 text-center text-xs font-bold text-sky-800">
-                  {t.adventure.waitStamina}
-                </div>
+                <motion.button
+                  type="button"
+                  whileTap={MOTION_PRESS_TAP}
+                  onClick={onRecharge}
+                  className="candy-sheet-action-btn candy-sheet-action-btn-pink w-full"
+                >
+                  {t.adventure.rechargeToRetry}
+                </motion.button>
               )}
               <motion.button
                 type="button"
                 whileTap={MOTION_PRESS_TAP}
-                onClick={onClose}
-                className="candy-sheet-action-btn candy-sheet-action-btn-secondary w-full"
+                onClick={onGoHome}
+                className="mt-1 w-full py-2 text-sm font-extrabold text-sky-800/65 underline decoration-sky-300 underline-offset-4"
               >
-                {t.common.close}
+                {t.adventure.returnHome}
               </motion.button>
             </div>
           </motion.div>

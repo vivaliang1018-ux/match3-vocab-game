@@ -4,6 +4,13 @@ const LEGACY_VOICE_FILENAME_STEMS: Readonly<Record<string, string>> = {
   // The shipped asset is lowercase. Resolve it explicitly because iOS app
   // bundles are case-sensitive and quick playback only tries the first URL.
   Beaver: 'beaver',
+  // These shipped English clips use generator-era punctuation/spacing. Map
+  // them before the quick-play path so it uses the recording instead of TTS.
+  'Walking: Facing Right': 'Walking： Facing Right',
+  'Kneeling: Facing Right': 'Kneeling： Facing Right',
+  'With White Cane: Facing Right': 'With White Cane： Facing Right',
+  // The generator removes the slash because it cannot be used in an MP3 filename.
+  '녹음/녹화 버튼': '녹음녹화 버튼',
 };
 
 /** Vite dev server matches literal `:` in filenames; `%3A` returns HTML instead of MP3. */

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { hasAdventurePayment, isPaidPlayableAdventureBoard } from '../lib/adventureResume';
 import { cn } from '../lib/utils';
 import { syncStatusBarForTab } from '../lib/capacitorInit';
 import { useAuth } from '../auth/AuthProvider';
@@ -24,12 +25,18 @@ import {
 } from '../lib/memoryCloudSync';
 import { THIINGS_100 } from '../data/thiings100';
 import { EMOJI_NOUN_CATEGORIES } from '../data/emojiNouns';
+import { getActiveCourseId, languageForCode, useCourse } from '../course';
+import { trackCoreEvent } from '../lib/coreAnalytics';
+import { loadPendingQuiz, savePendingQuiz, clearPendingQuiz, type PendingQuiz } from '../lib/pendingQuiz';
+import { createCoreEventLedger, quizAnalyticsScore } from '../lib/coreAnalyticsEvents';
+import { learningLanguageForCourse, learningWordForCourse, sourceWordForCourse } from '../lib/courseWord';
 import {
   EMOJI_LEARNING_BROWSE_SECTIONS,
   EMOJI_LEARNING_CATEGORIES,
   EMOJI_LEARNING_ITEMS_BY_CATEGORY,
   getEmojiLearningBrowseSection,
 } from '../lib/emojiLearningCategories';
+import { CATEGORY_UI_COPY, learningCategoryTitle, learningSectionTitle } from '../lib/learningCategoryPresentation';
 import {
   categoryCycleEntry,
   completeCategoryCycleBoard,
@@ -69,9 +76,35 @@ import {
   moodPaletteForDay,
   moodPaletteSwatch,
   canPlayMoodToday,
+  loadMoodDailyState,
+  saveMoodDailyState,
   tryConsumeMoodPlay,
   type MoodPaletteId,
 } from '../lib/moodBoard';
+import { useMembership } from '../membership/MembershipProvider';
+import {
+  enableLearningReminders,
+  markLearningActivity,
+  readLearningReminderSettings,
+  refreshLearningReminder,
+} from '../lib/learningNotificationsV2';
+import {
+  grantDailySayBlastReward,
+  isCloudQuotaAvailable,
+  resetDailyQuotaFromRewardedAd,
+  spendDailyQuota,
+  staminaFromDailyQuota,
+  synchronizeDailyQuota,
+  type DailyQuota,
+} from '../lib/dailyQuotaCloud';
+import {
+  hasPaidModeBoard,
+  loadModeBoardSnapshot,
+  removeModeBoardSnapshot,
+  saveModeBoardSnapshot,
+  validModeBoardSnapshot,
+  type ResumableMode,
+} from '../lib/modeBoardResume';
 import { CelebrationBurst } from './mobile/CelebrationBurst';
 import { RoundQuizSheet } from './mobile/RoundQuizSheet';
 import { RoundResultSheet, type RoundResult } from './mobile/RoundResultSheet';
@@ -113,7 +146,6 @@ import {
   HITS_PER_WORD_REVIEW,
   LATE_BOARD_ASSIST_MOVES,
   MATCH_CLEAR_BONUS_MOVES,
-  RESCUE_CONTINUE_MOVES,
   REVIVE_HITS_PER_WORD,
   REVIVE_WRONG_LIMIT,
   adventureTotalSets,
@@ -123,15 +155,20 @@ import {
   shouldForceReviewAfterClear,
 } from '../lib/adventureRules';
 import {
+  AD_STAMINA_RESETS_DAILY_MAX,
   grantSayBlastStamina,
   loadStaminaState,
+  resetStaminaFromRewardedAd,
   saveStaminaState,
   spendStamina,
   tickStamina,
   msUntilNextStamina,
   type StaminaState,
-  SAY_BLAST_DAILY_REWARD_MAX,
+  STAMINA_MAX,
 } from '../lib/stamina';
+import { rewardedAdsSupported, rewardedAdsTestMode, showStaminaRewardedAd } from '../lib/rewardedAds';
+import { REWARDED_AD_COPY } from '../i18n/rewardedAdCopy';
+import { NOTIFICATION_SETTINGS_COPY } from '../i18n/notificationSettingsCopy';
 import {
   isCategoryUnlocked,
   isReviewUnlocked,
@@ -164,6 +201,7 @@ import { pickVisuallyDistinctItems } from '../lib/emojiVisualConflicts';
 import type { Cell, ChallengeMode, QuizKind, Tile, WordItem } from '../types/game';
 import type { RefillBurst } from '../lib/boardRefill';
 import { allBoardCellKeys } from '../lib/boardRefill';
+import { boardSetupIdentity } from '../lib/boardSetupIdentity';
 import {
   loadFirstTimeGuideState,
   recordFeatureGuidePrompt,
@@ -184,6 +222,7 @@ type AdventureBoardSnapshot = {
   level: number;
   adventurePlayable: boolean;
   staminaOwed: boolean;
+  staminaPaid?: boolean;
   roundFree: boolean;
   rescueUsed: boolean;
   attemptLost: boolean;
@@ -239,7 +278,7 @@ function normalizedSnapshotUserId(userId: string | null | undefined): string {
 }
 
 function adventureSnapshotStorageKey(userId: string | null | undefined): string {
-  return `${ADVENTURE_SNAPSHOT_KEY_PREFIX}${normalizedSnapshotUserId(userId)}`;
+  return `${ADVENTURE_SNAPSHOT_KEY_PREFIX}${getActiveCourseId()}:${normalizedSnapshotUserId(userId)}`;
 }
 
 function loadAdventureBoardSnapshot(
@@ -258,6 +297,9 @@ function loadAdventureBoardSnapshot(
     ) {
       return null;
     }
+    // Do not trust the legacy default false: background initialization could
+    // save a never-played preview as paid. Preserve its layout, but require payment.
+    if (parsed.staminaOwed === false && !hasAdventurePayment(parsed)) parsed.staminaOwed = true;
     return parsed as AdventureBoardSnapshot;
   } catch {
     return null;
@@ -959,6 +1001,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   onBgmPauseChange,
 }) => {
   const { locale, t, ui } = useI18n();
+  const rewardedAdCopy = REWARDED_AD_COPY[locale];
+  const { courseId, course } = useCourse();
+  const { hasPremiumAccess, offerings, openPaywall } = useMembership();
+  const premiumAccessRef = useRef(hasPremiumAccess);
+  premiumAccessRef.current = hasPremiumAccess;
   const { user, ready: authReady, configured: authConfigured } = useAuth();
   const progressUserId = user?.uid ?? null;
   const progressUserIdRef = useRef<string | null>(progressUserId);
@@ -1017,29 +1064,32 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     const emojiItems: WordItem[] = EMOJI_NOUN_CATEGORIES.flatMap((cat) =>
       cat.items.map((it) => ({
         id: `emoji-${cat.id}-${it.id}`,
-        word: it.word,
+        word: learningWordForCourse(it, courseId),
+        sourceWord: sourceWordForCourse(it, courseId),
         cn: it.cn,
         emoji: it.emoji,
       })),
     );
-    const thiingsItems: WordItem[] = THIINGS_100.map((t) => ({
-      id: `thiings-${t.id}`,
-      word: t.word,
-      imgSrc: t.imgSrc,
-    }));
+    const thiingsItems: WordItem[] = learningLanguageForCourse(courseId) === 'en'
+      ? THIINGS_100.map((t) => ({
+          id: `thiings-${t.id}`,
+          word: t.word,
+          imgSrc: t.imgSrc,
+        }))
+      : [];
     return [...emojiItems, ...thiingsItems];
-  }, []);
+  }, [courseId]);
 
   const [categoryCycleProgress, setCategoryCycleProgress] =
-    useState<CategoryCycleProgress>(() => loadCategoryCycleProgress(progressUserId));
+    useState<CategoryCycleProgress>(() => loadCategoryCycleProgress(progressUserId, courseId));
   const categoryCycleProgressRef = useRef(categoryCycleProgress);
   categoryCycleProgressRef.current = categoryCycleProgress;
 
   useEffect(() => {
-    const next = loadCategoryCycleProgress(progressUserId);
+    const next = loadCategoryCycleProgress(progressUserId, courseId);
     categoryCycleProgressRef.current = next;
     setCategoryCycleProgress(next);
-  }, [progressUserId]);
+  }, [progressUserId, courseId]);
 
   const categoryPools = useMemo(
     () =>
@@ -1048,7 +1098,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           EMOJI_LEARNING_ITEMS_BY_CATEGORY.get(category.id) ?? [];
         const items = learningItems.map<WordItem>((entry) => ({
           id: `emoji-${entry.sourceCategoryId}-${entry.item.id}`,
-          word: entry.item.word,
+          word: learningWordForCourse(entry.item, courseId),
+          sourceWord: sourceWordForCourse(entry.item, courseId),
           cn: entry.item.cn,
           emoji: entry.item.emoji,
         }));
@@ -1059,10 +1110,9 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         );
         return {
           id: category.id,
-          label: locale === 'zh-CN' ? category.titleCn : category.title,
-          subtitle: category.title,
-          description:
-            locale === 'zh-CN' ? category.purposeCn : category.title,
+          label: learningCategoryTitle(category, locale),
+          subtitle: learningCategoryTitle(category, locale),
+          description: locale === 'zh-CN' ? category.purposeCn : CATEGORY_UI_COPY[locale].description,
           emoji: category.emoji,
           browseSectionId: getEmojiLearningBrowseSection(category.id).id,
           cycle: cycle.cycle,
@@ -1070,11 +1120,13 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           items,
         };
       }),
-    [categoryCycleProgress, locale],
+    [categoryCycleProgress, locale, courseId],
   );
   const [moodPaletteId, setMoodPaletteId] = useState<MoodPaletteId>(() =>
     moodPaletteForDay(),
   );
+  const moodPaletteIdRef = useRef(moodPaletteId);
+  moodPaletteIdRef.current = moodPaletteId;
   const moodBoardPool = useMemo(
     () => ({
       id: MOOD_BOARD_CATEGORY_ID,
@@ -1086,7 +1138,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   );
   const thiingsPool = useMemo(
     () => {
-      if (!THIINGS_100.length) return null;
+      if (!THIINGS_100.length || learningLanguageForCourse(courseId) !== 'en') return null;
       const items = THIINGS_100.map<WordItem>((t) => ({
         id: `thiings-${t.id}`,
         word: t.word,
@@ -1100,8 +1152,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return {
             id: 'thiings',
             label: 'Thiings',
-            subtitle: 'Image Pack',
-            description: 'Image Pack',
+            subtitle: CATEGORY_UI_COPY[locale].imagePack,
+            description: CATEGORY_UI_COPY[locale].imagePack,
             emoji: '🖼️',
             browseSectionId: 'extras',
             cycle: cycle.cycle,
@@ -1109,7 +1161,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             items,
           };
     },
-    [categoryCycleProgress],
+    [categoryCycleProgress, courseId, locale],
   );
   const challengePools = useMemo(
     () => (thiingsPool ? [...categoryPools, thiingsPool] : categoryPools),
@@ -1119,18 +1171,22 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     () => [
       ...EMOJI_LEARNING_BROWSE_SECTIONS.map((section) => ({
         id: section.id,
-        label: locale === 'zh-CN' ? section.titleCn : section.title,
+        label: learningSectionTitle(section, locale),
       })),
       ...(thiingsPool
-        ? [{ id: 'extras', label: locale === 'zh-CN' ? '更多内容' : 'More' }]
+        ? [{ id: 'extras', label: CATEGORY_UI_COPY[locale].extras }]
         : []),
     ],
     [locale, thiingsPool],
   );
+  const moodPlayOwedRef = useRef(initialEntry === 'mood');
+  const categoryPlayOwedRef = useRef(false);
   const [challengeMode, setChallengeMode] = useState<ChallengeMode>(() => {
     if (initialEntry === 'review') return 'review';
     if (initialEntry === 'mood') {
-      return tryConsumeMoodPlay() ? 'mood' : 'random';
+      return hasPaidModeBoard('mood', progressUserId) ||
+        (canPlayMoodToday({ hasPremiumAccess, userId: progressUserId }) &&
+          (hasPremiumAccess || loadStaminaState(Date.now(), progressUserId).value > 0)) ? 'mood' : 'random';
     }
     return 'random';
   });
@@ -1146,10 +1202,10 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const memoryScopeRef = useRef(memoryScopeForUserId(user?.uid ?? null));
   const [wordMemory, setWordMemory] = useState<Map<string, WordMemory>>(
-    () => hydrateMatch3Memories(user?.uid ?? null).map,
+    () => hydrateMatch3Memories(user?.uid ?? null, courseId).map,
   );
   const [roundLearnedIds, setRoundLearnedIds] = useState<string[]>(() =>
-    loadRoundLearnedIds(progressUserId),
+    loadRoundLearnedIds(progressUserId, courseId),
   );
   const roundLearnedIdsRef = useRef(roundLearnedIds);
   roundLearnedIdsRef.current = roundLearnedIds;
@@ -1159,11 +1215,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   useEffect(() => {
     let cancelled = false;
     const uid = user?.uid ?? null;
-    const local = hydrateMatch3Memories(uid);
+    const local = hydrateMatch3Memories(uid, courseId);
     memoryScopeRef.current = local.scope;
     setWordMemory(local.map);
 
-    void hydrateMatch3MemoriesWithCloud(uid).then(({ map, scope }) => {
+    void hydrateMatch3MemoriesWithCloud(uid, courseId).then(({ map, scope }) => {
       if (!cancelled) {
         memoryScopeRef.current = scope;
         // Preserve any interaction that landed after hydration's final local
@@ -1175,7 +1231,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [user?.uid]);
+  }, [user?.uid, courseId]);
 
   /** Only quiz-completed words shown in Learned are eligible for review. */
   const learnedItemIds = useMemo(
@@ -1195,11 +1251,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     () => reviewPool.filter((item) => Boolean(item.emoji)),
     [reviewPool],
   );
-  const reviewPoolKey = useMemo(
-    () => learnedItemIds.slice().sort().join('|'),
-    [learnedItemIds],
-  );
-
   const pool = useMemo(() => {
     if (challengeMode === 'review') return reviewPool;
     if (challengeMode === 'mood') return moodBoardPool.items;
@@ -1207,20 +1258,23 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     return adventurePool;
   }, [challengeMode, reviewPool, moodBoardPool, activeCategory, adventurePool]);
 
-  const boardSetupKey = useMemo(() => {
-    if (challengeMode === 'review') return `${progressUserId}:review:${reviewPoolKey}`;
-    if (challengeMode === 'mood')
-      return `${progressUserId}:mood:${moodPaletteId}`;
-    if (challengeMode === 'category')
-      return `${progressUserId}:category:${selectedCategoryId}`;
-    return `${progressUserId}:random`;
-  }, [
+  const boardSetupKey = useMemo(() => boardSetupIdentity({
+    courseId,
+    userId: progressUserId,
+    mode: challengeMode,
+    categoryId: selectedCategoryId,
+    moodPaletteId,
+  }), [
+    courseId,
     challengeMode,
     selectedCategoryId,
     moodPaletteId,
-    reviewPoolKey,
     progressUserId,
   ]);
+  const poolRef = useRef(pool);
+  poolRef.current = pool;
+  const allPoolRef = useRef(allPool);
+  allPoolRef.current = allPool;
 
   const [itemHitCount, setItemHitCount] = useState<Record<string, number>>({});
   const [gameItems, setGameItems] = useState<WordItem[]>(() =>
@@ -1254,13 +1308,32 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   /** Skip N boardSetupKey effect runs (seeded boards / mode handoffs). */
   const suppressBoardSetupSkipsRef = useRef(0);
   const [deadMachineOpen, setDeadMachineOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AppTab>(
+    initialEntry === 'learned' ? 'learned' : initialEntry === 'collection' ? 'words' : initialEntry === 'profile' ? 'profile' : 'game',
+  );
+  const [reminderPromptBusy, setReminderPromptBusy] = useState(false);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => readLearningReminderSettings().enabled);
+  const [rewardedAdBusy, setRewardedAdBusy] = useState(false);
+  const [rewardedAdStatus, setRewardedAdStatus] = useState<string | null>(null);
   const staminaGateResumeRef = useRef<StaminaGateResume | null>(null);
   const [reviewPaused, setReviewPaused] = useState(false);
+  const [gameLifecyclePaused, setGameLifecyclePaused] = useState(false);
   const [modePickerOpen, setModePickerOpen] = useState(false);
   const [categoryHubRequestKey, setCategoryHubRequestKey] = useState(0);
-  const [staminaState, setStaminaState] = useState<StaminaState>(() => loadStaminaState());
+  const [staminaState, setStaminaState] = useState<StaminaState>(() => loadStaminaState(Date.now(), progressUserId));
+  const [quotaSyncError, setQuotaSyncError] = useState(false);
   const staminaStateRef = useRef(staminaState);
   staminaStateRef.current = staminaState;
+  const rewardedAdResetsRemaining = Math.max(
+    0,
+    AD_STAMINA_RESETS_DAILY_MAX - staminaState.adResetsToday,
+  );
+  useEffect(() => {
+    const scoped = loadStaminaState(Date.now(), progressUserId);
+    staminaStateRef.current = scoped;
+    setStaminaState(scoped);
+    setQuotaSyncError(false);
+  }, [progressUserId]);
   /** Keep HUD at the board-entry stamina until the set ends (first move may spend). */
   const [staminaHudHold, setStaminaHudHold] = useState<number | null>(null);
   const [modeUnlocks, setModeUnlocks] = useState<ModeUnlockState>(() =>
@@ -1282,7 +1355,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   /** Next adventure board start is free (for example, abandoning the final quiz). */
   const adventureRoundFreeRef = useRef(false);
   /** Charge 1 stamina on the first matching move of this adventure board. */
-  const adventureStaminaOwedRef = useRef(false);
+  const adventureStaminaOwedRef = useRef(true);
+  const adventureStaminaPaidRef = useRef(false);
   const [adventurePlayable, setAdventurePlayable] = useState(true);
   const adventureFailedAwaitingRetryRef = useRef(false);
   const [failSheetOpen, setFailSheetOpen] = useState(false);
@@ -1292,18 +1366,18 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   roundResultRef.current = roundResult;
   const [collectionFocusItemIds, setCollectionFocusItemIds] = useState<string[]>([]);
   const [reviveFlash, setReviveFlash] = useState<
-    'success' | 'retry' | 'firstFailure' | 'rescueOffer' | null
+    'success' | 'firstFailure' | 'rescueOffer' | null
   >(null);
   const [firstReviveRemainingWords, setFirstReviveRemainingWords] = useState(0);
   const [reviveWrongTip, setReviveWrongTip] = useState<string | null>(null);
-  const [rescueMoveBonusFlashKey, setRescueMoveBonusFlashKey] = useState(0);
   const reviveTeachingAttemptRef = useRef(false);
   const reviveWrongTipShownRef = useRef(false);
   const reviveWrongTipTimerRef = useRef<number | null>(null);
-  const [coreCloudReadyUid, setCoreCloudReadyUid] = useState<string | null>(null);
+  const coreCloudScopeKey = progressUserId ? `${progressUserId}:${courseId}` : null;
+  const [coreCloudReadyScope, setCoreCloudReadyScope] = useState<string | null>(null);
 
   useEffect(() => {
-    const nextLearnedIds = loadRoundLearnedIds(progressUserId);
+    const nextLearnedIds = loadRoundLearnedIds(progressUserId, courseId);
     roundLearnedIdsRef.current = nextLearnedIds;
     setRoundLearnedIds(nextLearnedIds);
     setModeUnlocks(loadModeUnlocks(progressUserId));
@@ -1314,13 +1388,13 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setForcedReviewActive(false);
     forcedReviewActiveRef.current = false;
     setReviewPaused(false);
-  }, [progressUserId]);
+  }, [progressUserId, courseId]);
 
   useEffect(() => {
-    setCoreCloudReadyUid(null);
+    setCoreCloudReadyScope(null);
     if (!progressUserId) return;
     let cancelled = false;
-    void hydrateCoreProgressWithCloud(progressUserId).then((merged) => {
+    void hydrateCoreProgressWithCloud(progressUserId, courseId).then((merged) => {
       if (cancelled) return;
       roundLearnedIdsRef.current = merged.learnedIds;
       setRoundLearnedIds(merged.learnedIds);
@@ -1329,24 +1403,26 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       setPlayerSummary(merged.playerSummary);
       categoryCycleProgressRef.current = merged.categoryCycles;
       setCategoryCycleProgress(merged.categoryCycles);
-      setCoreCloudReadyUid(progressUserId);
+      setCoreCloudReadyScope(`${progressUserId}:${courseId}`);
     });
     return () => {
       cancelled = true;
     };
-  }, [progressUserId]);
+  }, [progressUserId, courseId]);
 
   useEffect(() => {
-    if (!progressUserId || coreCloudReadyUid !== progressUserId) return;
+    if (!progressUserId || coreCloudReadyScope !== coreCloudScopeKey) return;
     persistCoreProgress(progressUserId, {
       learnedIds: roundLearnedIds,
       modeUnlocks,
       playerSummary,
       categoryCycles: categoryCycleProgress,
-    });
+    }, { courseId });
   }, [
     categoryCycleProgress,
-    coreCloudReadyUid,
+    courseId,
+    coreCloudReadyScope,
+    coreCloudScopeKey,
     modeUnlocks,
     playerSummary,
     progressUserId,
@@ -1365,13 +1441,62 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const challengeModeRef = useRef(challengeMode);
   challengeModeRef.current = challengeMode;
+  const boardOwnerModeRef = useRef<ChallengeMode>(challengeMode);
+  const boardOwnerCategoryIdRef = useRef(selectedCategoryId);
+  const getReminderGameState = React.useCallback(() => {
+    const now = Date.now();
+    const current = tickStamina(staminaStateRef.current, now);
+    const remaining = msUntilNextStamina(current, now);
+    return {
+      dueReviewCount: reviewPool.reduce((count, item) => {
+        const memory = wordMemoryRef.current.get(memoryKeyForWord(item.word));
+        return count + (!memory || isDue(memory, now) ? 1 : 0);
+      }, 0),
+      staminaValue: current.value,
+      nextStaminaAt: remaining === null ? null : now + remaining,
+    };
+  }, [reviewPool]);
   const reviewRoundBoardMistakeIdsRef = useRef<Set<string>>(new Set());
 
   const persistStamina = React.useCallback((next: StaminaState) => {
     setStaminaState(next);
     staminaStateRef.current = next;
-    saveStaminaState(next);
+    saveStaminaState(next, progressUserIdRef.current);
   }, []);
+
+  const adoptCloudQuota = React.useCallback((quota: DailyQuota) => {
+    persistStamina(staminaFromDailyQuota(quota, staminaStateRef.current));
+    saveMoodDailyState({ dayKey: quota.dayKey, plays: quota.moodPlaysToday }, progressUserIdRef.current);
+    setQuotaSyncError(false);
+  }, [persistStamina]);
+
+  useEffect(() => {
+    const uid = progressUserId;
+    if (!isCloudQuotaAvailable(uid)) return;
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const quota = await synchronizeDailyQuota(
+          uid,
+          tickStamina(staminaStateRef.current),
+          loadMoodDailyState({ userId: uid }).plays,
+        );
+        if (!disposed) adoptCloudQuota(quota);
+      } catch (error) {
+        console.warn('[match3] daily quota sync failed', error);
+        if (!disposed) setQuotaSyncError(true);
+      }
+    };
+    void refresh();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [adoptCloudQuota, progressUserId]);
 
   const holdStaminaHudForBoard = React.useCallback(() => {
     setStaminaHudHold(staminaStateRef.current.value);
@@ -1401,10 +1526,10 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setWordMemory((prev) => {
       const next = new Map(prev);
       recordWordRecallFailure(next, item.word, item.cn);
-      persistWordMemories(next, memoryScopeRef.current);
+      persistWordMemories(next, memoryScopeRef.current, { courseId });
       return next;
     });
-  }, [itemById]);
+  }, [courseId, itemById]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -1463,6 +1588,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const firstSwapTutorialResolvingRef = useRef(false);
   const [popWord, setPopWord] = useState<{
     word: string;
+    sourceWord?: string;
     cn?: string;
     emoji?: string;
     imgSrc?: string;
@@ -1490,6 +1616,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   useEffect(() => {
     const restoreVocabularyAudio = () => {
       resetWordSpeechAfterBackground();
+      setGameLifecyclePaused(false);
       // iOS may require a fresh foreground user gesture even if audio was
       // unlocked before the app switch.
       ttsUnlockRef.current = false;
@@ -1501,6 +1628,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     };
     const suspendVocabularyAudio = () => {
       stopAllWordSpeech();
+      setGameLifecyclePaused(true);
       ttsUnlockRef.current = false;
       // Leaving the browser tab or native app is an explicit pause. Keep the
       // review stopped after foregrounding so the player decides when to resume.
@@ -1534,12 +1662,34 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const rescueUsedRef = useRef(false);
   const adventureBoardSnapshotRef = useRef<AdventureBoardSnapshot | null>(null);
   const snapshotRestoreInFlightRef = useRef(false);
+  const [restoredZeroMovePending, setRestoredZeroMovePending] = useState(false);
+  const [quizCheckpoint, setQuizCheckpoint] = useState<PendingQuiz | null>(() => loadPendingQuiz(courseId, progressUserId));
+  const quizCheckpointRef = useRef(quizCheckpoint);
+  const restoredQuizIdRef = useRef<string | null>(null);
+  const quizCompletionInFlightRef = useRef(false);
   const clearAdventureSnapshot = React.useCallback(() => {
     adventureBoardSnapshotRef.current = null;
     removeAdventureBoardSnapshot(progressUserIdRef.current);
   }, []);
 
+  const persistCurrentModeBoard = React.useCallback((mode: ResumableMode, playOwed: boolean) => {
+    if (gameItems.length < ADVENTURE_WORDS_PER_SET) return;
+    saveModeBoardSnapshot({
+      version: 1,
+      userId: normalizedSnapshotUserId(progressUserIdRef.current),
+      mode,
+      categoryId: mode === 'category' ? selectedCategoryId : null,
+      paletteId: mode === 'mood' ? moodPaletteId : null,
+      grid: gridRef.current.map((row) => row.map((tile) => ({ ...tile }))),
+      gameItems: [...gameItems],
+      itemHitCount: { ...itemHitCount },
+      playOwed,
+      savedAt: Date.now(),
+    });
+  }, [gameItems, itemHitCount, moodPaletteId, selectedCategoryId]);
+
   useEffect(() => {
+    if (quizCheckpointRef.current) return;
     snapshotRestoreInFlightRef.current = true;
     const learned = new Set(roundLearnedIdsRef.current);
     const saved = loadAdventureBoardSnapshot(progressUserId);
@@ -1548,6 +1698,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       !validAdventureBoardSnapshot(saved, progressUserId, allPool, learned)
     ) {
       adventureBoardSnapshotRef.current = null;
+      setRestoredZeroMovePending(false);
       if (saved) removeAdventureBoardSnapshot(progressUserId);
       snapshotRestoreInFlightRef.current = false;
       return;
@@ -1560,6 +1711,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       snapshotRestoreInFlightRef.current = false;
       return;
     }
+    if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0 && saved.staminaOwed) {
+      // An unpaid preview must go through the same gate as a new board.
+      setAdventurePlayable(false);
+      setDeadMachineOpen(true);
+      setGameItems([]);
+      setGrid(makeGrid([]));
+      snapshotRestoreInFlightRef.current = false;
+      return;
+    }
     suppressBoardSetupSkipsRef.current = Math.max(
       suppressBoardSetupSkipsRef.current,
       1,
@@ -1567,9 +1727,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setChallengeMode('random');
     setAdventurePlayable(saved.adventurePlayable);
     adventureStaminaOwedRef.current = saved.staminaOwed;
+    adventureStaminaPaidRef.current = hasAdventurePayment(saved);
     adventureRoundFreeRef.current = saved.roundFree;
+    const restoredFailure = saved.attemptLost || (saved.movesLeft <= 0 && saved.rescueUsed);
     rescueUsedRef.current = saved.rescueUsed;
-    adventureAttemptLostRef.current = saved.attemptLost;
+    adventureAttemptLostRef.current = restoredFailure;
+    adventureFailedAwaitingRetryRef.current = restoredFailure;
     movesLeftRef.current = saved.movesLeft;
     setMovesLeft(saved.movesLeft);
     setLevel(saved.level);
@@ -1581,6 +1744,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setWordLink(null);
     setPopWord(null);
     setBoardIntroActive(false);
+    setFailSheetOpen(restoredFailure);
+    setRestoredZeroMovePending(saved.movesLeft <= 0 && !restoredFailure);
     const release = window.setTimeout(() => {
       snapshotRestoreInFlightRef.current = false;
     }, 0);
@@ -1590,7 +1755,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     grid: Tile[][];
     hitCount: Record<string, number>;
   } | null>(null);
-  /** A failed Rescue breaks the Adventure Win Streak even if the +8 continuation clears. */
+  /** A failed Rescue ends the attempt and breaks the Adventure Win Streak. */
   const adventureAttemptLostRef = useRef(false);
   const rescueQuizPendingRef = useRef(false);
   const [quizOpen, setQuizOpen] = useState(false);
@@ -1601,12 +1766,59 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const [roundCelebrate, setRoundCelebrate] = useState(false);
 
   useEffect(() => {
-    if (snapshotRestoreInFlightRef.current || challengeMode !== 'random') return;
+    if (!authReady) return;
+    const saved = loadPendingQuiz(courseId, progressUserId);
+    if (!saved) {
+      if (quizCheckpointRef.current && quizCheckpointRef.current.userId !== (progressUserId || 'guest')) {
+        quizCheckpointRef.current = null;
+        setQuizCheckpoint(null);
+        setQuizOpen(false);
+      }
+      return;
+    }
+    if (restoredQuizIdRef.current === saved.id) return;
+    if (saved.items.some(item => !allPool.some(available => available.id === item.id))) {
+      clearPendingQuiz(courseId, progressUserId);
+      quizCheckpointRef.current = null;
+      setQuizCheckpoint(null);
+      return;
+    }
+    restoredQuizIdRef.current = saved.id;
+    quizCheckpointRef.current = saved;
+    setQuizCheckpoint(saved);
+    quizCompletionInFlightRef.current = false;
+    setChallengeMode(saved.mode);
+    boardOwnerModeRef.current = saved.mode;
+    boardOwnerCategoryIdRef.current = saved.categoryId ?? '';
+    if (saved.categoryId) setSelectedCategoryId(saved.categoryId);
+    setMoodPaletteId(saved.paletteId);
+    setLevel(saved.level);
+    setGameItems(saved.items);
+    setItemHitCount(saved.hitCount);
+    adventureAttemptLostRef.current = saved.attemptLost;
+    adventureStaminaOwedRef.current = false;
+    forcedReviewActiveRef.current = saved.forcedReview;
+    setForcedReviewActive(saved.forcedReview);
+    pendingRoundRef.current = { hitCount: saved.hitCount, excludeIds: new Set(saved.items.map(item => item.id)) };
+    roundSwitchPendingRef.current = true;
+    quizItemsRef.current = saved.items;
+    setQuizItems(saved.items);
+    setQuizKind(saved.kind);
+    setFailSheetOpen(false);
+    setDeadMachineOpen(false);
+    setSayBlastOpen(false);
+    setActiveTab('game');
+    setBoardIntroActive(false);
+    setQuizOpen(true);
+  }, [authReady, courseId, progressUserId, allPool]);
+
+  useEffect(() => {
+    if (activeTab !== 'game' || quizCheckpointRef.current || snapshotRestoreInFlightRef.current || challengeMode !== 'random' || boardOwnerModeRef.current !== 'random') return;
     if (
       quizOpen ||
       roundCelebrate ||
       roundSwitchPendingRef.current ||
-      !adventurePlayable ||
+      (!adventurePlayable && !failSheetOpen) ||
       gameItems.length < ADVENTURE_WORDS_PER_SET
     ) {
       if (quizOpen || roundCelebrate || roundSwitchPendingRef.current) {
@@ -1637,6 +1849,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       level,
       adventurePlayable,
       staminaOwed: adventureStaminaOwedRef.current,
+      staminaPaid: adventureStaminaPaidRef.current,
       roundFree: adventureRoundFreeRef.current,
       rescueUsed: rescueUsedRef.current,
       attemptLost: adventureAttemptLostRef.current,
@@ -1644,10 +1857,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     adventureBoardSnapshotRef.current = snapshot;
     saveAdventureBoardSnapshot(snapshot);
   }, [
+    activeTab,
     adventurePlayable,
     challengeMode,
     clearAdventureSnapshot,
     gameItems,
+    failSheetOpen,
     grid,
     itemHitCount,
     level,
@@ -1657,12 +1872,46 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     roundCelebrate,
   ]);
 
-  const openRoundCelebrate = React.useCallback(() => {
+  const analyticsLedgerRef = useRef(createCoreEventLedger());
+  const analyticsAttemptRef = useRef(0);
+  const analyticsRoundKey = `${analyticsAttemptRef.current}:${courseId}:${challengeMode}:${level}:${gameItems.map((item) => item.id).sort().join('|')}`;
+  const recordRoundAnalytics = React.useCallback((event: 'game_started' | 'set_completed' | 'quiz_completed', mistakenIds: string[] = []) => {
+    const occurrence = `${analyticsAttemptRef.current}:${analyticsRoundKey}`;
+    if (!analyticsLedgerRef.current(event, occurrence)) return;
+    const common = { course: courseId, set_number: level };
+    if (event === 'game_started') {
+      trackCoreEvent(event, { ...common, mode: challengeMode === 'random' ? 'adventure' : challengeMode });
+    } else if (event === 'set_completed') {
+      trackCoreEvent(event, { ...common, words_count: gameItems.length });
+    } else {
+      trackCoreEvent(event, { ...common, ...quizAnalyticsScore(quizItemsRef.current.map((item) => item.id), mistakenIds) });
+    }
+  }, [analyticsRoundKey, courseId, level, challengeMode, gameItems]);
+
+  const openRoundCelebrate = React.useCallback((items: WordItem[] = gameItems) => {
+    recordRoundAnalytics('set_completed');
     // Option A: the board hands straight to its memory check. Celebration and
     // settlement are now one screen after the quiz.
-    setQuizKind(Math.random() < 0.35 ? 'connect' : 'pick');
+    const kind = Math.random() < 0.35 ? 'connect' : 'pick';
+    const checkpoint: PendingQuiz = {
+      version: 1, id: `quiz-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      courseId, userId: progressUserIdRef.current || 'guest', items: [...items], kind,
+      mode: challengeMode, level, categoryId: challengeMode === 'category' ? selectedCategoryId : null,
+      paletteId: moodPaletteId, attemptLost: adventureAttemptLostRef.current,
+      forcedReview: forcedReviewActiveRef.current,
+      hitCount: { ...(pendingRoundRef.current?.hitCount ?? itemHitCount) },
+    };
+    savePendingQuiz(checkpoint);
+    if (challengeMode === 'random') clearAdventureSnapshot();
+    quizCheckpointRef.current = checkpoint;
+    restoredQuizIdRef.current = checkpoint.id;
+    setQuizCheckpoint(checkpoint);
+    quizCompletionInFlightRef.current = false;
+    quizItemsRef.current = items;
+    setQuizItems(items);
+    setQuizKind(kind);
     setQuizOpen(true);
-  }, []);
+  }, [recordRoundAnalytics, gameItems, courseId, challengeMode, level, selectedCategoryId, moodPaletteId, itemHitCount, clearAdventureSnapshot]);
   const [matchShakeKey, setMatchShakeKey] = useState(0);
   const [matchClearCells, setMatchClearCells] = useState<Cell[] | null>(null);
   const [matchClearKey, setMatchClearKey] = useState(0);
@@ -1674,19 +1923,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const wordLinkSeqRef = useRef(0);
   const clearTimerRef = useRef<number | null>(null);
   const boardEpochRef = useRef(0);
+  const quotaChargePendingRef = useRef(false);
   const hintTimerRef = useRef<number | null>(null);
   const [hintMove, setHintMove] = useState<{ a: Cell; b: Cell } | null>(null);
   /** 首次进入显示服务条款同意；接受后写入 localStorage */
   const [consentOpen, setConsentOpen] = useState(() => !readConsentAccepted());
-  const [activeTab, setActiveTab] = useState<AppTab>(
-    initialEntry === 'learned'
-      ? 'learned'
-      : initialEntry === 'collection'
-        ? 'words'
-        : initialEntry === 'profile'
-          ? 'profile'
-          : 'game',
-  );
   const [boardIntroActive, setBoardIntroActive] = useState(true);
   const handleBoardIntroComplete = React.useCallback(() => {
     setBoardIntroActive(false);
@@ -1697,6 +1938,19 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const refillDoneResolverRef = useRef<(() => void) | null>(null);
   const cascadeRunningRef = useRef(false);
   const [cascadeBusy, setCascadeBusy] = useState(false);
+  useEffect(() => {
+    if (challengeMode !== 'mood' && challengeMode !== 'category') return;
+    if (snapshotRestoreInFlightRef.current || roundResultRef.current !== null ||
+      boardOwnerModeRef.current !== challengeMode ||
+      (challengeMode === 'category' && boardOwnerCategoryIdRef.current !== selectedCategoryId) ||
+      boardIntroActive || quizOpen || roundCelebrate ||
+      roundSwitchPendingRef.current || cascadeBusy || matchClearCells !== null) return;
+    persistCurrentModeBoard(
+      challengeMode,
+      challengeMode === 'mood' ? moodPlayOwedRef.current : categoryPlayOwedRef.current,
+    );
+  }, [boardIntroActive, cascadeBusy, challengeMode, grid, itemHitCount, matchClearCells,
+    persistCurrentModeBoard, quizOpen, roundCelebrate]);
   const refillKeyRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tabScrollTopsRef = useRef<Partial<Record<AppTab, number>>>({});
@@ -1964,7 +2218,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       // Let React commit + gravity useLayoutEffect arm first.
       requestAnimationFrame(() => {
         requestAnimationFrame(poll);
-      });
+  });
     });
   }, []);
 
@@ -2077,17 +2331,83 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     resetRescueLifecycle();
   }, [clearReviveState, clearStaminaHudHold, resetRescueLifecycle, updateFirstTimeGuide]);
 
-  /** Spend stamina on first move of an adventure board; false → dead-machined. */
-  const chargeAdventureStaminaIfNeeded = React.useCallback((): boolean => {
+  /** Commit a new board only after its first valid match. */
+  const chargeAdventureStaminaIfNeeded = React.useCallback(async (): Promise<boolean> => {
+    const mode = challengeModeRef.current;
+    const uid = progressUserIdRef.current;
+    const needsCharge = (mode === 'category' && categoryPlayOwedRef.current) ||
+      (mode === 'mood' && moodPlayOwedRef.current) ||
+      (mode === 'random' && !reviveActiveRef.current && adventureStaminaOwedRef.current);
+    if (!needsCharge) return true;
+    if (isCloudQuotaAvailable(uid) && (mode === 'mood' || !hasPremiumAccess)) {
+      try {
+        const quota = await spendDailyQuota(
+          uid,
+          mode as 'random' | 'category' | 'mood',
+          hasPremiumAccess,
+          tickStamina(staminaStateRef.current),
+          loadMoodDailyState({ userId: uid }).plays,
+        );
+        if (!quota) {
+          const latest = await synchronizeDailyQuota(
+            uid,
+            tickStamina(staminaStateRef.current),
+            loadMoodDailyState({ userId: uid }).plays,
+          );
+          adoptCloudQuota(latest);
+          if (mode !== 'mood' && !hasPremiumAccess &&
+            staminaFromDailyQuota(latest, staminaStateRef.current).value <= 0) lockAdventureDead();
+          return false;
+        }
+        adoptCloudQuota(quota);
+        if (mode === 'category') {
+          categoryPlayOwedRef.current = false;
+          persistCurrentModeBoard('category', false);
+        } else if (mode === 'mood') {
+          moodPlayOwedRef.current = false;
+          persistCurrentModeBoard('mood', false);
+        } else {
+          adventureStaminaOwedRef.current = false;
+          adventureStaminaPaidRef.current = true;
+        }
+        return true;
+      } catch (error) {
+        console.warn('[match3] daily board charge failed', error);
+        setQuotaSyncError(true);
+        return false;
+      }
+    }
+    if (challengeModeRef.current === 'category' && categoryPlayOwedRef.current) {
+      if (!hasPremiumAccess && !applySpendStamina(1)) {
+        lockAdventureDead();
+        return false;
+      }
+      categoryPlayOwedRef.current = false;
+      persistCurrentModeBoard('category', false);
+      return true;
+    }
+    if (challengeModeRef.current === 'mood' && moodPlayOwedRef.current) {
+      const options = { hasPremiumAccess, userId: progressUserIdRef.current };
+      if (!canPlayMoodToday(options)) return false;
+      if (!hasPremiumAccess && !applySpendStamina(1)) {
+        lockAdventureDead();
+        return false;
+      }
+      if (!tryConsumeMoodPlay(options)) return false;
+      moodPlayOwedRef.current = false;
+      persistCurrentModeBoard('mood', false);
+      return true;
+    }
     if (challengeModeRef.current !== 'random' || reviveActiveRef.current) return true;
     if (!adventureStaminaOwedRef.current) return true;
-    if (!applySpendStamina(1)) {
+    if (!hasPremiumAccess && !applySpendStamina(1)) {
       lockAdventureDead();
       return false;
     }
     adventureStaminaOwedRef.current = false;
+    adventureStaminaPaidRef.current = true;
     return true;
-  }, [applySpendStamina, lockAdventureDead]);
+  }, [adoptCloudQuota, applySpendStamina, hasPremiumAccess, lockAdventureDead, persistCurrentModeBoard]);
 
   /** Arm timed target hunt (revive challenge or review mode). */
   const armTimedTarget = React.useCallback(
@@ -2142,10 +2462,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const retryAdventureBoard = React.useCallback(
     (items: WordItem[], free: boolean) => {
       if (challengeMode === 'random') {
+        adventureStaminaPaidRef.current = false;
         if (free) {
           adventureStaminaOwedRef.current = false;
           clearStaminaHudHold();
-        } else if (tickStamina(staminaStateRef.current).value <= 0) {
+        } else if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
           lockAdventureDead();
           return false;
         } else {
@@ -2156,6 +2477,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         setDeadMachineOpen(false);
       }
       adventureRoundFreeRef.current = false;
+      analyticsAttemptRef.current += 1;
       bumpBoardEpoch();
       clearReviveState();
       resetRescueLifecycle();
@@ -2213,45 +2535,23 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   const endAdventureFailed = React.useCallback(() => {
     clearReviveState();
     adventureFailedAwaitingRetryRef.current = true;
-    const hasStamina = staminaStateRef.current.value > 0;
+    const hasStamina = premiumAccessRef.current || staminaStateRef.current.value > 0;
     setAdventurePlayable(hasStamina);
-    if (hasStamina) {
-      setFailSheetOpen(true);
-      setDeadMachineOpen(false);
-    } else {
-      setFailSheetOpen(false);
-      setDeadMachineOpen(true);
-    }
+    setFailSheetOpen(true);
+    setDeadMachineOpen(false);
     recordCurrentAdventureLoss();
   }, [clearReviveState, recordCurrentAdventureLoss]);
 
   const failReviveAttempt = React.useCallback(() => {
-    const snapshot = rescueSnapshotRef.current;
     bumpBoardEpoch();
-    clearReviveState();
-    recordCurrentAdventureLoss();
     rescueSnapshotRef.current = null;
     roundSwitchPendingRef.current = false;
-    setFailSheetOpen(false);
-    setDeadMachineOpen(false);
-    setAdventurePlayable(true);
     setSelected(null);
     setHintMove(null);
     setWordLink(null);
     setMatchClearCells(null);
-    if (snapshot) {
-      const restoredGrid = snapshot.grid.map((row) => row.map((tile) => ({ ...tile })));
-      setGrid(restoredGrid);
-      setItemHitCount({ ...snapshot.hitCount });
-    }
-    movesLeftRef.current = RESCUE_CONTINUE_MOVES;
-    setMovesLeft(RESCUE_CONTINUE_MOVES);
-    setReviveFlash('retry');
-  }, [
-    bumpBoardEpoch,
-    clearReviveState,
-    recordCurrentAdventureLoss,
-  ]);
+    endAdventureFailed();
+  }, [bumpBoardEpoch, endAdventureFailed]);
 
   const enterRevive = React.useCallback((
     adventureGrid: Tile[][],
@@ -2296,6 +2596,16 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     }
     armTimedTarget(gameItems, adventureHitCount, undefined, true);
   }, [challengeMode, armTimedTarget, gameItems]);
+
+  // Older snapshots could persist a settled zero-move board without the
+  // matching revive/failure state. Repair that snapshot after its grid and
+  // progress have committed, rather than leaving an apparently live but
+  // permanently input-locked board. Entering revive does not spend stamina.
+  useEffect(() => {
+    if (!restoredZeroMovePending || gameItems.length < ADVENTURE_WORDS_PER_SET) return;
+    setRestoredZeroMovePending(false);
+    enterRevive(gridRef.current, itemHitCount);
+  }, [enterRevive, gameItems.length, itemHitCount, restoredZeroMovePending]);
 
   // Heal missing revive / review target.
   useEffect(() => {
@@ -2459,8 +2769,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       modeOverride?: ChallengeMode,
     ) => {
       const targetMode = modeOverride ?? challengeModeRef.current;
-      if (targetMode === 'mood' && !tryConsumeMoodPlay()) {
-        return;
+      if (targetMode === 'mood') {
+        if (!canPlayMoodToday({ hasPremiumAccess, userId: progressUserIdRef.current }) ||
+          (!hasPremiumAccess && tickStamina(staminaStateRef.current).value <= 0)) return;
+        moodPlayOwedRef.current = true;
+      }
+      if (targetMode === 'category') {
+        if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
+          lockAdventureDead();
+          return;
+        }
+        categoryPlayOwedRef.current = true;
       }
       const moodPaletteForRound =
         targetMode === 'mood' ? moodPaletteForDay() : moodPaletteId;
@@ -2485,12 +2804,13 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
               : activeCategory?.items ?? [];
 
       if (targetMode === 'random') {
+        adventureStaminaPaidRef.current = false;
         const free = adventureRoundFreeRef.current;
         adventureRoundFreeRef.current = false;
         if (free) {
           adventureStaminaOwedRef.current = false;
           clearStaminaHudHold();
-        } else if (tickStamina(staminaStateRef.current).value <= 0) {
+        } else if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
           staminaGateResumeRef.current = {
             hitCount: { ...nextHitCount },
             excludeIds: excludeIds ? new Set(excludeIds) : undefined,
@@ -2544,9 +2864,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         roundSwitchPendingRef.current = false;
         return;
       }
+      analyticsAttemptRef.current += 1;
       const nextLevel = advanceLevel ? level + 1 : level;
       if (advanceLevel) setLevel(nextLevel);
       bumpBoardEpoch();
+      boardOwnerModeRef.current = targetMode;
+      boardOwnerCategoryIdRef.current = selectedCategoryId;
       setRoundCelebrate(false);
       setGameItems(nextItems);
       setItemHitCount({});
@@ -2591,6 +2914,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       clearAdventureSnapshot,
       clearStaminaHudHold,
       holdStaminaHudForBoard,
+      hasPremiumAccess,
       lockAdventureDead,
       level,
       moodPaletteId,
@@ -2691,6 +3015,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         setReviewTutorialActive(false);
         return;
       }
+      analyticsAttemptRef.current += 1;
       const reviewTutorialGrid =
         !firstTimeGuideRef.current.hasCompletedReviewTutorial
           ? makeFixedMatchTutorialGrid(nextItems.map((item) => item.id))
@@ -2778,9 +3103,13 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const handleChallengeModeChange = React.useCallback(
     (mode: ChallengeMode) => {
+      if (quotaChargePendingRef.current) return;
       if (mode === 'mood') {
         if (challengeModeRef.current !== 'mood') {
-          if (!tryConsumeMoodPlay()) return;
+          const paidBoard = hasPaidModeBoard('mood', progressUserIdRef.current);
+          if (!paidBoard && (!canPlayMoodToday({ hasPremiumAccess, userId: progressUserIdRef.current }) ||
+            (!hasPremiumAccess && tickStamina(staminaStateRef.current).value <= 0))) return;
+          moodPlayOwedRef.current = !paidBoard;
         }
         const todayPalette = moodPaletteForDay();
         if (todayPalette !== moodPaletteId) setMoodPaletteId(todayPalette);
@@ -2789,6 +3118,19 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             ? { ...current, stage: 'completed' }
             : current,
         );
+      }
+      if (mode === 'category' && challengeModeRef.current !== 'category') {
+        const resumableCategory = challengePools.find((category) =>
+          hasPaidModeBoard('category', progressUserIdRef.current, category.id));
+        if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0 &&
+          !resumableCategory) {
+          lockAdventureDead();
+          return;
+        }
+        if (resumableCategory && !hasPaidModeBoard('category', progressUserIdRef.current, selectedCategoryId)) {
+          setSelectedCategoryId(resumableCategory.id);
+        }
+        categoryPlayOwedRef.current = !resumableCategory;
       }
       const preserveAdventureBoard = () => {
         if (
@@ -2814,6 +3156,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           level,
           adventurePlayable,
           staminaOwed: adventureStaminaOwedRef.current,
+          staminaPaid: adventureStaminaPaidRef.current,
           roundFree: adventureRoundFreeRef.current,
           rescueUsed: rescueUsedRef.current,
           attemptLost: adventureAttemptLostRef.current,
@@ -2851,7 +3194,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       if (refreshedStamina !== staminaStateRef.current) {
         persistStamina(refreshedStamina);
       }
-      if (refreshedStamina.value <= 0) {
+      const savedAdventure = adventureBoardSnapshotRef.current;
+      const canResumePaidBoard = savedAdventure && isPaidPlayableAdventureBoard(savedAdventure) &&
+        validAdventureBoardSnapshot(savedAdventure, progressUserIdRef.current, allPool,
+          new Set(roundLearnedIdsRef.current));
+      if (!premiumAccessRef.current && refreshedStamina.value <= 0 && !canResumePaidBoard) {
         staminaGateResumeRef.current = {
           hitCount: {},
           advanceLevel: false,
@@ -2862,7 +3209,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         return;
       }
 
-      const savedAdventure = adventureBoardSnapshotRef.current;
       if (
         savedAdventure &&
         validAdventureBoardSnapshot(
@@ -2872,6 +3218,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           new Set(roundLearnedIdsRef.current),
         )
       ) {
+        boardOwnerModeRef.current = 'random';
         bumpBoardEpoch();
         suppressBoardSetupSkipsRef.current = Math.max(
           suppressBoardSetupSkipsRef.current,
@@ -2879,13 +3226,18 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         );
         setChallengeMode('random');
         setDeadMachineOpen(false);
-        setFailSheetOpen(false);
+        const restoredFailure = savedAdventure.attemptLost ||
+          (savedAdventure.movesLeft <= 0 && savedAdventure.rescueUsed);
+        setFailSheetOpen(restoredFailure);
+        setRestoredZeroMovePending(savedAdventure.movesLeft <= 0 && !restoredFailure);
+        adventureFailedAwaitingRetryRef.current = restoredFailure;
         setReviewPaused(false);
         setAdventurePlayable(savedAdventure.adventurePlayable);
         adventureStaminaOwedRef.current = savedAdventure.staminaOwed;
+        adventureStaminaPaidRef.current = hasAdventurePayment(savedAdventure);
         adventureRoundFreeRef.current = savedAdventure.roundFree;
         rescueUsedRef.current = savedAdventure.rescueUsed;
-        adventureAttemptLostRef.current = savedAdventure.attemptLost;
+        adventureAttemptLostRef.current = restoredFailure;
         movesLeftRef.current = savedAdventure.movesLeft;
         setMovesLeft(savedAdventure.movesLeft);
         setLevel(savedAdventure.level);
@@ -2907,7 +3259,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       }
       if (savedAdventure) clearAdventureSnapshot();
       // Adventure: no stamina → dead machine, never open a free board.
-      if (tickStamina(staminaStateRef.current).value <= 0) {
+      if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
         staminaGateResumeRef.current = {
           hitCount: {},
           advanceLevel: false,
@@ -2940,17 +3292,23 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       itemHitCount,
       level,
       allPool,
+      challengePools,
       clearAdventureSnapshot,
       lockAdventureDead,
       startNextRound,
       modeUnlocks.pendingForcedReview,
       moodPaletteId,
+      hasPremiumAccess,
       persistStamina,
       updateFirstTimeGuide,
     ],
   );
 
   const handleQuizComplete = React.useCallback((mistakenItemIds: string[] = []) => {
+    if (challengeMode === 'mood' || challengeMode === 'category') {
+      removeModeBoardSnapshot(challengeMode, progressUserIdRef.current,
+        challengeMode === 'category' ? selectedCategoryId : null);
+    }
     stopAllWordSpeech();
     triggerGameHaptic('majorSuccess');
     setQuizOpen(false);
@@ -2960,6 +3318,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       roundLearnedIds,
       quizItemsSnapshot,
       progressUserIdRef.current,
+      courseId,
     );
     roundLearnedIdsRef.current = nextLearned;
     setRoundLearnedIds(nextLearned);
@@ -2981,7 +3340,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           recordWordRecallSuccess(next, it.word, it.cn);
         }
       }
-      persistWordMemories(next, memoryScopeRef.current);
+      persistWordMemories(next, memoryScopeRef.current, { courseId });
       wordMemoryRef.current = next;
       return next;
     });
@@ -3143,6 +3502,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         saveCategoryCycleProgress(
           categoryCompletion.progress,
           progressUserIdRef.current,
+          courseId,
         );
       }
       const summaryContext: SummaryContext = {
@@ -3161,7 +3521,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       playerSummaryRef.current = nextSummary;
       setPlayerSummary(nextSummary);
       const moodExhausted =
-        challengeMode === 'mood' && !canPlayMoodToday();
+        challengeMode === 'mood' && !canPlayMoodToday({ hasPremiumAccess, userId: progressUserIdRef.current });
       setRoundResult({
         kind: 'learned',
         items: quizItemsSnapshot,
@@ -3186,8 +3546,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         nextGoal: moodExhausted
           ? ui.mode.moodDailyLimitReached
           : ui.resultGoals.anotherTheme,
-        primaryActionLabel: moodExhausted ? ui.deadMachine.later : undefined,
-        followUp: moodExhausted ? 'home' : 'advance',
+        primaryActionLabel: undefined,
+        followUp: moodExhausted ? 'mood-limit' : 'advance',
       });
       return;
     }
@@ -3206,12 +3566,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     authConfigured,
     activeCategory,
     selectedCategoryId,
+    hasPremiumAccess,
+    courseId,
     t.modes.category,
   ]);
 
   // Review boards resolve directly into their result. Adventure/category/mood
   // still call the same completion routine from their required quiz.
-  finishReviewWithoutQuizRef.current = () => handleQuizComplete([]);
+  finishReviewWithoutQuizRef.current = () => {
+    recordRoundAnalytics('set_completed');
+    handleQuizComplete([]);
+  };
 
   const roundResultExitContinuationRef = React.useRef<(() => void) | null>(null);
 
@@ -3222,7 +3587,10 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     roundResultExitContinuationRef.current = () => {
       if (result.followUp === 'forced-review') beginForcedReview();
       else if (result.followUp === 'home') onHome();
-      else if (result.followUp !== 'review-choices') finishQuizAndAdvance();
+      else if (
+        result.followUp !== 'review-choices' &&
+        result.followUp !== 'mood-limit'
+      ) finishQuizAndAdvance();
       if (destination) setActiveTab(destination);
     };
     setRoundResult(null);
@@ -3238,6 +3606,16 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     roundResultExitContinuationRef.current = null;
     continueAfterExit?.();
   }, []);
+
+  const handleMoodResultUnlockPlus = React.useCallback(() => {
+    roundResultExitContinuationRef.current = () => openPaywall('profile');
+    setRoundResult(null);
+  }, [openPaywall]);
+
+  const handleRoundResultReturnHome = React.useCallback(() => {
+    roundResultExitContinuationRef.current = onHome;
+    setRoundResult(null);
+  }, [onHome]);
 
   const returnToCategoryHub = React.useCallback(() => {
     if (!roundResult?.categoryProgress) return;
@@ -3271,13 +3649,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   }, [allPool, modeUnlocks.adventureClears]);
 
   const handleReviewContinueReview = React.useCallback(() => {
+    const returningFromMood = roundResult?.followUp === 'mood-limit';
     setRoundResult(null);
-    // Skip the set just finished — pull older / more overdue words next.
+    // Mood is already complete, so it must not remain as a pending board.
+    // A normal review result can preserve its adventure resume point.
     enterReviewMode(false, {
-      keepPendingRound: true,
+      keepPendingRound: !returningFromMood,
       excludeIds: new Set(gameItems.map((it) => it.id)),
     });
-  }, [enterReviewMode, gameItems]);
+  }, [enterReviewMode, gameItems, roundResult?.followUp]);
 
   const handleReviewContinueAdventure = React.useCallback(() => {
     setRoundResult(null);
@@ -3296,7 +3676,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return;
     }
     if (savedAdventure) clearAdventureSnapshot();
-    if (tickStamina(staminaStateRef.current).value <= 0) {
+    if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
       staminaGateResumeRef.current = {
         hitCount: {},
         advanceLevel: false,
@@ -3326,19 +3706,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     // Stay on review board, paused — come back later via 继续挑战.
     setReviewPaused(true);
   }, []);
-
-  const handleQuizAbandon = React.useCallback(() => {
-    stopAllWordSpeech();
-    setQuizOpen(false);
-    pendingRoundRef.current = null;
-    roundSwitchPendingRef.current = false;
-    setRoundCelebrate(false);
-    // Restart the same set for free — does not count as learned / clear.
-    if (gameItems.length >= ADVENTURE_WORDS_PER_SET) {
-      adventureRoundFreeRef.current = true;
-      retryAdventureBoard([...gameItems], true);
-    }
-  }, [gameItems, retryAdventureBoard]);
 
 
   const reset = () => {
@@ -3389,6 +3756,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   };
 
   useEffect(() => {
+    // Read the latest pool without subscribing board creation to pool identity.
+    // Cloud hydration replaces these arrays after mount; treating that as a
+    // board destination change used to reshuffle an active board and re-arm
+    // its stamina charge.
+    const setupPool = poolRef.current;
+    const setupAllPool = allPoolRef.current;
     if (suppressBoardSetupSkipsRef.current > 0) {
       suppressBoardSetupSkipsRef.current -= 1;
       return;
@@ -3396,19 +3769,60 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     // Finishing a quiz updates the learned-word pool while the result sheet is open.
     // Keep the completed board in place; the result-sheet action owns the one and only
     // transition to the next board.
-    if (roundResultRef.current !== null) {
+    if (quizCheckpointRef.current || roundResultRef.current !== null) {
       return;
     }
     if (consentOpen) {
       return;
     }
+    if (challengeMode === 'mood' || challengeMode === 'category') {
+      const snapshot = loadModeBoardSnapshot(
+        challengeMode,
+        progressUserIdRef.current,
+        challengeMode === 'category' ? selectedCategoryId : null,
+      );
+      if (snapshot && !snapshot.playOwed &&
+        validModeBoardSnapshot(snapshot, challengeMode === 'mood' ? setupAllPool : setupPool)) {
+        bumpBoardEpoch();
+        boardOwnerModeRef.current = challengeMode;
+        boardOwnerCategoryIdRef.current = selectedCategoryId;
+        clearReviveState();
+        resetRescueLifecycle();
+        if (challengeMode === 'mood') {
+          moodPlayOwedRef.current = false;
+          if (snapshot.paletteId && snapshot.paletteId !== moodPaletteIdRef.current) {
+            suppressBoardSetupSkipsRef.current = 1;
+            setMoodPaletteId(snapshot.paletteId);
+          }
+        } else {
+          categoryPlayOwedRef.current = false;
+        }
+        setFailSheetOpen(false);
+        setDeadMachineOpen(false);
+        setGameItems([...snapshot.gameItems]);
+        setItemHitCount({ ...snapshot.itemHitCount });
+        setGrid(snapshot.grid.map((row) => row.map((tile) => ({ ...tile }))));
+        setSelected(null);
+        setHintMove(null);
+        setQuizOpen(false);
+        setBoardIntroActive(false);
+        setAdventurePlayable(true);
+        return;
+      }
+      if (snapshot && !validModeBoardSnapshot(snapshot, challengeMode === 'mood' ? setupAllPool : setupPool)) {
+        removeModeBoardSnapshot(challengeMode, progressUserIdRef.current,
+          challengeMode === 'category' ? selectedCategoryId : null);
+      }
+    }
     bumpBoardEpoch();
+    boardOwnerModeRef.current = challengeMode;
+    boardOwnerCategoryIdRef.current = selectedCategoryId;
     clearReviveState();
     resetRescueLifecycle();
     setFailSheetOpen(false);
     setDeadMachineOpen(false);
     adventureRoundFreeRef.current = false;
-    if (pool.length < 6) {
+    if (setupPool.length < 6) {
       setSelected(null);
       setLevel(1);
       setItemHitCount({});
@@ -3425,7 +3839,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return;
     }
     if (challengeMode === 'random') {
-      if (tickStamina(staminaStateRef.current).value <= 0) {
+      adventureStaminaPaidRef.current = false;
+      if (!premiumAccessRef.current && tickStamina(staminaStateRef.current).value <= 0) {
         lockAdventureDead();
         return;
       } else {
@@ -3435,37 +3850,39 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     } else {
       adventureStaminaOwedRef.current = false;
       clearStaminaHudHold();
+      if (challengeMode === 'category') categoryPlayOwedRef.current = true;
+      if (challengeMode === 'mood') moodPlayOwedRef.current = true;
     }
     const nextHitCount: Record<string, number> = {};
     const useForcedPool =
       challengeMode === 'review' &&
       (forcedReviewActiveRef.current ||
         loadModeUnlocks(progressUserIdRef.current).pendingForcedReview);
-    const poolById = new Map(allPool.map((it) => [it.id, it] as const));
+    const poolById = new Map(setupAllPool.map((it) => [it.id, it] as const));
     const nextItems = useForcedPool
       ? pickVisuallyDistinctForcedReviewItems(
           adventureSetHistoryRef.current,
           poolById,
           ADVENTURE_WORDS_PER_SET,
-          pool,
+          setupPool,
         )
       : challengeMode === 'random'
         ? pickAdventureItems(
-            pool,
+            setupPool,
             ADVENTURE_WORDS_PER_SET,
             new Set(roundLearnedIdsRef.current),
           )
         : challengeMode === 'category'
           ? pickCategoryCycleItems(
-              pool,
+              setupPool,
               ADVENTURE_WORDS_PER_SET,
               categoryCycleEntry(
                 categoryCycleProgressRef.current,
                 selectedCategoryId,
-                pool.map((item) => item.id),
+                setupPool.map((item) => item.id),
               ),
             )
-        : pickChallengeItems(pool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
+        : pickChallengeItems(setupPool, ADVENTURE_WORDS_PER_SET, nextHitCount, wordMemoryRef.current, {
             strategy: challengeMode === 'review' ? 'memory' : 'random',
           });
     setSelected(null);
@@ -3473,7 +3890,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       challengeMode === 'random'
         ? loadModeUnlocks(progressUserIdRef.current).adventureClears
         : 0;
-    const cap = Math.max(1, adventureTotalSets(allPool.length));
+    const cap = Math.max(1, adventureTotalSets(setupAllPool.length));
     setLevel(challengeMode === 'random' ? Math.min(clears + 1, cap) : 1);
     setItemHitCount(nextHitCount);
     setGameItems(nextItems);
@@ -3531,10 +3948,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setBoardIntroActive(true);
   }, [
     boardSetupKey,
-    pool,
     challengeMode,
     consentOpen,
-    allPool,
     bumpBoardEpoch,
     clearReviveState,
     clearStaminaHudHold,
@@ -3590,6 +4005,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   );
   const funTimerPaused =
     !timedHuntActive ||
+    activeTab !== 'game' ||
+    gameLifecyclePaused ||
     !funTargetId ||
     !timedTargetPlayable ||
     pool.length < 6 ||
@@ -3729,20 +4146,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
     let nextGrid = resolved.grid;
     if (!roundWillComplete) {
-      // Late moves: keep unfinished words plentiful enough to still match.
-      if (
+      const unfinishedIds = gameItems
+        .filter((it) => (projectedHits[it.id] ?? 0) < hitsNeeded)
+        .map((it) => it.id);
+      const shouldAssistAdventure =
         challengeMode === 'random' &&
         !reviveActiveRef.current &&
-        movesLeftRef.current <= lateBoardAssistMoves
-      ) {
-        const unfinishedIds = gameItems
-          .filter((it) => (projectedHits[it.id] ?? 0) < hitsNeeded)
-          .map((it) => it.id);
-        if (unfinishedIds.length > 0) {
-          const copy = nextGrid.map((row) => row.map((t) => ({ ...t })));
-          if (boostScarceUnfinishedWords(copy, unfinishedIds, itemIds, 4)) {
-            nextGrid = copy;
-          }
+        movesLeftRef.current <= lateBoardAssistMoves;
+      if (shouldAssistAdventure) {
+        const copy = nextGrid.map((row) => row.map((t) => ({ ...t })));
+        if (boostScarceUnfinishedWords(copy, unfinishedIds, itemIds, 4)) {
+          nextGrid = copy;
         }
       }
       nextGrid = reshuffleDeadlockedBoard(nextGrid);
@@ -3890,7 +4304,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         popDoneRef.current.finally(() => {
           pendingRoundRef.current = { hitCount: next, excludeIds: prevIds };
           setQuizItems(snapshot);
-          openRoundCelebrate();
+          openRoundCelebrate(snapshot);
         });
         return next;
       }
@@ -3912,6 +4326,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const showWord = (payload: {
     word: string;
+    sourceWord?: string;
     cn?: string;
     emoji?: string;
     imgSrc?: string;
@@ -3924,7 +4339,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setWordMemory((prev) => {
       const next = new Map<string, WordMemory>(prev);
       recordWordExposure(next, payload.word, payload.cn);
-      persistWordMemories(next, memoryScopeRef.current);
+      persistWordMemories(next, memoryScopeRef.current, { courseId });
       return next;
     });
     // Keep each card paired with its own pronunciation. A later match waits to
@@ -3985,8 +4400,9 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     return { cells: [...cells.values()], itemIds, isLine: false };
   };
 
-  const attemptSwap = (movedA: Cell, movedB: Cell) => {
+  const attemptSwap = async (movedA: Cell, movedB: Cell) => {
     if (
+      quotaChargePendingRef.current ||
       pool.length < 6 ||
       quizOpen ||
       roundCelebrate ||
@@ -3997,7 +4413,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       cascadeBusy ||
       cascadeRunningRef.current ||
       failSheetOpen ||
-      (challengeMode === 'random' && !adventurePlayable) ||
+      (challengeMode === 'random' && (!adventurePlayable || (adventureAttemptLostRef.current && !reviveActiveRef.current))) ||
       (challengeMode === 'review' && reviewPaused)
     ) {
       return;
@@ -4055,10 +4471,24 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     const directItem = itemById.get(targetItemId);
     const lineClearRuns = runsTouchingCells(findLineClearRuns(swapped), directMatch.cells);
 
-    if (!chargeAdventureStaminaIfNeeded()) {
+    const boardEpoch = boardEpochRef.current;
+    const modeAtSwap = challengeModeRef.current;
+    quotaChargePendingRef.current = true;
+    let charged = false;
+    try {
+      charged = await chargeAdventureStaminaIfNeeded();
+    } finally {
+      quotaChargePendingRef.current = false;
+    }
+    if (!charged || boardEpoch !== boardEpochRef.current || modeAtSwap !== challengeModeRef.current) {
       setSelected(null);
       return;
     }
+
+    void markLearningActivity({ locale, hasPremiumAccess, ...getReminderGameState() }).catch((error) => {
+      console.warn('[match3] unable to mark learning reminder activity', error);
+    });
+    recordRoundAnalytics('game_started');
 
     if (isFirstSwapTutorialSwap) {
       firstSwapTutorialResolvingRef.current = true;
@@ -4192,13 +4622,28 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           if (epoch !== boardEpochRef.current || !cascadeRunningRef.current) return;
 
           const clearedKeys = new Set(wave.cells.map((cell) => `${cell.r}:${cell.c}`));
+          const refillHitsNeeded = hitsNeededForMode(challengeMode);
+          const projectedRefillHits = {
+            ...itemHitCount,
+            [targetItemId]: Math.min(
+              refillHitsNeeded,
+              (itemHitCount[targetItemId] ?? 0) + 1,
+            ),
+          };
+          const unfinishedRefillIds = gameItems
+            .filter((it) => (projectedRefillHits[it.id] ?? 0) < refillHitsNeeded)
+            .map((it) => it.id);
           const preferUnfinished =
-            challengeMode === 'random' &&
-            !reviveActiveRef.current &&
-            movesLeftRef.current <= lateBoardAssistMoves
-              ? gameItems
-                  .filter((it) => (itemHitCount[it.id] ?? 0) < HITS_PER_WORD_DEFAULT)
-                  .map((it) => it.id)
+            (
+              challengeMode === 'random' &&
+              !reviveActiveRef.current &&
+              movesLeftRef.current <= lateBoardAssistMoves
+            ) || (
+              challengeMode === 'category' &&
+              !reviveActiveRef.current &&
+              unfinishedRefillIds.length === 1
+            )
+              ? unfinishedRefillIds
               : undefined;
           const refillItemIds =
             challengeMode === 'random' && !reviveActiveRef.current
@@ -4281,6 +4726,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     if (directItem && linkOrigin && !funWrongMatch && !timedHuntPrompt) {
       showWord({
         word: directItem.word,
+        sourceWord: directItem.sourceWord,
         cn: directItem.cn,
         emoji: directItem.emoji,
         imgSrc: directItem.imgSrc,
@@ -4329,7 +4775,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       setSelected({ r, c });
       return;
     }
-    attemptSwap(selected, { r, c });
+    void attemptSwap(selected, { r, c });
   };
 
   const swapCells = (from: Cell, to: Cell) => {
@@ -4345,7 +4791,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       }
     }
     setSelected(null);
-    attemptSwap(from, to);
+    void attemptSwap(from, to);
   };
 
   const usesThiings = allPool.some((it) => typeof it.imgSrc === 'string' && it.imgSrc.length > 0);
@@ -4358,6 +4804,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         ? ('pool' as const)
         : null;
   const canPlay = playBlockedReason === null && gameItems.length >= 6;
+  useEffect(() => {
+    if (challengeMode !== 'review' || activeTab !== 'game' || consentOpen || !canPlay) return;
+    if (!analyticsLedgerRef.current('review_started', analyticsRoundKey)) return;
+    trackCoreEvent('review_started', {
+      course: courseId,
+      review_type: forcedReviewActive || modeUnlocks.pendingForcedReview ? 'forced' : 'scheduled',
+    });
+  }, [analyticsRoundKey, challengeMode, activeTab, consentOpen, canPlay, courseId, forcedReviewActive, modeUnlocks.pendingForcedReview]);
+
   const dueReviewCount = useMemo(() => {
     const now = Date.now();
     return reviewPool.reduce((count, item) => {
@@ -4365,6 +4820,53 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       return count + (!memory || isDue(memory, now) ? 1 : 0);
     }, 0);
   }, [reviewPool, wordMemory]);
+
+  useEffect(() => {
+    const refresh = () => {
+      const wasPendingEnable = readLearningReminderSettings().pendingSystemEnable;
+      const remaining = msUntilNextStamina(staminaStateRef.current);
+      void refreshLearningReminder({
+        locale,
+        hasPremiumAccess,
+        playedToday: staminaStateRef.current.spentToday > 0,
+        dueReviewCount,
+        staminaValue: staminaStateRef.current.value,
+        nextStaminaAt: remaining === null ? null : Date.now() + remaining,
+      }).then(() => {
+        const enabled = readLearningReminderSettings().enabled;
+        setRemindersEnabled(enabled);
+        if (wasPendingEnable && enabled) setRewardedAdStatus(NOTIFICATION_SETTINGS_COPY[locale].enabled);
+      }).catch((error) => {
+        console.warn('[match3] unable to refresh learning reminder', error);
+      });
+    };
+    refresh();
+    const nativeListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) refresh();
+    });
+    return () => {
+      void nativeListener.then((handle) => handle.remove());
+    };
+  }, [dueReviewCount, hasPremiumAccess, locale, staminaState.spentToday, staminaState.value]);
+
+  const handleEnableReminders = async () => {
+    setReminderPromptBusy(true);
+    try {
+      const remaining = msUntilNextStamina(staminaStateRef.current);
+      const result = await enableLearningReminders({
+        locale,
+        hasPremiumAccess,
+        playedToday: staminaStateRef.current.spentToday > 0,
+        dueReviewCount,
+        staminaValue: staminaStateRef.current.value,
+        nextStaminaAt: remaining === null ? null : Date.now() + remaining,
+      });
+      setRemindersEnabled(readLearningReminderSettings().enabled);
+      return result;
+    } finally {
+      setReminderPromptBusy(false);
+    }
+  };
   const modeLabel = reviveActive
     ? t.adventure.reviveTitle
     : forcedReviewActive || (challengeMode === 'review' && modeUnlocks.pendingForcedReview)
@@ -4476,12 +4978,12 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   ]);
 
   useEffect(() => {
-    if (!user?.uid || coreCloudReadyUid !== user.uid || !promptAuthStartedRef.current) return;
+    if (!user?.uid || coreCloudReadyScope !== coreCloudScopeKey || !promptAuthStartedRef.current) return;
     promptAuthStartedRef.current = false;
     setAccountSaveConfirmation(true);
     const timer = window.setTimeout(() => setAccountSaveConfirmation(false), 1800);
     return () => window.clearTimeout(timer);
-  }, [coreCloudReadyUid, user?.uid]);
+  }, [coreCloudReadyScope, coreCloudScopeKey, user?.uid]);
 
   const dismissAccountPrompt = React.useCallback(() => {
     if (accountPromptKind === 'streak') dismissStreakGateForToday();
@@ -4506,7 +5008,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   const resumeAdventureAfterStaminaGate = React.useCallback(() => {
     const refreshed = tickStamina(staminaStateRef.current);
-    if (refreshed.value <= 0) {
+    if (!premiumAccessRef.current && refreshed.value <= 0) {
       lockAdventureDead();
       return;
     }
@@ -4517,6 +5019,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
     setSayBlastEntry('game');
     setDeadMachineOpen(false);
     setActiveTab('game');
+    if (adventureFailedAwaitingRetryRef.current) {
+      setAdventurePlayable(true);
+      setFailSheetOpen(true);
+      return;
+    }
     if (resume) {
       startNextRound(
         resume.hitCount,
@@ -4545,12 +5052,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
   }, [onBgmPauseChange, updateFirstTimeGuide]);
 
   const handleValidSayBlastExperience = React.useCallback(() => {
+    void markLearningActivity({ locale, hasPremiumAccess, ...getReminderGameState() }).catch((error) => {
+      console.warn('[match3] unable to mark Say & Blast reminder activity', error);
+    });
     updateFirstTimeGuide((current) =>
       current.stage === 'awaitingSayAndBlastCompletion'
         ? { ...current, stage: 'moodBoard' }
         : current,
     );
-  }, [updateFirstTimeGuide]);
+  }, [hasPremiumAccess, locale, updateFirstTimeGuide, getReminderGameState]);
 
   const exitSayBlast = React.useCallback(() => {
     const shouldReturnHome = sayBlastEntry !== 'game';
@@ -4568,11 +5078,76 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
   useEffect(() => () => onBgmPauseChange(false), [onBgmPauseChange]);
 
-  const rewardSayBlastStamina = React.useCallback((): 'granted' | 'banked' | 'daily-limit' => {
+  const rewardSayBlastStamina = React.useCallback(async (): Promise<'granted' | 'banked' | 'daily-limit' | 'sync-error'> => {
+    const uid = progressUserIdRef.current;
+    if (isCloudQuotaAvailable(uid)) {
+      try {
+        const quota = await grantDailySayBlastReward(
+          uid,
+          tickStamina(staminaStateRef.current),
+          loadMoodDailyState({ userId: uid }).plays,
+        );
+        if (!quota) return 'daily-limit';
+        adoptCloudQuota(quota);
+        return 'granted';
+      } catch (error) {
+        console.warn('[match3] Say & Blast reward sync failed', error);
+        setQuotaSyncError(true);
+        return 'sync-error';
+      }
+    }
     const reward = grantSayBlastStamina(staminaStateRef.current);
     persistStamina(reward.state);
     return reward.outcome;
-  }, [persistStamina]);
+  }, [adoptCloudQuota, persistStamina]);
+
+  const handleRewardedAdReset = React.useCallback(async () => {
+    if (rewardedAdBusy) return;
+    const current = tickStamina(staminaStateRef.current);
+    if (current.adResetsToday >= AD_STAMINA_RESETS_DAILY_MAX) {
+      setRewardedAdStatus(rewardedAdCopy.dailyLimit);
+      return;
+    }
+    setRewardedAdBusy(true);
+    setRewardedAdStatus(rewardedAdCopy.loading);
+    try {
+      await showStaminaRewardedAd();
+      const uid = progressUserIdRef.current;
+      if (isCloudQuotaAvailable(uid)) {
+        const quota = await resetDailyQuotaFromRewardedAd(
+          uid,
+          current,
+          loadMoodDailyState({ userId: uid }).plays,
+        );
+        if (!quota) {
+          setRewardedAdStatus(rewardedAdCopy.dailyLimit);
+          return;
+        }
+        adoptCloudQuota(quota);
+      } else {
+        const reward = resetStaminaFromRewardedAd(current);
+        if (reward.outcome !== 'granted') {
+          setRewardedAdStatus(
+            reward.outcome === 'daily-limit'
+              ? rewardedAdCopy.dailyLimit
+              : rewardedAdCopy.rewarded,
+          );
+          return;
+        }
+        persistStamina(reward.state);
+      }
+      setRewardedAdStatus(rewardedAdCopy.rewarded);
+    } catch (error) {
+      console.warn('[match3] rewarded ad failed', error);
+      setRewardedAdStatus(
+        rewardedAdsTestMode()
+          ? `Test ad error: ${error instanceof Error ? error.message : String(error)}`
+          : rewardedAdCopy.unavailable,
+      );
+    } finally {
+      setRewardedAdBusy(false);
+    }
+  }, [adoptCloudQuota, persistStamina, rewardedAdBusy, rewardedAdCopy]);
 
   const learnedGuideEligible =
     firstTimeGuide.stage === 'learned' &&
@@ -4624,6 +5199,11 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         unlockSpeechSynthesis();
       }}
     >
+      {quotaSyncError && isCloudQuotaAvailable(progressUserId) && (
+        <div role="alert" className="absolute inset-x-4 top-[max(12px,env(safe-area-inset-top))] z-[120] rounded-xl bg-rose-50 px-4 py-3 text-center text-sm font-bold text-rose-800 shadow-lg">
+          {CATEGORY_UI_COPY[locale].quotaSyncError}
+        </div>
+      )}
       <main
         ref={scrollContainerRef}
         className={cn(
@@ -4636,7 +5216,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       >
         {activeTab === 'game' && (
           <GamePanel
-            onHome={onHome}
+            onHome={() => { if (!quotaChargePendingRef.current) onHome(); }}
             onRestart={reset}
             clearedSets={modeUnlocks.adventureClears}
             gameItems={gameItems}
@@ -4659,8 +5239,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             movesLeft={
               challengeMode === 'random' && !reviveActive ? movesLeft : null
             }
-            movesBonusFlashKey={rescueMoveBonusFlashKey}
             stamina={staminaHudHold ?? staminaState.value}
+            unlimitedStamina={hasPremiumAccess}
             staminaBanked={staminaState.bankedRewards}
             canPlay={canPlay}
             playBlockedReason={playBlockedReason === 'stamina' ? 'stamina' : null}
@@ -4713,7 +5293,7 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             }
             categoryUnlocked={categoryUnlocked}
             moodUnlocked={modeUnlocks.adventureClears >= 3}
-            moodCanStartNew={canPlayMoodToday()}
+            moodCanStartNew={canPlayMoodToday({ hasPremiumAccess, userId: progressUserId }) && (hasPremiumAccess || staminaState.value > 0)}
             sayBlastReady={sayBlastPool.length >= ADVENTURE_WORDS_PER_SET}
             firstSwapTutorialMove={
               firstSwapTutorialEligible && !firstSwapTutorialResolving
@@ -4790,6 +5370,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
             onSfxEnabledChange={handleSfxEnabledChange}
             hapticsEnabled={hapticsEnabled}
             onHapticsEnabledChange={handleHapticsEnabledChange}
+            playedToday={staminaState.spentToday > 0}
+            reminderGameState={getReminderGameState()}
           />
         )}
       </main>
@@ -4810,6 +5392,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       {sayBlastOpen && (
         <SayBlastGame
           learnedItems={sayBlastPool}
+          speechLocale={languageForCode(course.targetLanguage).speechLocale}
+          analyticsSetNumber={level}
           progressUserId={progressUserId}
           onExit={exitSayBlast}
           returnToAdventure={sayBlastEntry === 'stamina-gate'}
@@ -4850,19 +5434,6 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
       )}
 
       <CelebrationBurst
-        show={reviveFlash === 'retry'}
-        title={ui.rescue.retryTitle}
-        subtitle={ui.rescue.retryBody}
-        emoji="✨"
-        className="candy-celebration-overlay-no-dim"
-        actionLabel={ui.rescue.continueMoves}
-        onDone={() => {
-          setReviveFlash(null);
-          setRescueMoveBonusFlashKey((key) => key + 1);
-        }}
-      />
-
-      <CelebrationBurst
         show={reviveFlash === 'success'}
         title={t.adventure.reviveSuccessTitle}
         subtitle={t.adventure.reviveSuccessSubtitle}
@@ -4873,8 +5444,8 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
           setReviveFlash(null);
           if (!rescueQuizPendingRef.current) return;
           rescueQuizPendingRef.current = false;
-          setQuizKind(Math.random() < 0.35 ? 'connect' : 'pick');
-          setQuizOpen(true);
+          recordRoundAnalytics('set_completed');
+          openRoundCelebrate(quizItemsRef.current);
         }}
       />
 
@@ -4883,12 +5454,21 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         items={quizItems}
         distractorPool={allPool}
         quizKind={quizKind}
-        onComplete={handleQuizComplete}
-        onAbandon={handleQuizAbandon}
+        checkpoint={quizCheckpoint}
+        onComplete={(mistakenItemIds) => {
+          if (quizCompletionInFlightRef.current) return;
+          quizCompletionInFlightRef.current = true;
+          recordRoundAnalytics('quiz_completed', mistakenItemIds);
+          handleQuizComplete(mistakenItemIds);
+          clearPendingQuiz(courseId, progressUserIdRef.current);
+          quizCheckpointRef.current = null;
+          setQuizCheckpoint(null);
+        }}
       />
 
       <RoundResultSheet
         result={roundResult}
+        onEnableReminders={handleEnableReminders}
         onExitComplete={handleRoundResultExitComplete}
         onContinue={() => completeRoundResult(null)}
         onReturnToCategory={returnToCategoryHub}
@@ -4896,9 +5476,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         canContinueReview={
           reviewPool.length >= ADVENTURE_WORDS_PER_SET && dueReviewCount > 0
         }
-        canGoAdventure={staminaState.value > 0}
+        canGoAdventure={hasPremiumAccess || staminaState.value > 0}
+        hasPremiumAccess={hasPremiumAccess}
+        lifetimeDisplayPrice={
+          offerings.lifetime.displayPrice === '—' ? null : offerings.lifetime.displayPrice
+        }
         onContinueReview={handleReviewContinueReview}
         onGoAdventure={handleReviewContinueAdventure}
+        onUnlockPlus={handleMoodResultUnlockPlus}
+        onReturnHome={handleRoundResultReturnHome}
         onRest={handleReviewContinueRest}
         onClaimAward={handleClaimRoundAward}
       />
@@ -4929,14 +5515,20 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
 
       <AdventureFailSheet
         open={failSheetOpen}
-        canRetry={staminaState.value > 0}
+        canRetry={hasPremiumAccess || staminaState.value > 0}
+        unlimitedRetry={hasPremiumAccess}
+        remainingWords={firstReviveRemainingWords}
         onRetry={handleFailRetry}
-        onClose={() => setFailSheetOpen(false)}
+        onRecharge={() => {
+          setFailSheetOpen(false);
+          setDeadMachineOpen(true);
+        }}
+        onGoHome={onHome}
       />
 
       <DeadMachineSheet
-        open={deadMachineOpen}
-        hasStamina={staminaState.value > 0}
+        open={deadMachineOpen && activeTab === 'game'}
+        hasStamina={hasPremiumAccess || staminaState.value > 0}
         nextStaminaAt={
           (() => {
             const remaining = msUntilNextStamina(staminaState);
@@ -4945,10 +5537,17 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         }
         canGoSayBlast={
           sayBlastPool.length >= ADVENTURE_WORDS_PER_SET &&
-          staminaState.sayBlastRewardsToday < SAY_BLAST_DAILY_REWARD_MAX
+          staminaState.value < STAMINA_MAX
         }
         canGoReview={reviewUnlocked && reviewPool.length >= ADVENTURE_WORDS_PER_SET}
-        canGoMood={modeUnlocks.adventureClears >= 3 && canPlayMoodToday()}
+        canGoMood={modeUnlocks.adventureClears >= 3 && canPlayMoodToday({ hasPremiumAccess, userId: progressUserId }) && (hasPremiumAccess || staminaState.value > 0)}
+        rewardedAdsAvailable={rewardedAdsSupported()}
+        adResetsRemaining={rewardedAdResetsRemaining}
+        adBusy={rewardedAdBusy}
+        adStatus={rewardedAdStatus}
+        lifetimeDisplayPrice={offerings.lifetime.displayPrice === '—' ? null : offerings.lifetime.displayPrice}
+        onWatchAd={() => void handleRewardedAdReset()}
+        onUnlockPlus={() => openPaywall('profile')}
         onGoSayBlast={() => {
           setDeadMachineOpen(false);
           openSayBlast('stamina-gate');
@@ -4957,6 +5556,15 @@ export const ItemMatchGamePage: React.FC<ItemMatchGamePageProps> = ({
         onGoMood={handleGoMoodFromDeadMachine}
         onContinue={resumeAdventureAfterStaminaGate}
         onGoHome={onHome}
+        remindersEnabled={remindersEnabled}
+        reminderBusy={reminderPromptBusy}
+        onEnableReminders={() => {
+          if (reminderPromptBusy) return;
+          void handleEnableReminders().then(result => {
+            const copy = NOTIFICATION_SETTINGS_COPY[locale];
+            setRewardedAdStatus(result === 'enabled' ? copy.enabled : result === 'denied' ? copy.permissionDenied : copy.unavailable);
+          }).catch(() => setRewardedAdStatus(NOTIFICATION_SETTINGS_COPY[locale].unavailable));
+        }}
       />
 
       <LegalConsentModal open={consentOpen} onAccept={acceptConsent} />

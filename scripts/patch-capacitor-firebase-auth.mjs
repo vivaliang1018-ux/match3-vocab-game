@@ -18,12 +18,13 @@ try {
 
 const facebookEntries = [
   /^\s*\.package\(url: "https:\/\/github\.com\/facebook\/facebook-ios-sdk(?:\.git)?", from: "[^"]+"\),?\n/m,
-  /^\s*\.product\(name: "FacebookCore", package: "facebook-ios-sdk"\),\n/m,
-  /^\s*\.product\(name: "FacebookLogin", package: "facebook-ios-sdk"\)\n?/m,
-  /^\s*\.define\("RGCFA_INCLUDE_FACEBOOK"\)\n?/m,
+  /^\s*\.product\(name: "FacebookCore", package: "facebook-ios-sdk"(?:,\s*condition: \.when\(traits: \["Facebook"\]\))?\),?\n/m,
+  /^\s*\.product\(name: "FacebookLogin", package: "facebook-ios-sdk"(?:,\s*condition: \.when\(traits: \["Facebook"\]\))?\),?\n/m,
+  /^\s*\.define\("RGCFA_INCLUDE_FACEBOOK"(?:, \.when\(traits: \["Facebook"\]\))?\),?\n?/m,
+  /^\s*\.trait\(\s*name: "Facebook",\s*description: "Includes the Facebook SDK\."\s*\),?\n/m,
 ];
 
-let patched = source;
+let patched = source.replace('.default(enabledTraits: ["Google", "Facebook"])', '.default(enabledTraits: ["Google"])');
 for (const entry of facebookEntries) {
   patched = patched.replace(entry, '');
 }

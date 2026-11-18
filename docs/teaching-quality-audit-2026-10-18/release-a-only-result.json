@@ -1,0 +1,16 @@
+{
+  "items": 1117,
+  "courses": 24,
+  "checkedCourseGlosses": 26808,
+  "changedGlosses": 98,
+  "changedEmojis": 23,
+  "changedTargetWords": 0,
+  "changedPublicFiles": 0,
+  "approvedCells": 98,
+  "deferredConflict": {
+    "id": "tired-face-2",
+    "course": "zh-CN-ja",
+    "target": "疲れた",
+    "reason": "Adjective meaning tired; requested face noun adds meaning. Kept unchanged pending confirmation."
+  }
+}

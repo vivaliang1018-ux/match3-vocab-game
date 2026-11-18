@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AnimatePresence, motion } from 'motion/react';
-import { Mic, MicOff, Pause, Play, RotateCcw, X } from 'lucide-react';
+import { Mic, MicOff, Pause, Play, RotateCcw, Volume2, X } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { getActiveCourseId } from '../../course';
+import { trackCoreEvent } from '../../lib/coreAnalytics';
 import type { Locale } from '../../i18n';
 import {
   addAppleSpeechLevelListener,
@@ -25,6 +27,7 @@ import {
   playSayBlastExplosionSfx,
 } from '../../lib/gameSfx';
 import { MOTION_PRESS_TAP } from '../../lib/motionPresets';
+import { calculateSayBlastRating } from '../../lib/sayBlastRating';
 import {
   loadSayBlastStats,
   recordSayBlastAttemptStarted,
@@ -35,6 +38,7 @@ import {
 } from '../../lib/sayBlastStats';
 import type { WordItem } from '../../types/game';
 import { cn } from '../../lib/utils';
+import { speakWordQuick } from '../../lib/wordSpeech';
 
 const LANE_COUNT = 6;
 const DROP_SIZE = 52;
@@ -77,6 +81,19 @@ const SPEECH_TARGET_ALIASES: Record<string, readonly string[]> = {
   hut: ['hot', 'hat'],
 };
 
+/**
+ * Give long words and multi-word labels enough time to be spoken. Short words
+ * keep the current pace; long phrases can fall up to 32% more slowly.
+ */
+function speakingTimeSpeedMultiplier(word: string): number {
+  const normalized = normalizeSpeech(word);
+  const compactLength = Array.from(normalized.replace(/\s+/g, '')).length;
+  const tokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  const lengthAllowance = Math.max(0, compactLength - 7) * 0.022;
+  const phraseAllowance = Math.max(0, tokenCount - 1) * 0.07;
+  return Math.max(0.68, Math.min(1, 1 - lengthAllowance - phraseAllowance));
+}
+
 type DropStatus = 'falling' | 'checking' | 'targeted' | 'settled';
 
 type FallingEmoji = {
@@ -111,7 +128,7 @@ type CenterPrompt = {
   detail?: string;
 };
 
-type PermissionPhase = 'requesting' | 'ready' | 'denied' | 'unsupported' | 'error';
+type PermissionPhase = 'intro' | 'requesting' | 'ready' | 'denied' | 'unsupported' | 'error';
 type AnswerSession = {
   dropId: string;
   target: string;
@@ -128,7 +145,8 @@ type GameResult = {
   bestStreak: number;
   blasted: number;
   missed: number;
-  staminaReward: 'granted' | 'banked' | 'daily-limit' | null;
+  missedItems: WordItem[];
+  staminaReward: 'granted' | 'banked' | 'daily-limit' | 'pending' | 'sync-error' | null;
   ratingTip: string;
   attemptNumber: number;
   careerTotalBlasted: number;
@@ -171,6 +189,9 @@ type Copy = {
   staminaReward: string;
   staminaBanked: string;
   staminaDailyLimit: string;
+  staminaSyncError: string;
+  staminaSyncing: string;
+  retryReward: string;
   staminaRule: string;
   staminaAlmost: string;
   staminaFailureEncouragement: string;
@@ -204,9 +225,9 @@ const EN_COPY: Copy = {
   permissionTitle: 'Microphone access needed',
   permissionBody:
     'Allow Microphone and Speech Recognition in iOS Settings to play Say & Blast.',
-  unsupportedTitle: 'On-device speech unavailable',
+  unsupportedTitle: 'Speech recognition unavailable',
   unsupportedBody:
-    'Say & Blast requires Apple’s on-device English speech recognition. It is unavailable on this device.',
+    'Speech recognition for this course is currently unavailable. Check your internet connection and try again.',
   retryPermission: 'Check again',
   learnedNeededTitle: 'Learn an Emoji first',
   learnedNeededBody: 'Finish an Adventure quiz, then your learned Emojis can appear here.',
@@ -228,10 +249,13 @@ const EN_COPY: Copy = {
   missed: 'Missed',
   staminaReward: '+1 stamina earned!',
   staminaBanked: '+1 stamina saved for later!',
-  staminaDailyLimit: 'Daily stamina reward limit reached (3/3).',
-  staminaRule: 'Earn 3 stars for +1 ❤️ · 80%+ accuracy · Max 3/day',
-  staminaAlmost: 'Almost there! Reach 3 stars to earn stamina.',
-  staminaFailureEncouragement: 'Keep going! Survive the round and reach 3 stars to earn stamina.',
+  staminaDailyLimit: 'Stamina is already full (3/3).',
+  staminaSyncError: 'Reward could not sync. Check your connection and try again.',
+  staminaSyncing: 'Syncing your reward…',
+  retryReward: 'Retry reward',
+  staminaRule: '3 stars earn +1 ❤️ · 70%+ accuracy',
+  staminaAlmost: 'Almost there! Reach 3 stars to earn +1 stamina.',
+  staminaFailureEncouragement: 'Survive with 70%+ accuracy.',
   startGame: 'Start Game',
   getReady: 'Get ready!',
   nextGoal: 'Next goal',
@@ -239,7 +263,7 @@ const EN_COPY: Copy = {
   accuracyGoal: (percent) => `Reach ${percent}% accuracy`,
   tutorialTitle: 'Quick Voice Practice',
   tutorialBody:
-    'Say the English word for 3 slow emojis. A correct word launches the attack.',
+    'Say the word shown for 3 slow emojis. A correct word launches the attack.',
   tutorialPractice: 'Start Practice',
   tutorialProgress: (cleared) => `${cleared}/3 practice hits`,
   tutorialCompleteTitle: 'Ready to Blast!',
@@ -263,8 +287,8 @@ const ZH_COPY: Copy = {
   preparing: '正在准备语音识别…',
   permissionTitle: '需要麦克风权限',
   permissionBody: '请在 iOS 设置中允许麦克风和语音识别，才能游玩开口出击。',
-  unsupportedTitle: '无法使用设备端语音识别',
-  unsupportedBody: '开口出击需要 Apple 的设备端英语语音识别，此设备暂不支持。',
+  unsupportedTitle: '语音识别暂不可用',
+  unsupportedBody: '当前课程的语音识别暂不可用，请检查网络连接后重试。',
   retryPermission: '重新检查',
   learnedNeededTitle: '先学习一个 emoji',
   learnedNeededBody: '完成一组闯关小测后，已学习的 emoji 就会出现在这里。',
@@ -286,17 +310,20 @@ const ZH_COPY: Copy = {
   missed: '未命中',
   staminaReward: '体力 +1！',
   staminaBanked: '体力 +1 已暂存！',
-  staminaDailyLimit: '今日奖励体力已达上限（3/3）',
-  staminaRule: '三星通关 · +1 体力 · 正确率 80%+ · 每天最多 3 次',
+  staminaDailyLimit: '体力已满（3/3）',
+  staminaSyncError: '奖励同步失败，请检查网络后重试。',
+  staminaSyncing: '正在同步奖励…',
+  retryReward: '重试领取奖励',
+  staminaRule: '三星通关 +1 体力 · 正确率 70%+',
   staminaAlmost: '还差一点！三星通关即可 +1 体力',
-  staminaFailureEncouragement: '继续加油！坚持完成并达到三星，即可 +1 体力',
+  staminaFailureEncouragement: '坚持完成、正确率达到 70% 即可获得体力',
   startGame: '开始游戏',
   getReady: '准备！',
   nextGoal: '下次目标',
   clearMore: (count) => `再消除 ${count} 个 emoji`,
   accuracyGoal: (percent) => `正确率达到 ${percent}%`,
   tutorialTitle: '快速语音练习',
-  tutorialBody: '先用3个慢速 emoji 练习。读出对应英文，武器就会自动发射。',
+  tutorialBody: '先用3个慢速 emoji 练习。读出画面显示的单词，武器就会自动发射。',
   tutorialPractice: '开始练习',
   tutorialProgress: (cleared) => `练习命中 ${cleared}/3`,
   tutorialCompleteTitle: '准备出击！',
@@ -312,55 +339,75 @@ const ZH_COPY: Copy = {
 };
 
 const ES_COPY: Copy = {
+  staminaSyncing: 'Sincronizando tu recompensa…',
+  staminaSyncError: 'No se pudo sincronizar la recompensa. Comprueba tu conexión.', retryReward: 'Reintentar recompensa',
   title: 'Di y dispara', score: 'Puntuación', cleared: 'Eliminados', listening: 'Escuchando…', preparing: 'Preparando el reconocimiento de voz…',
   permissionTitle: 'Se necesita acceso al micrófono', permissionBody: 'Permite el acceso al micrófono y al reconocimiento de voz en los ajustes de iOS para jugar.',
-  unsupportedTitle: 'Voz en el dispositivo no disponible', unsupportedBody: 'Di y dispara necesita el reconocimiento de voz en inglés en el dispositivo de Apple, que no está disponible aquí.', retryPermission: 'Comprobar de nuevo',
+  unsupportedTitle: 'Voz en el dispositivo no disponible', unsupportedBody: 'El reconocimiento de voz de Apple para el idioma de este curso no está disponible en este dispositivo.', retryPermission: 'Comprobar de nuevo',
   learnedNeededTitle: 'Primero aprende un Emoji', learnedNeededBody: 'Completa un quiz de Aventura para que tus Emojis aprendidos aparezcan aquí.',
   gameOver: '¡La pila alcanzó la línea de peligro!', tryAgain: 'Intentar de nuevo', exit: 'Salir', start: 'Comenzar', pause: 'Pausa', paused: 'En pausa', time: 'Tiempo', rush: '¡SPRINT FINAL!',
   successTitle: '¡Has sobrevivido!', threeStarTitle: '¡Desafío de tres estrellas completado!', successBody: '¡Has aguantado los 60 segundos!', failureTitle: 'Fin de la partida',
-  accuracy: 'Precisión', bestStreak: 'Mejor racha', blasted: 'Derribados', missed: 'Fallados', staminaReward: '¡Has ganado +1 de energía!', staminaBanked: '¡Has guardado +1 de energía para después!', staminaDailyLimit: 'Has alcanzado el límite diario de energía (3/3).',
-  staminaRule: 'Consigue 3 estrellas para ganar +1 ❤️ · 80 % o más de precisión · Máx. 3 al día', staminaAlmost: '¡Casi! Consigue 3 estrellas para ganar energía.', staminaFailureEncouragement: '¡Sigue así! Sobrevive a la ronda y consigue 3 estrellas para ganar energía.',
+  accuracy: 'Precisión', bestStreak: 'Mejor racha', blasted: 'Derribados', missed: 'Fallados', staminaReward: '¡Has ganado +1 de energía!', staminaBanked: '¡Has guardado +1 de energía para después!', staminaDailyLimit: 'La energía ya está completa (3/3).',
+  staminaRule: '3 estrellas: +1 ❤️ · 70 % de precisión', staminaAlmost: '¡Casi! Consigue 3 estrellas para ganar energía.', staminaFailureEncouragement: 'Sobrevive con 70 % de precisión para ganar energía.',
   startGame: 'Comenzar partida', getReady: '¡Prepárate!', nextGoal: 'Siguiente objetivo', clearMore: n => `Elimina ${n} ${n === 1 ? 'Emoji más' : 'Emojis más'}`, accuracyGoal: n => `Alcanza un ${n} % de precisión`,
-  tutorialTitle: 'Práctica rápida de voz', tutorialBody: 'Di la palabra en inglés de 3 Emojis lentos. Una respuesta correcta lanza el ataque.', tutorialPractice: 'Comenzar práctica', tutorialProgress: n => `${n}/3 aciertos de práctica`, tutorialCompleteTitle: '¡Listo para disparar!', tutorialCompleteBody: 'Ahora sobrevive durante 60 segundos. Los últimos 20 segundos son más rápidos.', tutorialContinue: 'Continuar',
+  tutorialTitle: 'Práctica rápida de voz', tutorialBody: 'Di la palabra que aparece con 3 Emojis lentos. Una respuesta correcta lanza el ataque.', tutorialPractice: 'Comenzar práctica', tutorialProgress: n => `${n}/3 aciertos de práctica`, tutorialCompleteTitle: '¡Listo para disparar!', tutorialCompleteBody: 'Ahora sobrevive durante 60 segundos. Los últimos 20 segundos son más rápidos.', tutorialContinue: 'Continuar',
   attemptNumber: n => `Desafío n.º ${n}`, challengeCompleted: n => `Desafío n.º ${n} completado`, careerBlasted: n => `${n} ${n === 1 ? 'Emoji derribado' : 'Emojis derribados'} en total`, milestoneReached: n => `¡${n} desafíos de voz! ¡Sigue así!`, newAccuracyRecord: '¡Nuevo récord de precisión!', newStreakRecord: '¡Nuevo récord de racha!', newBest: 'NUEVO RÉCORD',
 };
 
 const FR_COPY: Copy = {
+  staminaSyncing: 'Synchronisation de la récompense…',
+  staminaSyncError: 'Impossible de synchroniser la récompense. Vérifie ta connexion.', retryReward: 'Réessayer la récompense',
   title: 'Dis et explose', score: 'Score', cleared: 'Éliminés', listening: 'Écoute…', preparing: 'Préparation de la reconnaissance vocale…',
-  permissionTitle: 'Accès au microphone requis', permissionBody: 'Autorise le microphone et la reconnaissance vocale dans les réglages iOS pour jouer.', unsupportedTitle: 'Reconnaissance locale indisponible', unsupportedBody: 'Dis et explose nécessite la reconnaissance vocale anglaise locale d’Apple, indisponible sur cet appareil.', retryPermission: 'Vérifier à nouveau',
+  permissionTitle: 'Accès au microphone requis', permissionBody: 'Autorise le microphone et la reconnaissance vocale dans les réglages iOS pour jouer.', unsupportedTitle: 'Reconnaissance locale indisponible', unsupportedBody: 'La reconnaissance vocale locale d’Apple pour la langue de ce cours est indisponible sur cet appareil.', retryPermission: 'Vérifier à nouveau',
   learnedNeededTitle: 'Apprends d’abord un Emoji', learnedNeededBody: 'Termine un quiz Aventure pour que tes Emojis appris apparaissent ici.', gameOver: 'La pile a atteint la ligne de danger !', tryAgain: 'Réessayer', exit: 'Quitter', start: 'Démarrer', pause: 'Pause', paused: 'En pause', time: 'Temps', rush: 'SPRINT FINAL !',
   successTitle: 'Tu as survécu !', threeStarTitle: 'Défi trois étoiles terminé !', successBody: 'Tu as tenu pendant 60 secondes !', failureTitle: 'Partie terminée', accuracy: 'Précision', bestStreak: 'Meilleure série', blasted: 'Explosés', missed: 'Manqués',
-  staminaReward: '+1 énergie gagnée !', staminaBanked: '+1 énergie mise de côté !', staminaDailyLimit: 'Limite quotidienne d’énergie atteinte (3/3).', staminaRule: 'Obtiens 3 étoiles pour gagner +1 ❤️ · Précision de 80 % ou plus · Max. 3/jour', staminaAlmost: 'Presque ! Obtiens 3 étoiles pour gagner de l’énergie.', staminaFailureEncouragement: 'Continue ! Survis à la manche et obtiens 3 étoiles pour gagner de l’énergie.',
-  startGame: 'Démarrer la partie', getReady: 'Prépare-toi !', nextGoal: 'Prochain objectif', clearMore: n => `Élimine encore ${n} ${n === 1 ? 'Emoji' : 'Emojis'}`, accuracyGoal: n => `Atteins ${n} % de précision`, tutorialTitle: 'Entraînement vocal rapide', tutorialBody: 'Prononce le mot anglais de 3 Emojis lents. Une bonne réponse lance l’attaque.', tutorialPractice: 'Commencer l’entraînement', tutorialProgress: n => `${n}/3 réussites`, tutorialCompleteTitle: 'Prêt à exploser !', tutorialCompleteBody: 'Survis maintenant pendant 60 secondes. Les 20 dernières secondes accélèrent.', tutorialContinue: 'Continuer',
+  staminaReward: '+1 énergie gagnée !', staminaBanked: '+1 énergie mise de côté !', staminaDailyLimit: 'L’énergie est déjà pleine (3/3).', staminaRule: '3 étoiles : +1 ❤️ · 70 % de précision', staminaAlmost: 'Presque ! Obtiens 3 étoiles pour gagner de l’énergie.', staminaFailureEncouragement: 'Survis avec 70 % de précision pour gagner de l’énergie.',
+  startGame: 'Démarrer la partie', getReady: 'Prépare-toi !', nextGoal: 'Prochain objectif', clearMore: n => `Élimine encore ${n} ${n === 1 ? 'Emoji' : 'Emojis'}`, accuracyGoal: n => `Atteins ${n} % de précision`, tutorialTitle: 'Entraînement vocal rapide', tutorialBody: 'Prononce le mot affiché pour 3 Emojis lents. Une bonne réponse lance l’attaque.', tutorialPractice: 'Commencer l’entraînement', tutorialProgress: n => `${n}/3 réussites`, tutorialCompleteTitle: 'Prêt à exploser !', tutorialCompleteBody: 'Survis maintenant pendant 60 secondes. Les 20 dernières secondes accélèrent.', tutorialContinue: 'Continuer',
   attemptNumber: n => `Défi n° ${n}`, challengeCompleted: n => `Défi n° ${n} terminé`, careerBlasted: n => `${n} ${n === 1 ? 'Emoji explosé' : 'Emojis explosés'} au total`, milestoneReached: n => `${n} défis vocaux ! Continue !`, newAccuracyRecord: 'Nouveau record de précision !', newStreakRecord: 'Nouveau record de série !', newBest: 'NOUVEAU RECORD',
 };
 
 const DE_COPY: Copy = {
-  title: 'Sprechen & Treffen', score: 'Punkte', cleared: 'Entfernt', listening: 'Hört zu…', preparing: 'Spracherkennung wird vorbereitet…', permissionTitle: 'Mikrofonzugriff erforderlich', permissionBody: 'Erlaube Mikrofon und Spracherkennung in den iOS-Einstellungen, um zu spielen.', unsupportedTitle: 'Lokale Spracherkennung nicht verfügbar', unsupportedBody: 'Sprechen & Treffen benötigt Apples lokale englische Spracherkennung, die auf diesem Gerät nicht verfügbar ist.', retryPermission: 'Erneut prüfen',
+  staminaSyncing: 'Belohnung wird synchronisiert…',
+  staminaSyncError: 'Belohnung konnte nicht synchronisiert werden. Prüfe deine Verbindung.', retryReward: 'Belohnung erneut versuchen',
+  title: 'Sprechen & Treffen', score: 'Punkte', cleared: 'Entfernt', listening: 'Hört zu…', preparing: 'Spracherkennung wird vorbereitet…', permissionTitle: 'Mikrofonzugriff erforderlich', permissionBody: 'Erlaube Mikrofon und Spracherkennung in den iOS-Einstellungen, um zu spielen.', unsupportedTitle: 'Lokale Spracherkennung nicht verfügbar', unsupportedBody: 'Apples lokale Spracherkennung für die Sprache dieses Kurses ist auf diesem Gerät nicht verfügbar.', retryPermission: 'Erneut prüfen',
   learnedNeededTitle: 'Lerne zuerst ein Emoji', learnedNeededBody: 'Schließe ein Abenteuer-Quiz ab, damit deine gelernten Emojis hier erscheinen.', gameOver: 'Der Stapel hat die Gefahrenlinie erreicht!', tryAgain: 'Noch einmal', exit: 'Beenden', start: 'Start', pause: 'Pause', paused: 'Pausiert', time: 'Zeit', rush: 'ENDSPURT!', successTitle: 'Du hast überlebt!', threeStarTitle: 'Drei-Sterne-Challenge geschafft!', successBody: 'Du hast die vollen 60 Sekunden durchgehalten!', failureTitle: 'Spiel vorbei',
-  accuracy: 'Genauigkeit', bestStreak: 'Beste Serie', blasted: 'Getroffen', missed: 'Verfehlt', staminaReward: '+1 Energie verdient!', staminaBanked: '+1 Energie für später gespeichert!', staminaDailyLimit: 'Tägliches Energielimit erreicht (3/3).', staminaRule: '3 Sterne bringen +1 ❤️ · Mindestens 80 % Genauigkeit · Max. 3/Tag', staminaAlmost: 'Fast! Erreiche 3 Sterne, um Energie zu verdienen.', staminaFailureEncouragement: 'Weiter so! Überstehe die Runde und erreiche 3 Sterne, um Energie zu verdienen.',
-  startGame: 'Spiel starten', getReady: 'Mach dich bereit!', nextGoal: 'Nächstes Ziel', clearMore: n => `Entferne noch ${n} ${n === 1 ? 'Emoji' : 'Emojis'}`, accuracyGoal: n => `Erreiche ${n} % Genauigkeit`, tutorialTitle: 'Kurzes Sprechtraining', tutorialBody: 'Sprich das englische Wort für 3 langsame Emojis. Eine richtige Antwort startet den Angriff.', tutorialPractice: 'Training starten', tutorialProgress: n => `${n}/3 Trainingstreffer`, tutorialCompleteTitle: 'Bereit zum Treffen!', tutorialCompleteBody: 'Halte jetzt 60 Sekunden durch. Die letzten 20 Sekunden werden schneller.', tutorialContinue: 'Weiter',
+  accuracy: 'Genauigkeit', bestStreak: 'Beste Serie', blasted: 'Getroffen', missed: 'Verfehlt', staminaReward: '+1 Energie verdient!', staminaBanked: '+1 Energie für später gespeichert!', staminaDailyLimit: 'Die Energie ist bereits voll (3/3).', staminaRule: '3 Sterne: +1 ❤️ · 70 % Genauigkeit', staminaAlmost: 'Fast! Erreiche 3 Sterne, um Energie zu verdienen.', staminaFailureEncouragement: 'Überstehe die Runde mit 70 % Genauigkeit.',
+  startGame: 'Spiel starten', getReady: 'Mach dich bereit!', nextGoal: 'Nächstes Ziel', clearMore: n => `Entferne noch ${n} ${n === 1 ? 'Emoji' : 'Emojis'}`, accuracyGoal: n => `Erreiche ${n} % Genauigkeit`, tutorialTitle: 'Kurzes Sprechtraining', tutorialBody: 'Sprich das angezeigte Wort für 3 langsame Emojis. Eine richtige Antwort startet den Angriff.', tutorialPractice: 'Training starten', tutorialProgress: n => `${n}/3 Trainingstreffer`, tutorialCompleteTitle: 'Bereit zum Treffen!', tutorialCompleteBody: 'Halte jetzt 60 Sekunden durch. Die letzten 20 Sekunden werden schneller.', tutorialContinue: 'Weiter',
   attemptNumber: n => `Challenge Nr. ${n}`, challengeCompleted: n => `Challenge Nr. ${n} geschafft`, careerBlasted: n => `${n} ${n === 1 ? 'Emoji' : 'Emojis'} insgesamt getroffen`, milestoneReached: n => `${n} Sprech-Challenges! Weiter so!`, newAccuracyRecord: 'Neuer Genauigkeitsrekord!', newStreakRecord: 'Neuer Serienrekord!', newBest: 'NEUER REKORD',
 };
 
 const JA_COPY: Copy = {
-  title: '声でブラスト', score: 'スコア', cleared: '消去', listening: '聞き取り中…', preparing: '音声認識を準備中…', permissionTitle: 'マイクへのアクセスが必要です', permissionBody: 'プレイするには、iOSの設定でマイクと音声認識を許可してください。', unsupportedTitle: '端末内音声認識を利用できません', unsupportedBody: 'この機能に必要なAppleの端末内英語音声認識は、このデバイスでは利用できません。', retryPermission: 'もう一度確認',
+  staminaSyncing: '報酬を同期中…',
+  staminaSyncError: '報酬を同期できませんでした。接続を確認してください。', retryReward: '報酬を再試行',
+  title: '声でブラスト', score: 'スコア', cleared: '消去', listening: '聞き取り中…', preparing: '音声認識を準備中…', permissionTitle: 'マイクへのアクセスが必要です', permissionBody: 'プレイするには、iOSの設定でマイクと音声認識を許可してください。', unsupportedTitle: '端末内音声認識を利用できません', unsupportedBody: 'このコース言語に必要なAppleの端末内音声認識は、このデバイスでは利用できません。', retryPermission: 'もう一度確認',
   learnedNeededTitle: 'まず絵文字を1つ学ぼう', learnedNeededBody: '冒険クイズを完了すると、学習した絵文字がここに表示されます。', gameOver: '積み上がった絵文字が危険ラインに到達！', tryAgain: 'もう一度', exit: '終了', start: '開始', pause: '一時停止', paused: '一時停止中', time: '時間', rush: 'ラストスパート！', successTitle: '生き残りました！', threeStarTitle: '星3チャレンジ完了！', successBody: '60秒間耐え抜きました！', failureTitle: 'ゲームオーバー',
-  accuracy: '正確率', bestStreak: '最高連続正解', blasted: '撃破', missed: 'ミス', staminaReward: '体力を1獲得！', staminaBanked: '体力を1、あとで使えるように保存しました！', staminaDailyLimit: '1日の体力報酬上限に達しました（3/3）。', staminaRule: '星3で体力 +1 ❤️ · 正確率80%以上 · 1日最大3回', staminaAlmost: 'あと少し！星3を獲得すると体力がもらえます。', staminaFailureEncouragement: 'その調子！最後まで生き残り、星3を獲得して体力をもらおう。',
-  startGame: 'ゲーム開始', getReady: '準備！', nextGoal: '次の目標', clearMore: n => `あと${n}個の絵文字を消す`, accuracyGoal: n => `正確率${n}%を達成`, tutorialTitle: 'かんたん音声練習', tutorialBody: 'ゆっくり落ちる3個の絵文字の英語名を言いましょう。正解すると攻撃します。', tutorialPractice: '練習開始', tutorialProgress: n => `練習ヒット ${n}/3`, tutorialCompleteTitle: 'ブラスト準備完了！', tutorialCompleteBody: '60秒間生き残りましょう。最後の20秒はスピードアップします。', tutorialContinue: '続ける',
+  accuracy: '正確率', bestStreak: '最高連続正解', blasted: '撃破', missed: 'ミス', staminaReward: '体力を1獲得！', staminaBanked: '体力を1、あとで使えるように保存しました！', staminaDailyLimit: '体力は満タンです（3/3）。', staminaRule: '星3で体力 +1 ❤️ · 正確率70%以上', staminaAlmost: 'あと少し！星3を獲得すると体力がもらえます。', staminaFailureEncouragement: '正確率70%以上で最後まで生き残ろう。',
+  startGame: 'ゲーム開始', getReady: '準備！', nextGoal: '次の目標', clearMore: n => `あと${n}個の絵文字を消す`, accuracyGoal: n => `正確率${n}%を達成`, tutorialTitle: 'かんたん音声練習', tutorialBody: 'ゆっくり落ちる3個の絵文字に表示される単語を言いましょう。正解すると攻撃します。', tutorialPractice: '練習開始', tutorialProgress: n => `練習ヒット ${n}/3`, tutorialCompleteTitle: 'ブラスト準備完了！', tutorialCompleteBody: '60秒間生き残りましょう。最後の20秒はスピードアップします。', tutorialContinue: '続ける',
   attemptNumber: n => `チャレンジ #${n}`, challengeCompleted: n => `チャレンジ #${n} 完了`, careerBlasted: n => `累計${n}個の絵文字を撃破`, milestoneReached: n => `音声チャレンジ${n}回達成！その調子！`, newAccuracyRecord: '正確率の新記録！', newStreakRecord: '連続正解の新記録！', newBest: '新記録',
 };
 
 const KO_COPY: Copy = {
-  title: '말하고 쏘기', score: '점수', cleared: '제거', listening: '듣는 중…', preparing: '음성 인식 준비 중…', permissionTitle: '마이크 접근 권한이 필요해요', permissionBody: '플레이하려면 iOS 설정에서 마이크와 음성 인식을 허용하세요.', unsupportedTitle: '기기 내 음성 인식을 사용할 수 없어요', unsupportedBody: '이 기능에 필요한 Apple의 기기 내 영어 음성 인식을 이 기기에서 사용할 수 없어요.', retryPermission: '다시 확인',
+  staminaSyncing: '보상을 동기화하는 중…',
+  staminaSyncError: '보상을 동기화하지 못했어요. 연결을 확인해 주세요.', retryReward: '보상 다시 받기',
+  title: '말하고 쏘기', score: '점수', cleared: '제거', listening: '듣는 중…', preparing: '음성 인식 준비 중…', permissionTitle: '마이크 접근 권한이 필요해요', permissionBody: '플레이하려면 iOS 설정에서 마이크와 음성 인식을 허용하세요.', unsupportedTitle: '기기 내 음성 인식을 사용할 수 없어요', unsupportedBody: '이 기기에서는 이 코스 언어에 필요한 Apple의 기기 내 음성 인식을 사용할 수 없어요.', retryPermission: '다시 확인',
   learnedNeededTitle: '먼저 이모지 하나를 배우세요', learnedNeededBody: '모험 퀴즈를 완료하면 학습한 이모지가 여기에 나타나요.', gameOver: '이모지 더미가 위험선에 닿았어요!', tryAgain: '다시 시도', exit: '나가기', start: '시작', pause: '일시 정지', paused: '일시 정지됨', time: '시간', rush: '마지막 질주!', successTitle: '살아남았어요!', threeStarTitle: '별 3개 도전 완료!', successBody: '60초를 모두 버텼어요!', failureTitle: '게임 오버',
-  accuracy: '정확도', bestStreak: '최고 연속 정답', blasted: '명중', missed: '놓침', staminaReward: '체력 +1 획득!', staminaBanked: '체력 +1을 나중을 위해 저장했어요!', staminaDailyLimit: '오늘의 체력 보상 한도에 도달했어요(3/3).', staminaRule: '별 3개로 체력 +1 ❤️ · 정확도 80% 이상 · 하루 최대 3회', staminaAlmost: '거의 다 왔어요! 별 3개를 얻으면 체력을 받을 수 있어요.', staminaFailureEncouragement: '계속하세요! 끝까지 버티고 별 3개를 얻어 체력을 받으세요.',
-  startGame: '게임 시작', getReady: '준비하세요!', nextGoal: '다음 목표', clearMore: n => `이모지 ${n}개 더 제거`, accuracyGoal: n => `정확도 ${n}% 달성`, tutorialTitle: '빠른 음성 연습', tutorialBody: '천천히 떨어지는 이모지 3개의 영어 단어를 말하세요. 정답을 말하면 공격해요.', tutorialPractice: '연습 시작', tutorialProgress: n => `연습 명중 ${n}/3`, tutorialCompleteTitle: '발사 준비 완료!', tutorialCompleteBody: '이제 60초 동안 버티세요. 마지막 20초에는 속도가 빨라져요.', tutorialContinue: '계속하기',
+  accuracy: '정확도', bestStreak: '최고 연속 정답', blasted: '명중', missed: '놓침', staminaReward: '체력 +1 획득!', staminaBanked: '체력 +1을 나중을 위해 저장했어요!', staminaDailyLimit: '체력이 이미 가득 찼어요(3/3).', staminaRule: '별 3개로 체력 +1 ❤️ · 정확도 70%+', staminaAlmost: '거의 다 왔어요! 별 3개를 얻으면 체력을 받을 수 있어요.', staminaFailureEncouragement: '정확도 70% 이상으로 끝까지 살아남으세요.',
+  startGame: '게임 시작', getReady: '준비하세요!', nextGoal: '다음 목표', clearMore: n => `이모지 ${n}개 더 제거`, accuracyGoal: n => `정확도 ${n}% 달성`, tutorialTitle: '빠른 음성 연습', tutorialBody: '천천히 떨어지는 이모지 3개에 표시된 단어를 말하세요. 정답을 말하면 공격해요.', tutorialPractice: '연습 시작', tutorialProgress: n => `연습 명중 ${n}/3`, tutorialCompleteTitle: '발사 준비 완료!', tutorialCompleteBody: '이제 60초 동안 버티세요. 마지막 20초에는 속도가 빨라져요.', tutorialContinue: '계속하기',
   attemptNumber: n => `도전 #${n}`, challengeCompleted: n => `도전 #${n} 완료`, careerBlasted: n => `누적 이모지 ${n}개 명중`, milestoneReached: n => `음성 도전 ${n}회 달성! 계속하세요!`, newAccuracyRecord: '정확도 신기록!', newStreakRecord: '연속 정답 신기록!', newBest: '신기록',
 };
 
 const COPY_BY_LOCALE: Record<Locale, Copy> = {
   en: EN_COPY, es: ES_COPY, fr: FR_COPY, de: DE_COPY, ja: JA_COPY, ko: KO_COPY, 'zh-CN': ZH_COPY,
+};
+
+const VOICE_PERMISSION_INTRO: Record<Locale, string> = {
+  en: 'Microphone and speech recognition let the game hear the words you say.',
+  'zh-CN': '麦克风和语音识别用来听清你读出的单词。',
+  es: 'El micrófono y el reconocimiento de voz permiten al juego escuchar las palabras que dices.',
+  fr: 'Le micro et la reconnaissance vocale permettent au jeu de comprendre les mots que tu prononces.',
+  de: 'Mit Mikrofon und Spracherkennung hört das Spiel die Wörter, die du aussprichst.',
+  ja: 'マイクと音声認識を使って、読み上げた単語を聞き取ります。',
+  ko: '마이크와 음성 인식으로 읽어 준 단어를 알아들어요.',
 };
 
 const STAY_LABEL: Record<Locale, string> = {
@@ -371,6 +418,16 @@ const STAY_LABEL: Record<Locale, string> = {
   ja: '声でブラストを続ける',
   ko: '말하고 쏘기 계속하기',
   'zh-CN': '留在开口出击',
+};
+
+const MISSED_WORDS_LABEL: Record<Locale, string> = {
+  en: 'Practice these words',
+  es: 'Practica estas palabras',
+  fr: 'Révise ces mots',
+  de: 'Übe diese Wörter',
+  ja: 'この単語を練習',
+  ko: '이 단어를 연습해 보세요',
+  'zh-CN': '马上练一下这些词',
 };
 
 function normalizeSpeech(text: string): string {
@@ -410,6 +467,7 @@ function compactSpeech(text: string): string {
 }
 
 async function beginSpeechAnswerWithRecovery(
+  locale: string,
   words: readonly string[],
 ): Promise<{ cycleId: number }> {
   try {
@@ -417,7 +475,7 @@ async function beginSpeechAnswerWithRecovery(
   } catch {
     // The tutorial stops the native audio engine. If the first formal answer
     // arrives during that handoff, restore the engine before retrying.
-    await startAppleSpeechRecognition([]);
+    await startAppleSpeechRecognition(locale, []);
     return beginAppleSpeechAnswer(words);
   }
 }
@@ -491,34 +549,6 @@ function resultConfidence(event: AppleSpeechResult): number | null {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function calculateSayBlastRating({
-  cleared,
-  accuracy,
-}: {
-  cleared: number;
-  accuracy: number;
-}): {
-  stars: 1 | 2 | 3;
-  clearGrade: number;
-  accuracyGrade: number;
-  twoStarClearTarget: number;
-  threeStarClearTarget: number;
-} {
-  const threeStarClearTarget = 15;
-  const twoStarClearTarget = 8;
-  const clearGrade =
-    cleared >= threeStarClearTarget ? 3 : cleared >= twoStarClearTarget ? 2 : 1;
-  const accuracyGrade = accuracy >= 0.8 ? 3 : accuracy >= 0.65 ? 2 : 1;
-  const total = clearGrade + accuracyGrade;
-  return {
-    stars: total >= 6 ? 3 : total >= 4 ? 2 : 1,
-    clearGrade,
-    accuracyGrade,
-    twoStarClearTarget,
-    threeStarClearTarget,
-  };
-}
-
 function formatCountdown(seconds: number): string {
   const safeSeconds = Math.max(0, Math.ceil(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -527,6 +557,8 @@ function formatCountdown(seconds: number): string {
 
 export function SayBlastGame({
   learnedItems,
+  speechLocale,
+  analyticsSetNumber = 1,
   progressUserId,
   onExit,
   returnToAdventure = false,
@@ -535,11 +567,13 @@ export function SayBlastGame({
   onValidExperience,
 }: {
   learnedItems: WordItem[];
+  speechLocale: string;
+  analyticsSetNumber?: number;
   progressUserId?: string | null;
   onExit: () => void;
   returnToAdventure?: boolean;
   onContinueAdventure?: () => void;
-  onRewardStamina: () => 'granted' | 'banked' | 'daily-limit';
+  onRewardStamina: () => Promise<'granted' | 'banked' | 'daily-limit' | 'sync-error'>;
   onValidExperience: () => void;
 }) {
   const { locale, ui } = useI18n();
@@ -563,7 +597,8 @@ export function SayBlastGame({
   const arenaRef = useRef<HTMLDivElement | null>(null);
   const arenaShakeAnimationRef = useRef<Animation | null>(null);
   const [arenaSize, setArenaSize] = useState({ width: 0, height: 0 });
-  const [permissionPhase, setPermissionPhase] = useState<PermissionPhase>('requesting');
+  const [permissionPhase, setPermissionPhase] = useState<PermissionPhase>('intro');
+  const startAfterAuthorizationRef = useRef(false);
   const [listening, setListening] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
   const [drops, setDrops] = useState<FallingEmoji[]>([]);
@@ -586,6 +621,14 @@ export function SayBlastGame({
   const gameRunningRef = useRef(false);
   const [roundStarted, setRoundStarted] = useState(false);
   const roundStartedRef = useRef(false);
+  const analyticsStartedRef = useRef(false);
+  const reportAnalyticsStart = () => {
+    if (analyticsStartedRef.current) return;
+    analyticsStartedRef.current = true;
+    trackCoreEvent('game_started', {
+      course: getActiveCourseId(), mode: 'say_blast', set_number: analyticsSetNumber,
+    });
+  };
   const [countIn, setCountIn] = useState<number | null>(null);
   const countInRef = useRef<number | null>(null);
   countInRef.current = countIn;
@@ -602,8 +645,10 @@ export function SayBlastGame({
   rushActiveRef.current = rushActive;
   const correctAttemptsRef = useRef(0);
   const missedAttemptsRef = useRef(0);
+  const missedItemsRef = useRef<WordItem[]>([]);
   const bestStreakRef = useRef(0);
   const staminaRewardGrantedRef = useRef(false);
+  const [rewardRetryPending, setRewardRetryPending] = useState(false);
   const correctStreakRef = useRef(0);
   const missStreakRef = useRef(0);
   const adaptiveSpeedRef = useRef(1);
@@ -802,6 +847,13 @@ export function SayBlastGame({
       if (session?.dropId === dropId) session.resolved = true;
       if (tutorialPracticeRef.current) return;
       missedAttemptsRef.current += 1;
+      const missedDrop = dropsRef.current.find((drop) => drop.id === dropId);
+      if (
+        missedDrop &&
+        !missedItemsRef.current.some((item) => item.id === missedDrop.item.id)
+      ) {
+        missedItemsRef.current.push(missedDrop.item);
+      }
       missStreakRef.current += 1;
       correctStreakRef.current = 0;
       adaptiveSpeedRef.current = Math.max(
@@ -831,33 +883,24 @@ export function SayBlastGame({
       const rating =
         kind === 'success'
           ? calculateSayBlastRating({
-              cleared: clearedRef.current,
               accuracy: accuracy ?? 0,
             })
           : null;
       const stars = rating?.stars ?? 0;
       let ratingTip = '';
       if (rating && stars < 3) {
-        const weakestGrade = Math.min(rating.clearGrade, rating.accuracyGrade);
-        if (rating.clearGrade === weakestGrade) {
-          const target =
-            rating.clearGrade === 1
-              ? rating.twoStarClearTarget
-              : rating.threeStarClearTarget;
-          ratingTip = copy.clearMore(Math.max(1, target - clearedRef.current));
-        } else if (rating.accuracyGrade === weakestGrade) {
-          ratingTip = copy.accuracyGoal(
-            rating.accuracyGrade === 1 ? 65 : 80,
-          );
-        }
-      }
-      let staminaReward: GameResult['staminaReward'] = null;
-      if (kind === 'success' && stars === 3 && !staminaRewardGrantedRef.current) {
-        staminaRewardGrantedRef.current = true;
-        staminaReward = onRewardStamina();
+        ratingTip = copy.accuracyGoal(70);
       }
       const attemptNumber =
         activeAttemptNumberRef.current ?? careerStatsRef.current.attemptsStarted + 1;
+      let staminaReward: GameResult['staminaReward'] = null;
+      if (kind === 'success' && stars === 3 && !staminaRewardGrantedRef.current) {
+        staminaRewardGrantedRef.current = true;
+        staminaReward = 'pending';
+        void onRewardStamina()
+          .then((reward) => setGameResult((current) => current?.attemptNumber === attemptNumber ? { ...current, staminaReward: reward } : current))
+          .catch(() => setGameResult((current) => current?.attemptNumber === attemptNumber ? { ...current, staminaReward: 'sync-error' } : current));
+      }
       const completion = validExperienceReportedRef.current
         ? recordSayBlastRoundCompleted(
             { accuracy, bestStreak: bestStreakRef.current },
@@ -876,6 +919,7 @@ export function SayBlastGame({
         bestStreak: bestStreakRef.current,
         blasted: clearedRef.current,
         missed: missedAttemptsRef.current,
+        missedItems: [...missedItemsRef.current],
         staminaReward,
         ratingTip,
         attemptNumber,
@@ -993,7 +1037,7 @@ export function SayBlastGame({
       return;
     }
     try {
-      const { cycleId } = await beginSpeechAnswerWithRecovery([session.target]);
+      const { cycleId } = await beginSpeechAnswerWithRecovery(speechLocale, [session.target]);
       if (
         session.resolved ||
         gameOverRef.current ||
@@ -1016,7 +1060,7 @@ export function SayBlastGame({
     } catch {
       setListening(false);
     }
-  }, [updateDrops]);
+  }, [speechLocale, updateDrops]);
 
   const evaluateSpeechAttempt = useCallback(
     (reason: 'final' | 'silence') => {
@@ -1111,6 +1155,7 @@ export function SayBlastGame({
     remainingMsRef.current = GAME_DURATION_SECONDS * 1000;
     correctAttemptsRef.current = 0;
     missedAttemptsRef.current = 0;
+    missedItemsRef.current = [];
     bestStreakRef.current = 0;
     staminaRewardGrantedRef.current = false;
     correctStreakRef.current = 0;
@@ -1135,6 +1180,7 @@ export function SayBlastGame({
     answerSessionRef.current = null;
     finalizedDropIdsRef.current.clear();
     validExperienceReportedRef.current = false;
+    analyticsStartedRef.current = false;
     activeAttemptNumberRef.current = null;
     setActiveAttemptNumber(null);
     await stopAppleSpeechRecognition();
@@ -1142,12 +1188,12 @@ export function SayBlastGame({
   }, [clearEffectTimers]);
 
   const startSpeechForCurrentBoard = useCallback(async () => {
-    await startAppleSpeechRecognition([]);
+    await startAppleSpeechRecognition(speechLocale, []);
     const activeDrop = dropsRef.current.find(
       (drop) => drop.status === 'falling' || drop.status === 'checking',
     );
     if (!activeDrop) return;
-    const { cycleId } = await beginSpeechAnswerWithRecovery([
+    const { cycleId } = await beginSpeechAnswerWithRecovery(speechLocale, [
       activeDrop.item.word,
     ]);
     answerSessionRef.current = {
@@ -1163,7 +1209,7 @@ export function SayBlastGame({
         drop.id === activeDrop.id ? { ...drop, recognitionCycleId: cycleId } : drop,
       ),
     );
-  }, [updateDrops]);
+  }, [speechLocale, updateDrops]);
 
   const startGame = useCallback(async () => {
     if (
@@ -1185,6 +1231,7 @@ export function SayBlastGame({
         setCountIn(3);
       } else {
         await startSpeechForCurrentBoard();
+        reportAnalyticsStart();
         gameRunningRef.current = true;
         setGameRunning(true);
         setListening(true);
@@ -1213,12 +1260,13 @@ export function SayBlastGame({
         });
       }
       setCountIn(null);
-      void startAppleSpeechRecognition([])
+      void startAppleSpeechRecognition(speechLocale, [])
         .then(() => {
           if (gameOverRef.current || !appActiveRef.current) {
             void stopAppleSpeechRecognition();
             return;
           }
+          reportAnalyticsStart();
           gameRunningRef.current = true;
           setGameRunning(true);
           setListening(true);
@@ -1231,7 +1279,7 @@ export function SayBlastGame({
         });
     }, 1000);
     return () => window.clearTimeout(timer);
-  }, [countIn]);
+  }, [countIn, speechLocale]);
 
   const startTutorialPractice = useCallback(async () => {
     if (
@@ -1246,7 +1294,7 @@ export function SayBlastGame({
     setTutorialCleared(0);
     updateDrops([]);
     try {
-      await startAppleSpeechRecognition([]);
+      await startAppleSpeechRecognition(speechLocale, []);
       tutorialPracticeRef.current = true;
       setTutorialPhase('practice');
       gameRunningRef.current = true;
@@ -1256,7 +1304,7 @@ export function SayBlastGame({
       setPermissionPhase('error');
       setListening(false);
     }
-  }, [permissionPhase, practiceItems, updateDrops]);
+  }, [permissionPhase, practiceItems, speechLocale, updateDrops]);
 
   const finishTutorial = useCallback(async () => {
     tutorialPracticeRef.current = false;
@@ -1318,14 +1366,16 @@ export function SayBlastGame({
     }
     setPermissionPhase('requesting');
     try {
-      const current = await checkAppleSpeechPermissions();
-      if (!current.onDeviceRecognitionSupported) {
+      const current = await checkAppleSpeechPermissions(speechLocale);
+      if (
+        !current.localeSupported ||
+        !current.recognizerAvailable
+      ) {
         setPermissionPhase('unsupported');
         return;
       }
-      const permissions = await requestAppleSpeechPermissions();
+      const permissions = await requestAppleSpeechPermissions(speechLocale);
       if (
-        !permissions.onDeviceRecognitionSupported ||
         permissions.microphone !== 'granted' ||
         permissions.speechRecognition !== 'granted'
       ) {
@@ -1336,7 +1386,14 @@ export function SayBlastGame({
     } catch {
       setPermissionPhase('error');
     }
-  }, [playableItems.length, resetGame]);
+  }, [playableItems.length, resetGame, speechLocale]);
+
+  useEffect(() => {
+    if (permissionPhase !== 'ready' || !startAfterAuthorizationRef.current) return;
+    startAfterAuthorizationRef.current = false;
+    if (tutorialPhase !== null) void startTutorialPractice();
+    else void startGame();
+  }, [permissionPhase, tutorialPhase, startTutorialPractice, startGame]);
 
   useEffect(() => {
     const arena = arenaRef.current;
@@ -1372,7 +1429,6 @@ export function SayBlastGame({
         }
       });
       if (levelHandle) handles.push(levelHandle);
-      if (!disposed) await authorizeAndStart();
     })();
     return () => {
       disposed = true;
@@ -1382,7 +1438,7 @@ export function SayBlastGame({
       void stopAppleSpeechRecognition();
       for (const handle of handles) void handle.remove();
     };
-  }, [authorizeAndStart, clearEffectTimers]);
+  }, [clearEffectTimers]);
 
   useEffect(() => {
     if (!gameRunning || gameOver || tutorialPhase === 'practice') return;
@@ -1489,7 +1545,7 @@ export function SayBlastGame({
                 ]
               : playableItems[Math.floor(Math.random() * playableItems.length)];
           if (!item) return;
-          const { cycleId } = await beginSpeechAnswerWithRecovery([item.word]);
+          const { cycleId } = await beginSpeechAnswerWithRecovery(speechLocale, [item.word]);
           if (
             cancelled ||
             !gameRunningRef.current ||
@@ -1521,9 +1577,9 @@ export function SayBlastGame({
               lane,
               y: -DROP_SIZE,
               speed:
-                BASE_DROP_SPEED +
-                Math.min(28, clearedRef.current * 0.6) +
-                Math.random() * 10,
+                (BASE_DROP_SPEED +
+                  Math.min(28, clearedRef.current * 0.6) +
+                  Math.random() * 10) * speakingTimeSpeedMultiplier(item.word),
               status: 'falling' as const,
               spawnedAt: performance.now(),
               recognitionCycleId: cycleId,
@@ -1575,6 +1631,7 @@ export function SayBlastGame({
     beginOfficialAttempt,
     rushActive,
     scheduleDropPreparationRetry,
+    speechLocale,
     tutorialPhase,
     updateDrops,
   ]);
@@ -1694,7 +1751,10 @@ export function SayBlastGame({
           </div>
           <div className="mt-0.5 flex items-center justify-center gap-1 text-[11px] font-bold text-white/85">
             {listening ? <Mic size={12} aria-hidden /> : <MicOff size={12} aria-hidden />}
-            {permissionPhase === 'requesting' ? copy.preparing : copy.listening}
+            {permissionPhase === 'requesting' ? copy.preparing
+              : listening ? copy.listening
+                : permissionPhase === 'intro' || permissionPhase === 'ready' ? copy.getReady
+                  : permissionPhase === 'unsupported' ? copy.unsupportedTitle : copy.permissionTitle}
             <span
               className="ml-1 flex h-3 items-end gap-[2px]"
               aria-hidden
@@ -1854,7 +1914,7 @@ export function SayBlastGame({
         {permissionPhase === 'ready' && tutorialPhase === 'intro' && (
           <div className="absolute inset-0 z-[65] grid place-items-center bg-[#17133d]/48 px-6 backdrop-blur-sm">
             <motion.div
-              className="w-full max-w-sm rounded-[30px] border border-white/80 bg-white/96 px-6 py-7 text-center text-sky-950 shadow-2xl"
+              className="w-full max-w-sm rounded-[30px] border border-white/80 bg-white/96 px-5 py-5 text-center text-sky-950 shadow-2xl"
               initial={{ opacity: 0, scale: 0.78, y: 24 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
             >
@@ -2033,12 +2093,14 @@ export function SayBlastGame({
         {blocked && (
           <div className="absolute inset-0 z-[70] grid place-items-center bg-[#17133d]/55 px-6 backdrop-blur-sm">
             <div className="w-full max-w-sm rounded-[28px] border border-white/70 bg-white/95 px-6 py-7 text-center text-sky-950 shadow-2xl">
-              <div className="text-5xl" aria-hidden>
+              <div className="text-4xl" aria-hidden>
                 {playableItems.length === 0 ? '📚' : permissionPhase === 'unsupported' ? '📱' : '🎙️'}
               </div>
               <h2 className="mt-3 text-xl font-black">
                 {playableItems.length === 0
                   ? copy.learnedNeededTitle
+                  : permissionPhase === 'intro'
+                    ? (tutorialPhase !== null ? copy.tutorialTitle : copy.title)
                   : permissionPhase === 'unsupported'
                     ? copy.unsupportedTitle
                     : permissionPhase === 'requesting'
@@ -2050,7 +2112,9 @@ export function SayBlastGame({
                   ? copy.learnedNeededBody
                   : permissionPhase === 'unsupported'
                     ? copy.unsupportedBody
-                    : copy.permissionBody}
+                    : permissionPhase === 'intro'
+                      ? `${tutorialPhase !== null ? `${copy.tutorialBody} ` : ''}${VOICE_PERMISSION_INTRO[locale]}`
+                      : copy.permissionBody}
               </p>
               {playableItems.length > 0 &&
                 permissionPhase !== 'requesting' &&
@@ -2058,10 +2122,13 @@ export function SayBlastGame({
                   <motion.button
                     type="button"
                     whileTap={MOTION_PRESS_TAP}
-                    onClick={() => void authorizeAndStart()}
+                    onClick={() => {
+                      startAfterAuthorizationRef.current = true;
+                      void authorizeAndStart();
+                    }}
                     className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-5 w-full"
                   >
-                    {copy.retryPermission}
+                    {permissionPhase === 'intro' ? (tutorialPhase !== null ? copy.tutorialPractice : copy.startGame) : copy.retryPermission}
                   </motion.button>
                 )}
               <motion.button
@@ -2087,7 +2154,7 @@ export function SayBlastGame({
               <div className="text-5xl" aria-hidden>
                 {gameResult.kind === 'success' ? '🏆' : '💥'}
               </div>
-              <h2 className="mt-3 text-2xl font-black">
+              <h2 className="mt-2 text-2xl font-black">
                 {gameResult.kind === 'success'
                   ? gameResult.staminaReward === 'granted'
                     ? `❤️ ${copy.staminaReward}`
@@ -2109,12 +2176,16 @@ export function SayBlastGame({
                 {gameResult.kind === 'success'
                   ? gameResult.staminaReward === 'daily-limit'
                     ? copy.staminaDailyLimit
-                    : copy.successBody
+                    : gameResult.staminaReward === 'sync-error'
+                      ? copy.staminaSyncError
+                      : gameResult.staminaReward === 'pending'
+                        ? copy.staminaSyncing
+                        : copy.successBody
                   : copy.gameOver}
               </p>
 
               {gameResult.kind === 'success' && (
-                <div className="mt-4 flex justify-center gap-1 text-4xl">
+                <div className="mt-2 flex justify-center gap-1 text-3xl">
                   {[1, 2, 3].map((star) => (
                     <motion.span
                       key={star}
@@ -2136,12 +2207,12 @@ export function SayBlastGame({
                 </div>
               )}
 
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <div className="rounded-2xl bg-fuchsia-50 px-3 py-4">
-                  <div className="text-[10px] font-bold text-fuchsia-700">
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                <div className="rounded-xl bg-fuchsia-50 px-1 py-2.5">
+                  <div className="text-[9px] font-bold text-fuchsia-700">
                     {copy.accuracy}
                   </div>
-                  <div className="text-xl font-black">
+                  <div className="text-lg font-black">
                     {gameResult.accuracy === null
                       ? '—'
                       : `${Math.round(gameResult.accuracy * 100)}%`}
@@ -2152,42 +2223,52 @@ export function SayBlastGame({
                     </div>
                   )}
                 </div>
-                <div className="rounded-2xl bg-amber-50 px-3 py-4">
-                  <div className="text-[10px] font-bold text-amber-700">
+                <div className="rounded-xl bg-amber-50 px-1 py-2.5">
+                  <div className="text-[9px] font-bold text-amber-700">
                     {copy.bestStreak}
                   </div>
-                  <div className="text-xl font-black">{gameResult.bestStreak}</div>
+                  <div className="text-lg font-black">{gameResult.bestStreak}</div>
                   {gameResult.newBestStreak && (
                     <div className="mt-1 text-[9px] font-black tracking-wide text-emerald-600">
                       🏆 {copy.newBest}
                     </div>
                   )}
                 </div>
-                <div className="rounded-2xl bg-sky-50 px-3 py-4">
-                  <div className="text-[10px] font-bold text-sky-700">
+                <div className="rounded-xl bg-sky-50 px-1 py-2.5">
+                  <div className="text-[9px] font-bold text-sky-700">
                     {copy.blasted}
                   </div>
-                  <div className="text-xl font-black">{gameResult.blasted}</div>
+                  <div className="text-lg font-black">{gameResult.blasted}</div>
                 </div>
-                <div className="rounded-2xl bg-rose-50 px-3 py-4">
-                  <div className="text-[10px] font-bold text-rose-700">
+                <div className="rounded-xl bg-rose-50 px-1 py-2.5">
+                  <div className="text-[9px] font-bold text-rose-700">
                     {copy.missed}
                   </div>
-                  <div className="text-xl font-black">{gameResult.missed}</div>
+                  <div className="text-lg font-black">{gameResult.missed}</div>
                 </div>
-              </div>
-              <div className="mt-2 text-xs font-black text-sky-800/70">
-                {copy.score}: {score}
               </div>
 
-              <div className="mt-3 rounded-2xl bg-violet-50 px-4 py-3 text-violet-900">
-                <div className="text-sm font-black">
-                  🏁 {copy.challengeCompleted(gameResult.attemptNumber)}
+              {gameResult.missedItems.length > 0 && (
+                <div className="mt-3 rounded-2xl bg-rose-50 px-3 py-2.5 text-left">
+                  <div className="text-xs font-black text-rose-700">
+                    🎧 {MISSED_WORDS_LABEL[locale]}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {gameResult.missedItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => speakWordQuick(item.word)}
+                        className="inline-flex min-w-0 items-center gap-1 rounded-full border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-black text-sky-950 shadow-sm"
+                      >
+                        <span aria-hidden>{item.emoji ?? '🎧'}</span>
+                        <span className="max-w-40 break-words text-left">{item.word}</span>
+                        <Volume2 size={12} className="shrink-0 text-sky-600" aria-hidden />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs font-bold text-violet-700/80">
-                  {copy.careerBlasted(gameResult.careerTotalBlasted)}
-                </div>
-              </div>
+              )}
 
               {gameResult.milestone !== null && (
                 <div className="mt-3 rounded-2xl bg-gradient-to-r from-amber-100 to-rose-100 px-4 py-3 text-sm font-black text-rose-700">
@@ -2209,17 +2290,33 @@ export function SayBlastGame({
 
               {gameResult.kind === 'success' && gameResult.ratingTip && (
                 <div className="mt-3 rounded-2xl bg-sky-50 px-4 py-3 text-sm font-black text-sky-800">
-                  🎯 {copy.nextGoal}: {gameResult.ratingTip}
+                  🎯 {copy.nextGoal}: {gameResult.ratingTip} · +1 ❤️
                 </div>
               )}
 
-              {gameResult.staminaReward === null && (
+              {gameResult.staminaReward === null && gameResult.kind === 'failure' && (
                 <div className="mt-3 rounded-2xl bg-gradient-to-r from-rose-50 to-amber-50 px-4 py-3 text-sm font-black text-rose-700">
-                  ❤️{' '}
-                  {gameResult.kind === 'success'
-                    ? copy.staminaAlmost
-                    : copy.staminaFailureEncouragement}
+                  ❤️ {copy.staminaFailureEncouragement}
                 </div>
+              )}
+
+              {gameResult.staminaReward === 'sync-error' && (
+                <motion.button
+                  type="button"
+                  whileTap={MOTION_PRESS_TAP}
+                  disabled={rewardRetryPending}
+                  onClick={() => {
+                    setRewardRetryPending(true);
+                    void onRewardStamina().then((reward) => {
+                      setGameResult((current) => current ? { ...current, staminaReward: reward } : current);
+                    }).catch(() => {
+                      setGameResult((current) => current ? { ...current, staminaReward: 'sync-error' } : current);
+                    }).finally(() => setRewardRetryPending(false));
+                  }}
+                  className="candy-sheet-action-btn candy-sheet-action-btn-blue mt-4 w-full disabled:opacity-60"
+                >
+                  {copy.retryReward}
+                </motion.button>
               )}
 
               {returnToAdventure && gameResult.staminaReward === 'granted' && onContinueAdventure ? (
@@ -2228,7 +2325,7 @@ export function SayBlastGame({
                     type="button"
                     whileTap={MOTION_PRESS_TAP}
                     onClick={onContinueAdventure}
-                    className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-5 w-full"
+                    className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
                   >
                     ⚡️ {ui.deadMachine.continueSet}
                   </motion.button>
@@ -2247,7 +2344,7 @@ export function SayBlastGame({
                   type="button"
                   whileTap={MOTION_PRESS_TAP}
                   onClick={() => void resetGame()}
-                  className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-5 w-full"
+                  className="candy-sheet-action-btn candy-sheet-action-btn-pink mt-4 w-full"
                 >
                   <RotateCcw size={16} aria-hidden />
                   {copy.tryAgain}

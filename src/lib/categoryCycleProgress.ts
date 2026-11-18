@@ -4,8 +4,11 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
+import type { CourseId } from '../courseConfig';
 
 const STORAGE_KEY = 'match3-category-cycles-v1';
+const courseStorageKey = (courseId: CourseId = getActiveCourseId()) => `${STORAGE_KEY}:${courseId}`;
 
 export type CategoryCycleEntry = {
   cycle: number;
@@ -92,20 +95,23 @@ function mergeProgress(accountRaw: string, guestRaw: string): string {
 
 export function loadCategoryCycleProgress(
   userUid?: string | null,
+  courseId?: CourseId,
 ): CategoryCycleProgress {
-  claimGuestProgress(STORAGE_KEY, userUid, mergeProgress);
-  return parseCategoryCycleProgress(readScopedProgress(STORAGE_KEY, userUid));
+  const key = courseStorageKey(courseId);
+  claimGuestProgress(key, userUid, mergeProgress);
+  return parseCategoryCycleProgress(readScopedProgress(key, userUid));
 }
 
 export function saveCategoryCycleProgress(
   progress: CategoryCycleProgress,
   userUid?: string | null,
+  courseId?: CourseId,
 ): void {
-  writeScopedProgress(STORAGE_KEY, JSON.stringify(progress), userUid);
+  writeScopedProgress(courseStorageKey(courseId), JSON.stringify(progress), userUid);
 }
 
-export function clearCategoryCycleProgress(userUid?: string | null): void {
-  clearScopedProgress(STORAGE_KEY, userUid);
+export function clearCategoryCycleProgress(userUid?: string | null, courseId?: CourseId): void {
+  clearScopedProgress(courseStorageKey(courseId), userUid);
 }
 
 export function categoryCycleEntry(

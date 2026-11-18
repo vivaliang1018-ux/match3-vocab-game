@@ -1,5 +1,7 @@
 import { assetUrl } from './assetUrl';
 import { encodeVoicePathSegment } from './emojiVoiceFileUrl';
+import { getActiveCourseId, languageForCode } from '../course';
+import { learningLanguageForCourse } from './courseWord';
 
 type SpeakOptions = {
   /** Call `speak` in the same task as the user gesture (required on iOS Safari). */
@@ -21,7 +23,17 @@ type CompletionSpeechOptions = {
   quickStart?: boolean;
 };
 
-const RECORDED_VOICE_BASE = assetUrl('emoji-voice');
+function recordedVoiceBase(): string {
+  try {
+    const target = learningLanguageForCourse(getActiveCourseId());
+    if (target === 'es') return assetUrl('emoji-voice-es');
+    if (target === 'ja') return assetUrl('emoji-voice-ja');
+    if (target === 'ko') return assetUrl('emoji-voice-ko');
+    return assetUrl('emoji-voice');
+  } catch {
+    return assetUrl('emoji-voice');
+  }
+}
 /** Recordings are mastered to -16 LUFS; unity gain avoids clipping their peaks. */
 const WORD_PLAYBACK_GAIN = 1;
 
@@ -105,7 +117,7 @@ function buildRecordedWordUrls(word: string): string[] {
   const push = (s: string) => {
     const t = s.trim();
     if (!t) return;
-    urls.add(`${RECORDED_VOICE_BASE}/${encodeVoicePathSegment(t)}.mp3`);
+    urls.add(`${recordedVoiceBase()}/${encodeVoicePathSegment(t)}.mp3`);
   };
   const addVariants = (s: string) => {
     const forms = [s, s.normalize('NFC'), s.normalize('NFD')];
@@ -255,6 +267,14 @@ export async function playRecordedWordAndWait(
 }
 
 function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  try {
+    const target = learningLanguageForCourse(getActiveCourseId());
+    const targetPrefix = target === 'zh-CN' ? 'zh' : target;
+    const targetVoices = voices.filter((v) => v.lang?.toLowerCase().startsWith(targetPrefix.toLowerCase()));
+    if (targetVoices.length > 0) return targetVoices[0];
+  } catch {
+    // ignore unavailable storage
+  }
   const en = voices.filter((v) => v.lang?.toLowerCase().startsWith('en'));
   if (en.length === 0) return voices[0];
   return (
@@ -289,7 +309,8 @@ export function speak(word: string, options?: SpeakOptions): boolean {
       synth.resume();
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = voice?.lang ?? 'en-US';
+      const target = learningLanguageForCourse(getActiveCourseId());
+      u.lang = voice?.lang ?? languageForCode(target).speechLocale;
       u.rate = 0.95;
       u.volume = 1;
       u.pitch = 1;

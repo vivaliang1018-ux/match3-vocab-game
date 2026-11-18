@@ -1,25 +1,32 @@
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import {
-  ChevronRight,
-  LogIn,
-  Music,
-  Vibrate,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, Crown, Languages, LogIn, Music, ShieldCheck, Vibrate, Volume2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { WordMemory } from '../../lib/ebbinghausMemory';
 import { masteredEmojiCount } from '../../lib/ebbinghausMemory';
 import { assetUrl } from '../../lib/assetUrl';
 import { useAuth } from '../../auth/AuthProvider';
-import { MOTION_PRESS_DEEP, MOTION_SPRING_BOUNCY } from '../../lib/motionPresets';
-import { LOCALE_OPTIONS, useI18n } from '../../i18n';
+import { MOTION_PRESS_DEEP } from '../../lib/motionPresets';
+import { useI18n } from '../../i18n';
+import { COURSE_SETUP_COPY } from '../../lib/coursePresentation';
+import { useCourse } from '../../course';
+import { useMembership } from '../../membership/MembershipProvider';
+import { MEMBERSHIP_COPY } from '../../membership/membershipCopy';
 import { cn } from '../../lib/utils';
 import { readAppVersionLabel } from '../../lib/appVersion';
+import { REWARDED_AD_COPY } from '../../i18n/rewardedAdCopy';
+import { NOTIFICATION_SETTINGS_COPY } from '../../i18n/notificationSettingsCopy';
+import { NOTIFICATION_SCOPE_COPY } from '../../i18n/notificationScopeCopy';
+import { adPrivacyOptionsRequired, showAdPrivacyOptions } from '../../lib/rewardedAds';
+import {
+  readLearningReminderSettings,
+  type LearningReminderContext,
+} from '../../lib/learningNotificationsV2';
+import { NotificationSettingsSheet } from './NotificationSettingsSheet';
 import { ProfileJourneySummary } from './ProfileJourneySummary';
 import { CandyFrostingHeader } from './CandyFrostingHeader';
+import { CoursePickerSheet } from './CoursePickerSheet';
 import { SignInSheet } from './SignInSheet';
 import { AccountAvatar, AccountSettingsSheet } from './AccountSettingsSheet';
 import { LegalDocSheet } from './LegalDocSheet';
@@ -47,6 +54,8 @@ type ProfilePanelProps = {
   onSfxEnabledChange: (enabled: boolean) => void;
   hapticsEnabled: boolean;
   onHapticsEnabledChange: (enabled: boolean) => void;
+  playedToday: boolean;
+  reminderGameState?: Pick<LearningReminderContext, 'dueReviewCount' | 'staminaValue' | 'nextStaminaAt'>;
 };
 
 export function ProfilePanel({
@@ -63,15 +72,26 @@ export function ProfilePanel({
   onSfxEnabledChange,
   hapticsEnabled,
   onHapticsEnabledChange,
+  playedToday,
+  reminderGameState,
 }: ProfilePanelProps) {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, t } = useI18n();
+  const courseCopy = COURSE_SETUP_COPY[locale];
+  const { courseId, course, sourceLanguage } = useCourse();
   const { user } = useAuth();
+  const { storeSupported, status: membershipStatus, openPaywall } = useMembership();
   const [signInOpen, setSignInOpen] = useState(false);
   const [legalDoc, setLegalDoc] = useState<'terms' | 'privacy' | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [coursePickerOpen, setCoursePickerOpen] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [versionLabel, setVersionLabel] = useState(t.meta.uiVersion);
+  const [showAdPrivacy, setShowAdPrivacy] = useState(false);
+  const [reminderSettings, setReminderSettings] = useState(() => readLearningReminderSettings());
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const masteredCount = masteredEmojiCount(wordMemory, allPool);
+  const reminderCopy = NOTIFICATION_SETTINGS_COPY[locale];
+  const hasPremiumAccess = membershipStatus === 'premium';
 
   useEffect(() => {
     let active = true;
@@ -83,6 +103,16 @@ export function ProfilePanel({
       active = false;
     };
   }, [t.meta.uiVersion]);
+
+  useEffect(() => {
+    let active = true;
+    void adPrivacyOptionsRequired().then((required) => {
+      if (active) setShowAdPrivacy(required);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Retroactively unlock badges from existing progress when opening profile.
   useEffect(() => {
@@ -119,7 +149,7 @@ export function ProfilePanel({
   return (
     <div className="profile-candy-page pb-6">
       <div className="profile-candy-board">
-        <CandyFrostingHeader title="PROFILE" />
+        <CandyFrostingHeader title={t.tabs.profile} />
 
         <div className="profile-candy-body">
           {user ? (
@@ -168,6 +198,28 @@ export function ProfilePanel({
           )}
 
           <div className="mt-3.5 space-y-2">
+            {storeSupported && (
+              <motion.button
+                type="button"
+                className={cn('membership-profile-card', membershipStatus === 'premium' && 'membership-profile-card-premium')}
+                whileTap={MOTION_PRESS_DEEP}
+                disabled={membershipStatus === 'premium'}
+                onClick={() => {
+                  if (membershipStatus !== 'premium') openPaywall('profile');
+                }}
+              >
+                <span className="membership-profile-icon" aria-hidden><Crown size={19} /></span>
+                <span className="membership-profile-copy">
+                  <strong>{MEMBERSHIP_COPY[locale].plus}</strong>
+                  <small>{membershipStatus === 'premium'
+                    ? MEMBERSHIP_COPY[locale].profileActiveSummary
+                    : MEMBERSHIP_COPY[locale].profileSummary}</small>
+                </span>
+                <span className="membership-profile-action" aria-hidden>
+                  {membershipStatus === 'premium' ? <CheckCircle2 size={20} /> : <ChevronRight size={18} />}
+                </span>
+              </motion.button>
+            )}
             {!user && (
               <>
                 <motion.button
@@ -193,76 +245,59 @@ export function ProfilePanel({
           </div>
 
           <ProfileSection>
-            <div className="profile-candy-section-label mb-2">
-              {t.profile.language}
-            </div>
-            <div
-              className="flex flex-nowrap justify-center gap-1"
-              role="radiogroup"
-              aria-label={t.profile.language}
-              aria-describedby="profile-menu-language-hint"
+            <button
+              type="button"
+              className="profile-candy-course-row"
+              aria-label={`${courseCopy.changeCourse}: ${course.label}`}
+              onClick={() => setCoursePickerOpen(true)}
             >
-              {LOCALE_OPTIONS.map((opt) => {
-                const selected = locale === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={opt.label}
-                    onClick={() => setLocale(opt.id)}
-                    className={cn(
-                      'profile-candy-locale-btn',
-                      selected && 'profile-candy-locale-btn-active',
-                    )}
-                  >
-                    {opt.shortLabel}
-                  </button>
-                );
-              })}
-            </div>
-            <p
-              id="profile-menu-language-hint"
-              className="mt-2 text-center text-[9px] font-bold leading-snug text-sky-800/65"
-            >
-              {t.profile.languageHint}
-            </p>
+              <span className="profile-candy-setting-icon"><Languages size={18} aria-hidden /></span>
+              <span className="profile-candy-course-row-copy">
+                <strong>{courseCopy.currentCourse}</strong>
+                <small>{course.label}</small>
+              </span>
+              <ChevronRight size={19} aria-hidden />
+            </button>
           </ProfileSection>
 
           <ProfileSection>
-            <div className="grid grid-cols-2 gap-3">
-              <CandyToggle
+            <div className="profile-candy-preferences">
+              <CompactPreferenceSwitch
                 label={t.profile.sfx}
                 enabled={sfxEnabled}
                 onLabel={t.profile.toggleOn}
                 offLabel={t.profile.toggleOff}
-                onIcon={Volume2}
-                offIcon={VolumeX}
+                icon={Volume2}
                 onChange={onSfxEnabledChange}
               />
-              <CandyToggle
+              <CompactPreferenceSwitch
                 label={t.profile.bgm}
                 enabled={bgmEnabled}
                 onLabel={t.profile.toggleOn}
                 offLabel={t.profile.toggleOff}
-                onIcon={Music}
-                offIcon={Music}
-                offIconMuted
+                icon={Music}
                 onChange={onBgmEnabledChange}
               />
-              <div className="col-span-2">
-                <CandyToggle
-                  label={t.profile.haptics}
-                  enabled={hapticsEnabled}
-                  onLabel={t.profile.toggleOn}
-                  offLabel={t.profile.toggleOff}
-                  onIcon={Vibrate}
-                  offIcon={Vibrate}
-                  offIconMuted
-                  onChange={onHapticsEnabledChange}
-                />
-              </div>
+              <CompactPreferenceSwitch
+                label={t.profile.haptics}
+                enabled={hapticsEnabled}
+                onLabel={t.profile.toggleOn}
+                offLabel={t.profile.toggleOff}
+                icon={Vibrate}
+                onChange={onHapticsEnabledChange}
+              />
+              <button
+                type="button"
+                className="profile-candy-preference-row"
+                onClick={() => setNotificationSettingsOpen(true)}
+              >
+                <span className="profile-candy-setting-icon"><Bell size={18} aria-hidden /></span>
+                <span className="profile-candy-preference-label">{NOTIFICATION_SCOPE_COPY[locale].notifications}</span>
+                <span className="ml-auto text-[11px] font-black text-sky-700/70">
+                  {reminderSettings.enabled ? reminderCopy.summaryOn : reminderCopy.summaryOff}
+                </span>
+                <ChevronRight size={17} aria-hidden />
+              </button>
             </div>
           </ProfileSection>
 
@@ -300,6 +335,20 @@ export function ProfilePanel({
               >
                 {t.profile.privacyPolicy}
               </button>
+              {showAdPrivacy && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold text-pink-600 underline decoration-pink-400/60 underline-offset-2"
+                  onClick={() => {
+                    void showAdPrivacyOptions()
+                      .then(() => setStatusMsg(REWARDED_AD_COPY[locale].privacyUpdated))
+                      .catch(() => setStatusMsg(REWARDED_AD_COPY[locale].privacyUnavailable));
+                  }}
+                >
+                  <ShieldCheck size={11} aria-hidden />
+                  {REWARDED_AD_COPY[locale].privacyChoices}
+                </button>
+              )}
             </p>
             {usesThiings && (
               <p className="mt-1.5 text-[10px] font-medium text-sky-800/65">
@@ -318,6 +367,14 @@ export function ProfilePanel({
         <div className="profile-candy-snow-base" aria-hidden />
       </div>
 
+      {coursePickerOpen && (
+        <CoursePickerSheet
+          initialSourceLanguage={sourceLanguage}
+          initialCourseId={courseId}
+          onClose={() => setCoursePickerOpen(false)}
+          onConfirmed={() => setCoursePickerOpen(false)}
+        />
+      )}
       <SignInSheet open={signInOpen} onClose={() => setSignInOpen(false)} />
       <AccountSettingsSheet
         open={accountOpen}
@@ -329,6 +386,18 @@ export function ProfilePanel({
         title={legalDoc === 'terms' ? t.profile.termsOfService : t.profile.privacyPolicy}
         src={assetUrl(legalDoc === 'terms' ? 'terms.html' : 'privacy.html')}
         onClose={() => setLegalDoc(null)}
+      />
+      <NotificationSettingsSheet
+        open={notificationSettingsOpen}
+        locale={locale}
+        hasPremiumAccess={hasPremiumAccess}
+        playedToday={playedToday}
+        reminderGameState={reminderGameState}
+        onClose={() => {
+          setNotificationSettingsOpen(false);
+          setReminderSettings(readLearningReminderSettings());
+        }}
+        onStatus={setStatusMsg}
       />
     </div>
   );
@@ -342,68 +411,38 @@ function ProfileSection({ children }: { children: ReactNode }) {
   );
 }
 
-function CandyToggle({
+function CompactPreferenceSwitch({
   label,
   enabled,
   onLabel,
   offLabel,
-  onIcon: OnIcon,
-  offIcon: OffIcon,
-  offIconMuted = false,
+  icon: Icon,
+  disabled = false,
   onChange,
 }: {
   label: string;
   enabled: boolean;
   onLabel: string;
   offLabel: string;
-  onIcon: LucideIcon;
-  offIcon: LucideIcon;
-  offIconMuted?: boolean;
+  icon: LucideIcon;
+  disabled?: boolean;
   onChange: (enabled: boolean) => void;
 }) {
-  const stateLabel = enabled ? onLabel : offLabel;
-  const Icon = enabled ? OnIcon : OffIcon;
-
   return (
-    <motion.button
+    <button
       type="button"
       role="switch"
       aria-checked={enabled}
-      aria-label={`${label}: ${stateLabel}`}
+      aria-label={`${label}: ${enabled ? onLabel : offLabel}`}
+      disabled={disabled}
       onClick={() => onChange(!enabled)}
-      whileTap={MOTION_PRESS_DEEP}
-      className={cn(
-        'profile-candy-toggle',
-        enabled ? 'profile-candy-toggle-on' : 'profile-candy-toggle-off',
-      )}
+      className="profile-candy-preference-row"
     >
-      <span className="profile-candy-toggle-gloss" aria-hidden />
-      <span
-        className={cn(
-          'profile-candy-toggle-label',
-          enabled ? 'profile-candy-toggle-label-on' : 'profile-candy-toggle-label-off',
-        )}
-      >
-        {label}
+      <span className="profile-candy-setting-icon"><Icon size={18} aria-hidden /></span>
+      <span className="profile-candy-preference-label">{label}</span>
+      <span className={cn('profile-candy-mini-switch', enabled && 'profile-candy-mini-switch-on')} aria-hidden>
+        <span className="profile-candy-mini-switch-thumb" />
       </span>
-      <motion.span
-        className="profile-candy-toggle-knob"
-        animate={{
-          x: enabled ? 'calc(100cqw - 2.45rem - 0.7rem)' : 0,
-          y: '-50%',
-          scale: enabled ? [1, 1.08, 1] : [1, 0.94, 1],
-        }}
-        transition={MOTION_SPRING_BOUNCY}
-      >
-        <Icon
-          size={17}
-          className={cn(enabled ? 'text-sky-500' : 'text-pink-500')}
-          aria-hidden
-        />
-        {!enabled && offIconMuted && (
-          <span className="profile-candy-toggle-knob-slash" aria-hidden />
-        )}
-      </motion.span>
-    </motion.button>
+    </button>
   );
 }

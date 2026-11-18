@@ -9,6 +9,9 @@ export type SpeechPermissionState = 'prompt' | 'granted' | 'denied';
 export type AppleSpeechPermissions = {
   speechRecognition: SpeechPermissionState;
   microphone: SpeechPermissionState;
+  locale: string;
+  localeSupported: boolean;
+  recognizerAvailable: boolean;
   onDeviceRecognitionSupported: boolean;
 };
 
@@ -42,9 +45,9 @@ export type AppleSpeechCycle = {
 };
 
 interface AppleSpeechRecognitionPlugin {
-  checkPermissions(): Promise<AppleSpeechPermissions>;
-  requestPermissions(): Promise<AppleSpeechPermissions>;
-  start(options: { words: string[] }): Promise<AppleSpeechCycle>;
+  checkPermissions(options: { locale: string }): Promise<AppleSpeechPermissions>;
+  requestPermissions(options: { locale: string }): Promise<AppleSpeechPermissions>;
+  start(options: { words: string[]; locale: string }): Promise<AppleSpeechCycle>;
   beginAnswer(options: { words: string[] }): Promise<AppleSpeechCycle>;
   updateVocabulary(options: { words: string[] }): Promise<void>;
   playCountdownTone(options: { kind: 'beep' | 'start' }): Promise<void>;
@@ -74,35 +77,43 @@ export function isAppleSpeechRecognitionAvailable(): boolean {
   );
 }
 
-export async function requestAppleSpeechPermissions(): Promise<AppleSpeechPermissions> {
-  if (!isAppleSpeechRecognitionAvailable()) {
-    return {
-      speechRecognition: 'denied',
-      microphone: 'denied',
-      onDeviceRecognitionSupported: false,
-    };
-  }
-  return AppleSpeechRecognition.requestPermissions();
+function unavailablePermissions(locale: string): AppleSpeechPermissions {
+  return {
+    speechRecognition: 'denied',
+    microphone: 'denied',
+    locale,
+    localeSupported: false,
+    recognizerAvailable: false,
+    onDeviceRecognitionSupported: false,
+  };
 }
 
-export async function checkAppleSpeechPermissions(): Promise<AppleSpeechPermissions> {
+export async function requestAppleSpeechPermissions(
+  locale: string,
+): Promise<AppleSpeechPermissions> {
   if (!isAppleSpeechRecognitionAvailable()) {
-    return {
-      speechRecognition: 'denied',
-      microphone: 'denied',
-      onDeviceRecognitionSupported: false,
-    };
+    return unavailablePermissions(locale);
   }
-  return AppleSpeechRecognition.checkPermissions();
+  return AppleSpeechRecognition.requestPermissions({ locale });
+}
+
+export async function checkAppleSpeechPermissions(
+  locale: string,
+): Promise<AppleSpeechPermissions> {
+  if (!isAppleSpeechRecognitionAvailable()) {
+    return unavailablePermissions(locale);
+  }
+  return AppleSpeechRecognition.checkPermissions({ locale });
 }
 
 export async function startAppleSpeechRecognition(
+  locale: string,
   words: readonly string[] = [],
 ): Promise<AppleSpeechCycle> {
   if (!isAppleSpeechRecognitionAvailable()) {
     throw new Error('apple-speech-unavailable');
   }
-  return AppleSpeechRecognition.start({ words: [...words] });
+  return AppleSpeechRecognition.start({ words: [...words], locale });
 }
 
 export async function beginAppleSpeechAnswer(

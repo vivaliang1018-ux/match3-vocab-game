@@ -1,4 +1,5 @@
 import type { WordItem } from '../types/game';
+import { claimGuestProgress, clearScopedProgress, readScopedProgress, writeScopedProgress } from './progressScope';
 
 export const MOOD_BOARD_CATEGORY_ID = 'mood-board';
 
@@ -163,9 +164,16 @@ export function moodBoardItems(
   return allItems.filter((item) => Boolean(item.emoji) && allowed.has(item.emoji!));
 }
 
-const MOOD_DAILY_STORAGE_KEY = 'matchingo-mood-daily-v1';
+const MOOD_DAILY_STORAGE_KEY = 'matchingo-mood-daily-v2';
 
-export const MOOD_DAILY_PLAY_MAX = 3;
+export const MOOD_DAILY_FREE_PLAY_MAX = 1;
+export const MOOD_DAILY_PREMIUM_PLAY_MAX = 3;
+
+export type MoodPlayOptions = {
+  hasPremiumAccess?: boolean;
+  userId?: string | null;
+  now?: number;
+};
 
 export type MoodDailyState = {
   dayKey: string;
@@ -180,10 +188,18 @@ function moodDayKeyFrom(ms: number): string {
   return `${y}-${m}-${day}`;
 }
 
-export function loadMoodDailyState(now = Date.now()): MoodDailyState {
+export function loadMoodDailyState(options: MoodPlayOptions = {}): MoodDailyState {
+  const { userId = null, now = Date.now() } = options;
   const today = moodDayKeyFrom(now);
   try {
-    const raw = localStorage.getItem(MOOD_DAILY_STORAGE_KEY);
+    claimGuestProgress(MOOD_DAILY_STORAGE_KEY, userId, (accountRaw, guestRaw) => {
+      const account = JSON.parse(accountRaw) as MoodDailyState;
+      const guest = JSON.parse(guestRaw) as MoodDailyState;
+      if (account.dayKey !== today) return guestRaw;
+      if (guest.dayKey !== today) return accountRaw;
+      return JSON.stringify({ dayKey: today, plays: Math.max(account.plays, guest.plays) });
+    });
+    const raw = readScopedProgress(MOOD_DAILY_STORAGE_KEY, userId);
     if (!raw) return { dayKey: today, plays: 0 };
     const parsed = JSON.parse(raw) as Partial<MoodDailyState>;
     if (typeof parsed.dayKey !== 'string' || parsed.dayKey !== today) {
@@ -199,27 +215,37 @@ export function loadMoodDailyState(now = Date.now()): MoodDailyState {
   }
 }
 
-function saveMoodDailyState(state: MoodDailyState): void {
+export function saveMoodDailyState(state: MoodDailyState, userId: string | null): void {
   try {
-    localStorage.setItem(MOOD_DAILY_STORAGE_KEY, JSON.stringify(state));
+    writeScopedProgress(MOOD_DAILY_STORAGE_KEY, JSON.stringify(state), userId);
   } catch {
     // ignore quota
   }
 }
 
-export function moodPlaysRemainingToday(now = Date.now()): number {
-  const state = loadMoodDailyState(now);
-  return Math.max(0, MOOD_DAILY_PLAY_MAX - state.plays);
+export function clearMoodDailyState(userId: string): void {
+  clearScopedProgress(MOOD_DAILY_STORAGE_KEY, userId);
 }
 
-export function canPlayMoodToday(now = Date.now()): boolean {
-  return moodPlaysRemainingToday(now) > 0;
+export function moodPlaysRemainingToday(options: MoodPlayOptions = {}): number {
+  const state = loadMoodDailyState(options);
+  const limit = options.hasPremiumAccess
+    ? MOOD_DAILY_PREMIUM_PLAY_MAX
+    : MOOD_DAILY_FREE_PLAY_MAX;
+  return Math.max(0, limit - state.plays);
+}
+
+export function canPlayMoodToday(options: MoodPlayOptions = {}): boolean {
+  return moodPlaysRemainingToday(options) > 0;
 }
 
 /** Spend one daily mood play. Returns false when the daily limit is already reached. */
-export function tryConsumeMoodPlay(now = Date.now()): boolean {
-  const state = loadMoodDailyState(now);
-  if (state.plays >= MOOD_DAILY_PLAY_MAX) return false;
-  saveMoodDailyState({ dayKey: state.dayKey, plays: state.plays + 1 });
+export function tryConsumeMoodPlay(options: MoodPlayOptions = {}): boolean {
+  const state = loadMoodDailyState(options);
+  const limit = options.hasPremiumAccess
+    ? MOOD_DAILY_PREMIUM_PLAY_MAX
+    : MOOD_DAILY_FREE_PLAY_MAX;
+  if (state.plays >= limit) return false;
+  saveMoodDailyState({ dayKey: state.dayKey, plays: state.plays + 1 }, options.userId ?? null);
   return true;
 }

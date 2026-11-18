@@ -34,6 +34,15 @@ import { useLimitedGuidePrompt } from './useLimitedGuidePrompt';
 import { useModalDialog } from './useModalDialog';
 
 const GRID_SIZE = 7;
+const CATEGORY_ROUND_LABEL: Record<Locale, (round: number) => string> = {
+  en: (round) => `Round ${round}`,
+  'zh-CN': (round) => `第 ${round} 轮`,
+  es: (round) => `Ronda ${round}`,
+  fr: (round) => `Manche ${round}`,
+  de: (round) => `Runde ${round}`,
+  ja: (round) => `第${round}ラウンド`,
+  ko: (round) => `${round}라운드`,
+};
 const SWIPE_THRESHOLD_PX = 16;
 const TAP_THRESHOLD_PX = 10;
 const SHELF_STEP_MS = 72;
@@ -375,6 +384,7 @@ type GamePanelProps = {
   movesLeft: number | null;
   movesBonusFlashKey?: number;
   stamina: number;
+  unlimitedStamina?: boolean;
   staminaBanked?: number;
   canPlay: boolean;
   playBlockedReason?: 'stamina' | 'pool' | null;
@@ -430,6 +440,7 @@ type GamePanelProps = {
 
 type PopWordPayload = {
   word: string;
+  sourceWord?: string;
   cn?: string;
   emoji?: string;
   imgSrc?: string;
@@ -445,7 +456,7 @@ function PopWordOverlay({
   locale: Locale;
 }) {
   const { ui } = useI18n();
-  const nativeTranslation = getEmojiLearningTranslation(popWord, locale);
+  const nativeTranslation = popWord.sourceWord?.trim() || getEmojiLearningTranslation(popWord, locale);
   return (
     <motion.div
       className="pointer-events-none absolute inset-0 z-[60] flex items-center justify-center px-3"
@@ -478,7 +489,7 @@ function PopWordOverlay({
         <div className="mt-3 max-w-full break-words text-2xl font-black tracking-tight">
           {popWord.word}
         </div>
-        {nativeTranslation && (
+        {nativeTranslation && nativeTranslation !== popWord.word && (
           <div className="mt-2 text-base font-bold text-sky-700/75">{nativeTranslation}</div>
         )}
       </div>
@@ -508,6 +519,7 @@ export function GamePanel({
   movesLeft,
   movesBonusFlashKey = 0,
   stamina,
+  unlimitedStamina = false,
   staminaBanked = 0,
   canPlay,
   playBlockedReason = null,
@@ -1082,9 +1094,10 @@ export function GamePanel({
         <House size={20} strokeWidth={2.6} aria-hidden />
       </motion.button>
 
-      <div className="relative z-10 flex shrink-0 items-stretch gap-1.5 pt-2.5">
+      <div className="tablet-game-stage relative z-10 flex min-h-0 flex-1 flex-col">
+      <div className="tablet-game-hud relative z-10 flex shrink-0 items-stretch gap-1.5 pt-2.5">
         <HudPlaque
-          className="min-w-0 flex-1 self-start overflow-visible"
+          className="tablet-game-goals min-w-0 flex-1 self-start overflow-visible"
           label={challengeMode === 'review' || challengeMode === 'category' ? modeLabel : t.hud.wordSet}
           value={
             <div className="relative min-w-0">
@@ -1096,7 +1109,7 @@ export function GamePanel({
                 >
                   {challengeMode === 'category' && activeCategoryPool ? (
                     <span className="inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-sky-700 ring-1 ring-sky-200/80">
-                      Round {activeCategoryPool.cycle}
+                      {CATEGORY_ROUND_LABEL[locale](activeCategoryPool.cycle)}
                     </span>
                   ) : (
                     <HudStatNumber>
@@ -1116,35 +1129,12 @@ export function GamePanel({
                 {challengeMode === 'random' ? (
                 <span
                   className="mb-0.5 inline-flex items-center gap-1 self-center rounded-full bg-rose-50/90 px-1.5 py-0.5 ring-1 ring-rose-200/70"
-                  aria-label={`${t.hud.stamina} ${t.hud.staminaCount(stamina, STAMINA_MAX)}`}
-                  title={`${t.hud.stamina} ${t.hud.staminaCount(stamina, STAMINA_MAX)}`}
+                  aria-label={`${t.hud.stamina} ${unlimitedStamina ? '∞' : t.hud.staminaCount(stamina, STAMINA_MAX)}`}
+                  title={`${t.hud.stamina} ${unlimitedStamina ? '∞' : t.hud.staminaCount(stamina, STAMINA_MAX)}`}
                 >
-                  <span className="inline-flex items-center gap-px text-[13px] leading-none">
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {Array.from({ length: STAMINA_MAX }, (_, i) => {
-                        const filled = i < stamina;
-                        return (
-                          <motion.span
-                            key={`stamina-heart-${i}-${filled ? 'on' : 'off'}`}
-                            layout
-                            className="inline-block origin-center will-change-transform"
-                            initial={{ opacity: 0, scale: 0.35 }}
-                            animate={{
-                              opacity: filled ? 1 : 0.55,
-                              scale: 1,
-                            }}
-                            exit={{ opacity: 0, scale: 0.35 }}
-                            transition={{ duration: 0.28, ease: IOS_EASE }}
-                            aria-hidden
-                          >
-                            {filled ? '❤️' : '♡'}
-                          </motion.span>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </span>
+                  <span className="text-[13px] leading-none" aria-hidden>❤️</span>
                   <span className="text-[10px] font-black tabular-nums text-rose-700/90">
-                    {t.hud.staminaCount(stamina, STAMINA_MAX)}
+                    {unlimitedStamina ? '∞' : t.hud.staminaCount(stamina, STAMINA_MAX)}
                   </span>
                   {staminaBanked > 0 && (
                     <span
@@ -1161,7 +1151,7 @@ export function GamePanel({
               <div className="mt-1.5 min-w-0 overflow-hidden py-0.5">
                 <motion.div
                   key={`${challengeMode}-${gameItems.map((it) => it.id).join('|')}`}
-                  className="flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-visible no-scrollbar px-0.5 pb-0.5 pr-1"
+                  className="tablet-game-targets flex flex-nowrap items-center gap-1 overflow-x-auto overflow-y-visible no-scrollbar px-0.5 pb-0.5 pr-1"
                   variants={MOTION_STAGGER_TIGHT_CONTAINER}
                   initial="hidden"
                   animate="visible"
@@ -1234,7 +1224,7 @@ export function GamePanel({
           }
         />
 
-        <div className="relative flex w-[108px] shrink-0 flex-col self-stretch gap-1.5">
+        <div className="tablet-game-controls relative flex w-[108px] shrink-0 flex-col self-stretch gap-1.5">
           <motion.button
             ref={modePickerButtonRef}
             type="button"
@@ -1290,7 +1280,7 @@ export function GamePanel({
       </div>
 
       {pendingForcedReview && challengeMode !== 'review' && onResumeForcedReview ? (
-        <div className="relative z-10 mt-2 flex items-center justify-between gap-2 rounded-2xl border border-amber-300/80 bg-amber-50/95 px-3 py-2 shadow-sm">
+        <div className="tablet-game-banner relative z-10 mt-2 flex items-center justify-between gap-2 rounded-2xl border border-amber-300/80 bg-amber-50/95 px-3 py-2 shadow-sm">
           <span className="text-xs font-black text-amber-900">{t.modes.pendingReviewBanner}</span>
           <button
             type="button"
@@ -1305,7 +1295,7 @@ export function GamePanel({
       {/* Center the board; overlays are absolute so they won't reflow this slot. */}
       <div
         className={cn(
-          'relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center pb-2 pt-1',
+          'tablet-game-board-slot relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center pb-2 pt-1',
           pendingForcedReview && challengeMode !== 'review' ? 'mt-3' : 'mt-9',
         )}
       >
@@ -1340,7 +1330,10 @@ export function GamePanel({
           )
         ) : (
           <div
-            className="relative flex w-full max-w-[min(100%,min(92vw,480px))] shrink-0 flex-col"
+            className={cn(
+              'tablet-game-board relative flex w-full max-w-[min(100%,min(92vw,480px))] shrink-0 flex-col',
+              timedHuntActive && 'tablet-game-board--timed',
+            )}
             ref={popBoardRef}
           >
             {timedHuntActive && (
@@ -1633,6 +1626,7 @@ export function GamePanel({
             </AnimatePresence>
           </div>
         )}
+      </div>
       </div>
 
       <ModePickerSheet

@@ -1,4 +1,5 @@
 import type { Locale } from '../i18n/types';
+import { getReadySpanishLearningName } from './spanishLearningContent';
 
 export type EmojiTranslationLocale = 'es' | 'fr' | 'de' | 'ja' | 'ko';
 
@@ -25,14 +26,14 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage très souriant aux yeux rieurs",
     "de": "grinsendes Gesicht mit lachenden Augen",
     "ja": "笑顔",
-    "ko": "미소 짓는 눈으로 활짝 웃는 얼굴"
+    "ko": "눈웃음으로 활짝 웃는 얼굴"
   },
   "😁": {
     "es": "cara radiante con ojos sonrientes",
     "fr": "visage souriant aux yeux rieurs",
     "de": "strahlendes Gesicht mit lachenden Augen",
     "ja": "にやっと笑う",
-    "ko": "미소 짓는 눈으로 웃는 얼굴"
+    "ko": "눈웃음 짓는 얼굴"
   },
   "😆": {
     "es": "cara sonriendo con los ojos cerrados",
@@ -60,7 +61,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage riant aux larmes",
     "de": "Gesicht mit Freudentränen",
     "ja": "嬉し泣き",
-    "ko": "기쁨의 눈물을 흘리는 얼굴"
+    "ko": "눈물 흘리며 웃는 얼굴"
   },
   "🙂": {
     "es": "cara sonriendo ligeramente",
@@ -88,7 +89,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage souriant avec yeux rieurs",
     "de": "lächelndes Gesicht mit lachenden Augen",
     "ja": "にこにこ",
-    "ko": "미소 짓는 눈으로 살짝 웃는 얼굴"
+    "ko": "눈웃음 짓는 살짝 웃는 얼굴"
   },
   "😇": {
     "es": "cara sonriendo con aureola",
@@ -137,21 +138,21 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage aux yeux rieurs faisant un bisou",
     "de": "küssendes Gesicht mit lächelnden Augen",
     "ja": "にっこりキス",
-    "ko": "미소 짓는 눈으로 키스하는 얼굴"
+    "ko": "눈웃음 지으며 키스하는 얼굴"
   },
   "😚": {
     "es": "cara besando con los ojos cerrados",
     "fr": "visage faisant un bisou avec les yeux fermés",
     "de": "küssendes Gesicht mit geschlossenen Augen",
     "ja": "ちゅっ",
-    "ko": "눈을 감은 채로 키스하는 얼굴"
+    "ko": "눈 감고 키스하는 얼굴"
   },
   "😜": {
     "es": "cara sacando la lengua y guiñando un ojo",
     "fr": "visage qui tire la langue et fait un clin d’œil",
     "de": "zwinkerndes Gesicht mit herausgestreckter Zunge",
     "ja": "あっかんべー",
-    "ko": "윙크하면서 혀를 내민 얼굴"
+    "ko": "윙크하며 메롱하는 얼굴"
   },
   "😝": {
     "es": "cara con ojos cerrados y lengua fuera",
@@ -193,14 +194,14 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage avec yeux ouverts et main sur la bouche",
     "de": "Gesicht mit offenen Augen und Hand über dem Mund",
     "ja": "目を開けて口に手を当てた顔",
-    "ko": "눈을 뜨고 손으로 입을 가린 얼굴"
+    "ko": "눈 뜨고 입 가린 얼굴"
   },
   "🫣": {
     "es": "cara tapada con ojo espiando",
     "fr": "visage qui regarde entre ses doigts",
     "de": "Gesicht mit durch die Finger linsendem Auge",
     "ja": "指の間からのぞき見る顔",
-    "ko": "한쪽 눈을 가리고 훔쳐보는 얼굴"
+    "ko": "한쪽 눈 가리고 엿보는 얼굴"
   },
   "🤫": {
     "es": "cara pidiendo silencio",
@@ -263,7 +264,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage en pointillés",
     "de": "gestricheltes Gesicht",
     "ja": "点線の顔",
-    "ko": "테두리가 점선으로 된 얼굴"
+    "ko": "점선 테두리 얼굴"
   },
   "😏": {
     "es": "cara sonriendo con superioridad",
@@ -333,7 +334,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "miam",
     "de": "sich die Lippen leckendes Gesicht",
     "ja": "にこにこぺろり",
-    "ko": "맛있는 음식을 음미하는 얼굴"
+    "ko": "음식 맛보는 얼굴"
   },
   "😶‍🌫️": {
     "es": "cara entre las nubes",
@@ -480,7 +481,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage avec bouche en diagonale",
     "de": "Gesicht mit schrägem Mund",
     "ja": "口が斜めの顔",
-    "ko": "입이 한쪽으로 올라간 얼굴"
+    "ko": "한쪽 입꼬리 올라간 얼굴"
   },
   "😟": {
     "es": "cara preocupada",
@@ -557,7 +558,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage anxieux avec goutte de sueur",
     "de": "besorgtes Gesicht mit Schweißtropfen",
     "ja": "冷や汗青ざめ",
-    "ko": "땀 흘리며 불안해하는 얼굴"
+    "ko": "땀 흘리며 불안한 얼굴"
   },
   "😥": {
     "es": "cara triste pero aliviada",
@@ -683,14 +684,14 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage souriant avec des cornes",
     "de": "grinsendes Gesicht mit Hörnern",
     "ja": "笑った悪魔",
-    "ko": "머리에 뿔이 달린 웃는 얼굴"
+    "ko": "뿔 달린 웃는 얼굴"
   },
   "👿": {
     "es": "cara enfadada con cuernos",
     "fr": "visage en colère avec des cornes",
     "de": "wütendes Gesicht mit Hörnern",
     "ja": "怒った悪魔",
-    "ko": "머리에 뿔이 달린 화난 얼굴"
+    "ko": "뿔 달린 화난 얼굴"
   },
   "💀": {
     "es": "calavera",
@@ -767,14 +768,14 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "chat qui sourit avec des yeux rieurs",
     "de": "grinsende Katze mit lachenden Augen",
     "ja": "にやっと笑う猫",
-    "ko": "미소 짓는 눈으로 활짝 웃는 고양이 얼굴"
+    "ko": "눈웃음 짓는 활짝 웃는 고양이"
   },
   "😹": {
     "es": "gato llorando de risa",
     "fr": "chat qui pleure de joie",
     "de": "Katze mit Freudentränen",
     "ja": "嬉し泣きする猫",
-    "ko": "기쁨의 눈물을 흘리는 고양이 얼굴"
+    "ko": "눈물 흘리며 웃는 고양이"
   },
   "😻": {
     "es": "gato sonriendo con ojos de corazón",
@@ -830,7 +831,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "visage souriant avec une larme",
     "de": "lachendes Gesicht mit Träne",
     "ja": "嬉し涙の顔",
-    "ko": "눈물 흘리며 웃는 얼굴"
+    "ko": "미소 지으며 눈물 흘리는 얼굴"
   },
   "🤪": {
     "es": "cara de loco",
@@ -1096,7 +1097,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "index pointant vers l’utilisateur",
     "de": "auf Betrachter zeigender Zeigefinger",
     "ja": "人を指差している手",
-    "ko": "보는 사람을 가리키는 검지"
+    "ko": "나를 가리키는 검지"
   },
   "👍": {
     "es": "pulgar hacia arriba",
@@ -1337,18 +1338,18 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "뾰로통한 여자"
   },
   "🙅‍♀️": {
-    "es": "mujer haciendo el gesto de \"no\"",
+    "es": "mujer haciendo el gesto de no",
     "fr": "femme faisant un geste d’interdiction",
     "de": "Frau mit überkreuzten Armen",
     "ja": "ダメのポーズをする女",
-    "ko": "안 된다는 제스처를 하는 여자"
+    "ko": "안 돼 손짓하는 여자"
   },
   "🙆‍♀️": {
-    "es": "mujer haciendo el gesto de \"de acuerdo\"",
+    "es": "mujer haciendo el gesto de de acuerdo",
     "fr": "femme faisant un geste d’acceptation",
     "de": "Frau mit Händen auf dem Kopf",
     "ja": "OKのポーズをする女",
-    "ko": "오케이라는 제스처를 하는 여자"
+    "ko": "OK 손짓하는 여자"
   },
   "💁‍♀️": {
     "es": "empleada de mostrador de información",
@@ -1526,39 +1527,39 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "남자"
   },
   "🧔‍♀️": {
-    "es": "mujer: barba",
+    "es": "barba",
     "fr": "femme barbue",
     "de": "Frau: Bart",
     "ja": "あごひげの女性",
     "ko": "수염 난 여자"
   },
   "👩‍🦰": {
-    "es": "mujer: pelo pelirrojo",
+    "es": "pelo pelirrojo",
     "fr": "femme : cheveux roux",
     "de": "Frau: rotes Haar",
-    "ja": "女性: 赤毛",
-    "ko": "여자: 빨간 머리"
+    "ja": "赤毛の女性",
+    "ko": "빨간 머리 여자"
   },
   "👩‍🦱": {
-    "es": "mujer: pelo rizado",
+    "es": "pelo rizado",
     "fr": "femme : cheveux bouclés",
     "de": "Frau: lockiges Haar",
-    "ja": "女性: 巻き毛",
-    "ko": "여자: 곱슬머리"
+    "ja": "巻き毛の女性",
+    "ko": "곱슬머리 여자"
   },
   "👩‍🦳": {
-    "es": "mujer: pelo blanco",
+    "es": "pelo blanco",
     "fr": "femme : cheveux blancs",
     "de": "Frau: weißes Haar",
-    "ja": "女性: 白髪",
-    "ko": "여자: 백발"
+    "ja": "白髪の女性",
+    "ko": "백발 여자"
   },
   "👩‍🦲": {
-    "es": "mujer: sin pelo",
+    "es": "sin pelo",
     "fr": "femme : chauve",
     "de": "Frau: Glatze",
-    "ja": "女性: はげ頭",
-    "ko": "여자: 대머리"
+    "ja": "髪のない女性",
+    "ko": "대머리 여자"
   },
   "👩": {
     "es": "mujer",
@@ -1890,11 +1891,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "걷는 여자"
   },
   "🚶‍♀️‍➡️": {
-    "es": "mujer caminando: hacia la derecha",
+    "es": "mujer caminando hacia la derecha",
     "fr": "femme qui marche : vers la droite",
     "de": "Fußgängerin: nach rechts",
-    "ja": "歩く女: 右向き",
-    "ko": "걷는 여자: 오른쪽을 향한"
+    "ja": "右向きに歩く女性",
+    "ko": "오른쪽으로 걷는 여자"
   },
   "🧍‍♀️": {
     "es": "mujer de pie",
@@ -1911,11 +1912,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "무릎을 꿇은 여자"
   },
   "🧎‍♀️‍➡️": {
-    "es": "mujer de rodillas: hacia la derecha",
+    "es": "mujer de rodillas hacia la derecha",
     "fr": "femme à genoux : vers la droite",
     "de": "kniende Frau: nach rechts",
-    "ja": "正座する女性: 右向き",
-    "ko": "무릎을 꿇은 여자: 오른쪽을 향한"
+    "ja": "右向きに正座する女性",
+    "ko": "오른쪽을 향해 무릎 꿇은 여자"
   },
   "👩‍🦯": {
     "es": "mujer con bastón",
@@ -1925,11 +1926,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "지팡이를 든 여자"
   },
   "👩‍🦯‍➡️": {
-    "es": "mujer con bastón: hacia la derecha",
+    "es": "mujer con bastón hacia la derecha",
     "fr": "femme avec canne blanche : vers la droite",
     "de": "Frau mit Langstock: nach rechts",
-    "ja": "杖をついた女性: 右向き",
-    "ko": "지팡이를 든 여자: 오른쪽을 향한"
+    "ja": "右向きで杖をつく女性",
+    "ko": "오른쪽으로 지팡이 짚는 여자"
   },
   "👩‍🦼": {
     "es": "mujer en silla de ruedas eléctrica",
@@ -1939,11 +1940,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "전동 휠체어를 탄 여자"
   },
   "👩‍🦼‍➡️": {
-    "es": "mujer en silla de ruedas eléctrica: hacia la derecha",
+    "es": "mujer en silla de ruedas eléctrica hacia la derecha",
     "fr": "femme en fauteuil motorisé : vers la droite",
     "de": "Frau in elektrischem Rollstuhl: nach rechts",
-    "ja": "電動車椅子の女性: 右向き",
-    "ko": "전동 휠체어를 탄 여자: 오른쪽을 향한"
+    "ja": "右向きで電動車椅子に乗る女性",
+    "ko": "오른쪽을 향해 전동 휠체어를 탄 여자"
   },
   "👩‍🦽": {
     "es": "mujer en silla de ruedas manual",
@@ -1953,11 +1954,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "수동 휠체어를 탄 여자"
   },
   "👩‍🦽‍➡️": {
-    "es": "mujer en silla de ruedas manual: hacia la derecha",
+    "es": "mujer en silla de ruedas manual hacia la derecha",
     "fr": "femme en fauteuil roulant manuel : vers la droite",
     "de": "Frau in manuellem Rollstuhl: nach rechts",
-    "ja": "手動式車椅子の女性: 右向き",
-    "ko": "수동 휠체어를 탄 여자: 오른쪽을 향한"
+    "ja": "右向きで手動式車椅子に乗る女性",
+    "ko": "오른쪽을 향해 수동 휠체어를 탄 여자"
   },
   "🏃‍♀️": {
     "es": "mujer corriendo",
@@ -1967,11 +1968,11 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "ko": "뛰는 여자"
   },
   "🏃‍♀️‍➡️": {
-    "es": "mujer corriendo: hacia la derecha",
+    "es": "mujer corriendo hacia la derecha",
     "fr": "femme qui court : vers la droite",
     "de": "laufende Frau: nach rechts",
-    "ja": "走る女: 右向き",
-    "ko": "뛰는 여자: 오른쪽을 향한"
+    "ja": "右向きに走る女性",
+    "ko": "오른쪽으로 뛰는 여자"
   },
   "🧑‍🩰": {
     "es": "bailarina de ballet",
@@ -2090,28 +2091,28 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "homme avec casquette chinoise",
     "de": "Mann mit chinesischem Hut",
     "ja": "中華帽の男性",
-    "ko": "중국 전통 모자를 쓰고 있는 남자"
+    "ko": "중국 모자를 쓴 남자"
   },
   "🧕": {
     "es": "mujer con hiyab",
     "fr": "femme avec foulard",
     "de": "Frau mit Kopftuch",
     "ja": "スカーフの女性",
-    "ko": "머리에 스카프를 두른 여자"
+    "ko": "스카프 두른 여자"
   },
   "🕴": {
     "es": "persona trajeada levitando",
     "fr": "homme d’affaires en lévitation",
     "de": "schwebender Mann im Anzug",
     "ja": "浮いてるビジネスマン",
-    "ko": "공중에 떠 있는 정장 입은 남자"
+    "ko": "정장 입고 뜬 남자"
   },
   "👯‍♀️": {
     "es": "mujeres con orejas de conejo",
     "fr": "femmes avec des oreilles de lapin",
     "de": "Frauen mit Hasenohren",
     "ja": "バニーガール",
-    "ko": "토끼 귀를 쓰고 춤추는 여자들"
+    "ko": "토끼 귀 쓰고 춤추는 사람들"
   },
   "🤺": {
     "es": "persona haciendo esgrima",
@@ -2650,7 +2651,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "poussin de face",
     "de": "Küken von vorne",
     "ja": "前を向いているひよこ",
-    "ko": "정면을 향해 날개를 편 병아리"
+    "ko": "날개 편 병아리"
   },
   "🐦": {
     "es": "pájaro",
@@ -3721,7 +3722,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "fourchette et couteau avec assiette",
     "de": "Teller mit Messer und Gabel",
     "ja": "ナイフとフォークと皿",
-    "ko": "포크와 나이프가 있는 접시"
+    "ko": "포크와 나이프 접시"
   },
   "🍴": {
     "es": "tenedor y cuchillo",
@@ -4085,7 +4086,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "bouteille de champagne",
     "de": "Flasche mit knallendem Korken",
     "ja": "シャンパン",
-    "ko": "코르크가 튀어나오고 있는 병"
+    "ko": "코르크가 튀는 병"
   },
   "🍷": {
     "es": "copa de vino",
@@ -4498,7 +4499,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "pont de nuit",
     "de": "Brücke vor Nachthimmel",
     "ja": "夜の橋",
-    "ko": "밤하늘을 배경으로 하는 다리"
+    "ko": "밤하늘의 다리"
   },
   "♨️": {
     "es": "aguas termales",
@@ -5933,7 +5934,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "appareil photo avec flash",
     "de": "Fotoapparat mit Blitz",
     "ja": "フラッシュを焚いているカメラ",
-    "ko": "플래시를 터트리고 있는 카메라"
+    "ko": "플래시 터지는 카메라"
   },
   "📹": {
     "es": "videocámara",
@@ -6584,7 +6585,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "appel entrant",
     "de": "Mobiltelefon mit Pfeil",
     "ja": "着信中",
-    "ko": "왼쪽에 화살표가 있는 휴대전화"
+    "ko": "왼쪽 화살표 휴대전화"
   },
   "💻": {
     "es": "ordenador portátil",
@@ -6786,29 +6787,29 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "es": "buzón cerrado con la bandera levantada",
     "fr": "boîte aux lettres fermée drapeau levé",
     "de": "geschlossener Briefkasten mit Post",
-    "ja": "閉じた郵便受け（手紙あり）",
-    "ko": "표지가 올라간 닫힌 우편함"
+    "ja": "手紙が入った閉じた郵便受け",
+    "ko": "깃발 올라간 닫힌 우편함"
   },
   "📪": {
     "es": "buzón cerrado con la bandera bajada",
     "fr": "boîte aux lettres fermée drapeau baissé",
     "de": "geschlossener Briefkasten ohne Post",
-    "ja": "閉じた郵便受け（手紙なし）",
-    "ko": "표지가 내려간 닫힌 우편함"
+    "ja": "手紙が入っていない閉じた郵便受け",
+    "ko": "깃발 내려간 닫힌 우편함"
   },
   "📬": {
     "es": "buzón abierto con la bandera levantada",
     "fr": "boîte aux lettres ouverte drapeau levé",
     "de": "offener Briefkasten mit Post",
-    "ja": "開いた郵便受け（手紙あり）",
-    "ko": "표지가 올라간 열린 우편함"
+    "ja": "手紙が入った開いた郵便受け",
+    "ko": "깃발 올라간 열린 우편함"
   },
   "📭": {
     "es": "buzón abierto con la bandera bajada",
     "fr": "boîte aux lettres ouverte drapeau baissé",
     "de": "offener Briefkasten ohne Post",
-    "ja": "開いた郵便受け（手紙なし）",
-    "ko": "표지가 내려간 열린 우편함"
+    "ja": "手紙が入っていない開いた郵便受け",
+    "ko": "깃발 내려간 열린 우편함"
   },
   "🖋️": {
     "es": "estilográfica",
@@ -7025,7 +7026,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "page",
     "de": "Vorderseite eines Blattes",
     "ja": "ページ",
-    "ko": "오른쪽 모서리가 접힌 문서"
+    "ko": "모서리 접힌 문서"
   },
   "💰": {
     "es": "bolsa de dinero",
@@ -7109,7 +7110,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "fr": "urne électorale",
     "de": "Urne mit Wahlzettel",
     "ja": "投票箱",
-    "ko": "투표 용지가 있는 투표 상자"
+    "ko": "투표함"
   },
   "💼": {
     "es": "maletín",
@@ -7556,7 +7557,7 @@ export const EMOJI_LOCALIZED_NAMES: Record<string, EmojiLocalizedNames> = {
     "es": "reproducir o pausa",
     "fr": "bouton lecture/pause",
     "de": "Wiedergabe oder Pause",
-    "ja": "再生／一時停止ボタン",
+    "ja": "再生と一時停止のボタン",
     "ko": "재생 또는 일시 정지 버튼"
   },
   "◀️": {
@@ -7834,5 +7835,8 @@ export function getEmojiLearningTranslation(
   if (locale === 'en') return null;
   if (locale === 'zh-CN') return item.cn?.trim() || null;
   if (!item.emoji) return null;
+  if (locale === 'es') {
+    return getReadySpanishLearningName(item.emoji) ?? EMOJI_LOCALIZED_NAMES[item.emoji]?.es ?? null;
+  }
   return EMOJI_LOCALIZED_NAMES[item.emoji]?.[locale] ?? null;
 }

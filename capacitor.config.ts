@@ -20,6 +20,9 @@ const config: CapacitorConfig = {
       skipNativeAuth: true,
       providers: ['apple.com', 'google.com'],
     },
+    LocalNotifications: {
+      presentationOptions: ['badge', 'sound', 'banner', 'list'],
+    },
   },
   ios: {
     contentInset: 'never',

@@ -6,8 +6,11 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
+import type { CourseId } from '../courseConfig';
 
 const STORAGE_KEY = 'match3-player-summary-v1';
+const courseStorageKey = (courseId: CourseId = getActiveCourseId()) => `${STORAGE_KEY}:${courseId}`;
 
 export type BadgeId =
   | 'first_clear'
@@ -332,8 +335,9 @@ export function mergePlayerSummaries(
   };
 }
 
-export function loadPlayerSummary(userUid?: string | null): PlayerSummary {
-  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+export function loadPlayerSummary(userUid?: string | null, courseId?: CourseId): PlayerSummary {
+  const key = courseStorageKey(courseId);
+  claimGuestProgress(key, userUid, (accountRaw, guestRaw) => {
     try {
       return JSON.stringify(
         mergePlayerSummaries(
@@ -346,7 +350,7 @@ export function loadPlayerSummary(userUid?: string | null): PlayerSummary {
     }
   });
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    const raw = readScopedProgress(key, userUid);
     if (!raw) return { ...DEFAULT_SUMMARY, badges: [] };
     return parsePlayerSummary(JSON.parse(raw));
   } catch {
@@ -376,12 +380,12 @@ function sanitizeClaimedAt(raw: unknown): Partial<Record<AwardTrackId, number>> 
   return out;
 }
 
-export function savePlayerSummary(summary: PlayerSummary, userUid?: string | null): void {
-  writeScopedProgress(STORAGE_KEY, JSON.stringify(summary), userUid);
+export function savePlayerSummary(summary: PlayerSummary, userUid?: string | null, courseId?: CourseId): void {
+  writeScopedProgress(courseStorageKey(courseId), JSON.stringify(summary), userUid);
 }
 
-export function clearPlayerSummary(userUid?: string | null): void {
-  clearScopedProgress(STORAGE_KEY, userUid);
+export function clearPlayerSummary(userUid?: string | null, courseId?: CourseId): void {
+  clearScopedProgress(courseStorageKey(courseId), userUid);
 }
 
 function withBadge(summary: PlayerSummary, id: BadgeId, now: number): PlayerSummary {

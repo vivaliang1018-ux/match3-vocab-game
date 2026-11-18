@@ -38,23 +38,15 @@ async function loadMessages(locale: Locale): Promise<Messages> {
 }
 
 /** Map device / browser language tags to a supported locale; unknown → English. */
-export function detectSystemLocale(): Locale {
-  const candidates: string[] = [];
-  try {
-    if (typeof navigator !== 'undefined') {
-      if (Array.isArray(navigator.languages)) candidates.push(...navigator.languages);
-      if (navigator.language) candidates.push(navigator.language);
-    }
-  } catch {
-    // ignore
-  }
-
+export function resolveSupportedLocale(candidates: readonly string[]): Locale {
   for (const raw of candidates) {
     const tag = raw.trim().toLowerCase().replace(/_/g, '-');
     if (!tag) continue;
 
-    // Only Simplified Chinese maps to zh-CN; Traditional (zh-TW / zh-Hant / …) falls through → en
-    if (tag === 'zh-cn' || tag === 'zh-hans' || tag.startsWith('zh-hans-') || tag === 'zh') {
+    // The app intentionally ships one Chinese UI. Map every Chinese system
+    // locale, including Hong Kong and Traditional Chinese, to that Simplified
+    // Chinese copy rather than unexpectedly falling back to English.
+    if (tag === 'zh' || tag.startsWith('zh-')) {
       return 'zh-CN';
     }
 
@@ -68,6 +60,19 @@ export function detectSystemLocale(): Locale {
   }
 
   return 'en';
+}
+
+export function detectSystemLocale(): Locale {
+  const candidates: string[] = [];
+  try {
+    if (typeof navigator !== 'undefined') {
+      if (Array.isArray(navigator.languages)) candidates.push(...navigator.languages);
+      if (navigator.language) candidates.push(navigator.language);
+    }
+  } catch {
+    // ignore
+  }
+  return resolveSupportedLocale(candidates);
 }
 
 export function loadLocale(): Locale {

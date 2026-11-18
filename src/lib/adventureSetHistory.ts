@@ -5,16 +5,19 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
 
 const STORAGE_KEY = 'match3-adventure-set-history-v1';
+const courseStorageKey = () => `${STORAGE_KEY}:${getActiveCourseId()}`;
 
 /** Rolling list of recently cleared adventure sets (each set = 6 word item ids). */
 export type AdventureSetHistory = string[][];
 
 export function loadAdventureSetHistory(userUid?: string | null): AdventureSetHistory {
-  claimGuestProgress(STORAGE_KEY, userUid);
+  const key = courseStorageKey();
+  claimGuestProgress(key, userUid);
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    const raw = readScopedProgress(key, userUid);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -33,14 +36,14 @@ export function saveAdventureSetHistory(
   userUid?: string | null,
 ): void {
   writeScopedProgress(
-    STORAGE_KEY,
+    courseStorageKey(),
     JSON.stringify(history.slice(-ADVENTURE_SETS_PER_FORCED_REVIEW)),
     userUid,
   );
 }
 
 export function clearAdventureSetHistory(userUid?: string | null): void {
-  clearScopedProgress(STORAGE_KEY, userUid);
+  clearScopedProgress(courseStorageKey(), userUid);
 }
 
 /** Append a cleared adventure set; keep only the last N sets used for forced review. */

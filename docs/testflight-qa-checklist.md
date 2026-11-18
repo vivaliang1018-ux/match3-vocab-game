@@ -76,7 +76,7 @@
 
 | # | Test | Pass? | Notes |
 |---|------|-------|-------|
-| 4.1 | Starts with 20 moves; HUD shows 当前组 (= cleared+1) and stamina as hearts + n/5; the first matching move spends 1 stamina, including the player's first-ever Adventure | | |
+| 4.1 | Starts with 20 moves; HUD shows 当前组 (= cleared+1) and stamina as hearts + n/3; the first matching move spends 1 stamina, including the player's first-ever Adventure | | |
 | 4.2 | Normal 3-match costs 1 move; 4+/line clear nets 0 (−1+1) | | |
 | 4.3 | At ≤6 moves, unfinished words drop more often | | |
 | 4.4 | Out of moves → revive: 6 words ×2 hits, 3 misses = fail | | |

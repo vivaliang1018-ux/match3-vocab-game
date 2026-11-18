@@ -1,9 +1,12 @@
-const STORAGE_KEY = 'match3-stamina-v1';
+import { claimGuestProgress, clearScopedProgress, readScopedProgress, writeScopedProgress } from './progressScope';
 
-export const STAMINA_DAILY_BASE = 5;
-export const STAMINA_MAX = 5;
-export const STAMINA_REGEN_MS = 60 * 60 * 1000;
-export const SAY_BLAST_DAILY_REWARD_MAX = 3;
+// v2 starts a new daily ledger; the old hourly-regeneration state cannot tell
+// us how many boards were already played today.
+const STORAGE_KEY = 'match3-stamina-v2';
+
+export const STAMINA_DAILY_BASE = 3;
+export const STAMINA_MAX = STAMINA_DAILY_BASE;
+export const AD_STAMINA_RESETS_DAILY_MAX = 2;
 
 export type StaminaState = {
   value: number;
@@ -15,6 +18,10 @@ export type StaminaState = {
   dayKey: string;
   /** Bonus stamina earned from Say & Blast during `dayKey`. */
   sayBlastRewardsToday: number;
+  /** Rewarded-ad stamina resets used during `dayKey`. */
+  adResetsToday: number;
+  /** New boards started today, across every course. */
+  spentToday: number;
 };
 
 function dayKeyFrom(ms: number): string {
@@ -36,12 +43,15 @@ export function defaultStaminaState(now = Date.now()): StaminaState {
     lastRegenAt: now,
     dayKey: dayKeyFrom(now),
     sayBlastRewardsToday: 0,
+    adResetsToday: 0,
+    spentToday: 0,
   };
 }
 
-export function loadStaminaState(now = Date.now()): StaminaState {
+export function loadStaminaState(now = Date.now(), userId: string | null = null): StaminaState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    claimGuestProgress(STORAGE_KEY, userId);
+    const raw = readScopedProgress(STORAGE_KEY, userId);
     if (!raw) return defaultStaminaState(now);
     const parsed = JSON.parse(raw) as Partial<StaminaState>;
     const base: StaminaState = {
@@ -56,6 +66,14 @@ export function loadStaminaState(now = Date.now()): StaminaState {
         typeof parsed.sayBlastRewardsToday === 'number'
           ? Math.max(0, Math.floor(parsed.sayBlastRewardsToday))
           : 0,
+      adResetsToday:
+        typeof parsed.adResetsToday === 'number'
+          ? Math.min(AD_STAMINA_RESETS_DAILY_MAX, Math.max(0, Math.floor(parsed.adResetsToday)))
+          : 0,
+      spentToday:
+        typeof parsed.spentToday === 'number'
+          ? Math.max(0, Math.floor(parsed.spentToday))
+          : 0,
     };
     return tickStamina(base, now);
   } catch {
@@ -63,90 +81,45 @@ export function loadStaminaState(now = Date.now()): StaminaState {
   }
 }
 
-export function saveStaminaState(state: StaminaState): void {
+export function saveStaminaState(state: StaminaState, userId: string | null = null): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    writeScopedProgress(STORAGE_KEY, JSON.stringify(state), userId);
   } catch {
     // ignore quota
   }
 }
 
-/** Apply hourly regen + daily top-up to base when below max. */
+export function clearStaminaState(userId: string): void {
+  clearScopedProgress(STORAGE_KEY, userId);
+}
+
+/** Reset to three stamina on a new local day; there is no hourly regeneration. */
 export function tickStamina(state: StaminaState, now = Date.now()): StaminaState {
-  let { value, bankedRewards, lastRegenAt, dayKey, sayBlastRewardsToday } = state;
-  bankedRewards = Number.isFinite(bankedRewards)
-    ? Math.max(0, Math.floor(bankedRewards))
-    : 0;
   const today = dayKeyFrom(now);
-
-  if (dayKey !== today) {
-    dayKey = today;
-    sayBlastRewardsToday = 0;
-    if (value < STAMINA_DAILY_BASE) value = STAMINA_DAILY_BASE;
-    lastRegenAt = now;
-  }
-
-  if (value < STAMINA_MAX && lastRegenAt < now) {
-    const elapsed = now - lastRegenAt;
-    const gained = Math.floor(elapsed / STAMINA_REGEN_MS);
-    if (gained > 0) {
-      value = clampStamina(value + gained);
-      lastRegenAt += gained * STAMINA_REGEN_MS;
-      if (value >= STAMINA_MAX) lastRegenAt = now;
-    }
-  }
-
-  if (value < STAMINA_MAX && bankedRewards > 0) {
-    const claimed = Math.min(STAMINA_MAX - value, bankedRewards);
-    value += claimed;
-    bankedRewards -= claimed;
-  }
-
+  if (state.dayKey !== today) return defaultStaminaState(now);
   return {
-    value: clampStamina(value),
-    bankedRewards: Math.max(0, Math.floor(bankedRewards)),
-    lastRegenAt,
-    dayKey,
-    sayBlastRewardsToday: Math.max(0, Math.floor(sayBlastRewardsToday)),
+    value: clampStamina(state.value),
+    bankedRewards: 0,
+    lastRegenAt: state.lastRegenAt,
+    dayKey: today,
+    sayBlastRewardsToday: Math.min(10_000, Math.max(0, Math.floor(state.sayBlastRewardsToday) || 0)),
+    adResetsToday: Math.min(
+      AD_STAMINA_RESETS_DAILY_MAX,
+      Math.max(0, Math.floor(state.adResetsToday) || 0),
+    ),
+    spentToday: Math.min(10_000, Math.max(0, Math.floor(state.spentToday) || 0)),
   };
 }
 
 export function spendStamina(state: StaminaState, amount = 1, now = Date.now()): StaminaState | null {
   const ticked = tickStamina(state, now);
-  if (ticked.value < amount) return null;
-  const next = { ...ticked, value: ticked.value - amount };
-  if (next.value < STAMINA_MAX && next.bankedRewards > 0) {
-    const claimed = Math.min(STAMINA_MAX - next.value, next.bankedRewards);
-    next.value += claimed;
-    next.bankedRewards -= claimed;
-  }
-  if (ticked.value >= STAMINA_MAX && next.value < STAMINA_MAX) {
-    next.lastRegenAt = now;
-  }
-  return next;
-}
-
-export function grantStamina(state: StaminaState, amount = 1, now = Date.now()): StaminaState {
-  const ticked = tickStamina(state, now);
-  return { ...ticked, value: clampStamina(ticked.value + amount) };
-}
-
-export function grantOrBankStamina(
-  state: StaminaState,
-  amount = 1,
-  now = Date.now(),
-): { state: StaminaState; outcome: 'granted' | 'banked' } {
-  const ticked = tickStamina(state, now);
-  const openSlots = Math.max(0, STAMINA_MAX - ticked.value);
-  const granted = Math.min(openSlots, Math.max(0, Math.floor(amount)));
-  const banked = Math.max(0, Math.floor(amount) - granted);
+  const cost = Math.max(0, Math.floor(amount));
+  if (ticked.value < cost) return null;
   return {
-    state: {
-      ...ticked,
-      value: clampStamina(ticked.value + granted),
-      bankedRewards: ticked.bankedRewards + banked,
-    },
-    outcome: banked > 0 ? 'banked' : 'granted',
+    ...ticked,
+    value: clampStamina(ticked.value - cost),
+    spentToday: ticked.spentToday + cost,
+    lastRegenAt: now,
   };
 }
 
@@ -155,23 +128,44 @@ export function grantSayBlastStamina(
   now = Date.now(),
 ): { state: StaminaState; outcome: 'granted' | 'banked' | 'daily-limit' } {
   const ticked = tickStamina(state, now);
-  if (ticked.sayBlastRewardsToday >= SAY_BLAST_DAILY_REWARD_MAX) {
-    return { state: ticked, outcome: 'daily-limit' };
-  }
-  const reward = grantOrBankStamina(ticked, 1, now);
+  if (ticked.value >= STAMINA_MAX) return { state: ticked, outcome: 'daily-limit' };
   return {
     state: {
-      ...reward.state,
+      ...ticked,
+      value: ticked.value + 1,
       sayBlastRewardsToday: ticked.sayBlastRewardsToday + 1,
+      lastRegenAt: now,
     },
-    outcome: reward.outcome,
+    outcome: 'granted',
   };
 }
 
-/** Ms until next +1, or null if full. */
+/** Apply a rewarded-ad result. Call only after the ad reports a reward. */
+export function resetStaminaFromRewardedAd(
+  state: StaminaState,
+  now = Date.now(),
+): { state: StaminaState; outcome: 'granted' | 'daily-limit' | 'not-needed' } {
+  const ticked = tickStamina(state, now);
+  if (ticked.adResetsToday >= AD_STAMINA_RESETS_DAILY_MAX) {
+    return { state: ticked, outcome: 'daily-limit' };
+  }
+  if (ticked.value >= STAMINA_MAX) return { state: ticked, outcome: 'not-needed' };
+  return {
+    state: {
+      ...ticked,
+      value: STAMINA_MAX,
+      adResetsToday: ticked.adResetsToday + 1,
+      lastRegenAt: now,
+    },
+    outcome: 'granted',
+  };
+}
+
+/** Ms until the next local daily reset, or null while entries remain. */
 export function msUntilNextStamina(state: StaminaState, now = Date.now()): number | null {
   const ticked = tickStamina(state, now);
-  if (ticked.value >= STAMINA_MAX) return null;
-  const nextAt = ticked.lastRegenAt + STAMINA_REGEN_MS;
-  return Math.max(0, nextAt - now);
+  if (ticked.value > 0) return null;
+  const today = new Date(now);
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  return Math.max(0, tomorrow.getTime() - now);
 }

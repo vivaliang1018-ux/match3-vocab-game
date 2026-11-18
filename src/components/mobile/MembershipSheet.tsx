@@ -14,12 +14,14 @@ type MembershipSheetProps = {
   mode: 'welcome' | 'paywall';
   expired?: boolean;
   signedIn: boolean;
-  monthlyDisplayPrice: string;
-  annualDisplayPrice: string;
+  lifetimeDisplayPrice: string;
+  storeReady: boolean;
+  storeBusy: boolean;
+  storeError: string | null;
   onStartTrial: () => void;
-  onSelectPlan: (plan: MembershipPlan) => boolean;
+  onSelectPlan: (plan: MembershipPlan) => Promise<'purchased' | 'pending' | 'cancelled'>;
   onContinueFree: () => void;
-  onRestore: () => void;
+  onRestore: () => Promise<boolean>;
   onClose: () => void;
 };
 
@@ -28,8 +30,10 @@ export function MembershipSheet({
   mode,
   expired = false,
   signedIn,
-  monthlyDisplayPrice,
-  annualDisplayPrice,
+  lifetimeDisplayPrice,
+  storeReady,
+  storeBusy,
+  storeError,
   onStartTrial,
   onSelectPlan,
   onContinueFree,
@@ -49,14 +53,27 @@ export function MembershipSheet({
     if (open) setStatusMessage(null);
   }, [open, mode]);
 
-  const choosePlan = (plan: MembershipPlan) => {
+  const choosePlan = async (plan: MembershipPlan) => {
     setStatusMessage(null);
-    if (!onSelectPlan(plan)) setStatusMessage(copy.purchasePending);
+    if (!storeReady) {
+      setStatusMessage(copy.purchasePending);
+      return;
+    }
+    try {
+      const result = await onSelectPlan(plan);
+      if (result === 'pending') setStatusMessage(copy.pendingApproval);
+    } catch {
+      setStatusMessage(copy.purchaseError);
+    }
   };
 
-  const restore = () => {
-    setStatusMessage(copy.purchasePending);
-    onRestore();
+  const restore = async () => {
+    setStatusMessage(null);
+    try {
+      if (!(await onRestore())) setStatusMessage(copy.restoreEmpty);
+    } catch {
+      setStatusMessage(copy.purchaseError);
+    }
   };
 
   if (typeof document === 'undefined') return null;
@@ -139,46 +156,51 @@ export function MembershipSheet({
                   </div>
                 )}
 
-                <motion.button
-                  type="button"
-                  className="membership-plan membership-plan-annual"
-                  whileTap={MOTION_PRESS_TAP}
-                  onClick={() => choosePlan('annual')}
-                >
-                  <span className="membership-plan-badge">{copy.recommended}</span>
-                  <span>
-                    <strong>{copy.annual}</strong>
-                    <small>{annualDisplayPrice} {copy.perYear}</small>
-                  </span>
-                </motion.button>
-                <motion.button
-                  type="button"
-                  className="membership-plan"
-                  whileTap={MOTION_PRESS_TAP}
-                  onClick={() => choosePlan('monthly')}
-                >
-                  <span>
-                    <strong>{copy.monthly}</strong>
-                    <small>{monthlyDisplayPrice} {copy.perMonth}</small>
-                  </span>
-                </motion.button>
+                {!storeReady && (
+                  <p className="auth-sheet-status auth-sheet-status-ok">{copy.purchasePending}</p>
+                )}
 
-                {statusMessage && (
+                {storeReady && <motion.button
+                  type="button"
+                  className="membership-plan membership-plan-lifetime"
+                  whileTap={MOTION_PRESS_TAP}
+                  disabled={!storeReady || storeBusy}
+                  onClick={() => { void choosePlan('lifetime'); }}
+                >
+                  <span className="membership-plan-main">
+                    <strong>{copy.lifetime}</strong>
+                    <small>{lifetimeDisplayPrice}</small>
+                  </span>
+                </motion.button>}
+
+                {(statusMessage || (storeReady && storeError)) && (
                   <p className="auth-sheet-status auth-sheet-status-ok">
-                    {statusMessage}
+                    {statusMessage || copy.purchaseError}
                   </p>
                 )}
 
-                <button
-                  type="button"
-                  className="membership-free"
-                  onClick={onContinueFree}
-                >
-                  {copy.continueFree}
-                </button>
-                <button type="button" className="membership-restore" onClick={restore}>
-                  {copy.restore}
-                </button>
+                <div className="membership-secondary-actions">
+                  <button
+                    type="button"
+                    className="membership-free"
+                    onClick={onContinueFree}
+                  >
+                    {copy.continueFree}
+                  </button>
+                  <span aria-hidden>·</span>
+                  <button type="button" className="membership-restore" disabled={storeBusy} onClick={() => { void restore(); }}>
+                    {copy.restore}
+                  </button>
+                </div>
+
+                <div className="membership-purchase-footer">
+                  {storeReady && <p>{copy.oneTimePurchase}</p>}
+                  <div className="membership-legal-links">
+                    <a href={import.meta.env.VITE_TERMS_OF_SERVICE_URL || 'https://vivaliang1018-ux.github.io/match3-vocab-game/terms.html'} target="_blank" rel="noreferrer">{copy.terms}</a>
+                    <span aria-hidden>·</span>
+                    <a href={import.meta.env.VITE_PRIVACY_POLICY_URL || 'https://vivaliang1018-ux.github.io/match3-vocab-game/privacy.html'} target="_blank" rel="noreferrer">{copy.privacy}</a>
+                  </div>
+                </div>
               </>
             )}
           </motion.div>

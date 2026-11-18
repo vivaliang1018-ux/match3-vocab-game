@@ -28,7 +28,7 @@ export function LearnedWordModal({
   onClose,
 }: LearnedWordModalProps) {
   const { locale, t, ui } = useI18n();
-  const nativeTranslation = item ? getEmojiLearningTranslation(item, locale) : null;
+  const nativeTranslation = item ? item.sourceWord?.trim() || getEmojiLearningTranslation(item, locale) : null;
   const dialogRef = useModalDialog({ open: open && Boolean(item), onClose });
 
   const handlePlay = () => {
@@ -94,7 +94,7 @@ export function LearnedWordModal({
             >
               {item.word}
             </motion.h3>
-            {nativeTranslation && (
+            {nativeTranslation && nativeTranslation !== item.word && (
               <motion.p
                 className="learned-word-modal-cn"
                 initial={{ opacity: 0, y: 8 }}

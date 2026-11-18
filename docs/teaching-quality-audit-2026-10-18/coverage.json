@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-18",
+  "items": 1117,
+  "targetExpressions": 4468,
+  "courses": 24,
+  "coursePairs": 26808,
+  "priorSnapshotDifferences": [],
+  "stats": {
+    "en": {
+      "expected": 1117,
+      "found": 1117,
+      "bindings": {
+        "exact": 1116,
+        "filesystem-normalization": 1
+      },
+      "invalid": 0,
+      "durationMin": 0.421125,
+      "durationMax": 2.94775,
+      "underPoint32": 0,
+      "over4point5": 0,
+      "formats": [
+        "[{\"codec_name\":\"mp3\",\"sample_rate\":\"24000\",\"channels\":1}]"
+      ]
+    },
+    "es": {
+      "expected": 1117,
+      "found": 1117,
+      "bindings": {
+        "exact": 873,
+        "filesystem-normalization": 244
+      },
+      "invalid": 0,
+      "durationMin": 0.72,
+      "durationMax": 4.344,
+      "underPoint32": 0,
+      "over4point5": 0,
+      "formats": [
+        "[{\"codec_name\":\"mp3\",\"sample_rate\":\"24000\",\"channels\":1}]"
+      ]
+    },
+    "ja": {
+      "expected": 1117,
+      "found": 1117,
+      "bindings": {
+        "exact": 1117
+      },
+      "invalid": 0,
+      "durationMin": 0.552,
+      "durationMax": 3.48,
+      "underPoint32": 0,
+      "over4point5": 0,
+      "formats": [
+        "[{\"codec_name\":\"mp3\",\"sample_rate\":\"24000\",\"channels\":1}]"
+      ]
+    },
+    "ko": {
+      "expected": 1117,
+      "found": 1117,
+      "bindings": {
+        "exact": 1117
+      },
+      "invalid": 0,
+      "durationMin": 0.72,
+      "durationMax": 3.744,
+      "underPoint32": 0,
+      "over4point5": 0,
+      "formats": [
+        "[{\"codec_name\":\"mp3\",\"sample_rate\":\"24000\",\"channels\":1}]"
+      ]
+    }
+  },
+  "extras": 0,
+  "pronunciationCertified": 0,
+  "spokenTextCertified": 0
+}

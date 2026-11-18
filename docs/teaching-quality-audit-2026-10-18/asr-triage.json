@@ -1,0 +1,178 @@
+[
+  {
+    "id": "mermaid",
+    "locale": "en",
+    "target": "Mermaid",
+    "file": "public/emoji-voice/Mermaid.mp3",
+    "sha256": "5f740843031b236de9ddd359b64cf4b854f9b3909e8fb19812ed3b2512c53f86",
+    "transcript": "I'mma beade.",
+    "avg_logprob": -1.1220207214355469,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "shortcake",
+    "locale": "en",
+    "target": "Shortcake",
+    "file": "public/emoji-voice/Shortcake.mp3",
+    "sha256": "79421144d2e6ca86931e680d06437fb1c17566843548e806fb58b8e5d8ebdaf6",
+    "transcript": "Shortkate.",
+    "avg_logprob": -0.7269730567932129,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "cinema-light",
+    "locale": "en",
+    "target": "Cinema Light",
+    "file": "public/emoji-voice/Cinema Light.mp3",
+    "sha256": "7ef5bf5d9e322f8617e419b4fe2a569c9ce705409515461622e2f95d560f6606",
+    "transcript": "Cinema Light.",
+    "avg_logprob": -0.9100678563117981,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "japanese-symbol",
+    "locale": "en",
+    "target": "Japanese Symbol",
+    "file": "public/emoji-voice/Japanese Symbol.mp3",
+    "sha256": "820415a73f936aa414c01ef28e3e4e7f704427ae75a0f8f351f306e1de01a688",
+    "transcript": "Japanese symbol.",
+    "avg_logprob": -0.6533706188201904,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "paw-prints",
+    "locale": "es",
+    "target": "huellas de pezuñas",
+    "file": "public/emoji-voice-es/huellas de pezuñas.mp3",
+    "sha256": "fdc22cd11a4f03c38ad341eef3c7dcfc159b9c7155da3a2df5b371595c84541c",
+    "transcript": "Guayas de pezunias.",
+    "avg_logprob": -0.6494102229674658,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "roasted-sweet-potato",
+    "locale": "es",
+    "target": "patata asada",
+    "file": "public/emoji-voice-es/patata asada.mp3",
+    "sha256": "dad1eb88f0c06d4b9f98bd1b0600d08a91d893788a79df4a155e1ef459c711d8",
+    "transcript": "¡Badada, sala!",
+    "avg_logprob": -0.9159981966018677,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "factory-worker",
+    "locale": "ja",
+    "target": "女性の溶接工",
+    "file": "public/emoji-voice-ja/女性の溶接工.mp3",
+    "sha256": "f38d6260ef5402405792e5ea1062f33b7a4e9d4fb04c5b9efe13b7754216c1d7",
+    "transcript": "女性の要説と",
+    "avg_logprob": -0.6143918931484222,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "shortcake",
+    "locale": "ja",
+    "target": "ショートケーキ",
+    "file": "public/emoji-voice-ja/ショートケーキ.mp3",
+    "sha256": "821ee9e855617f58cc629e323d763f498fd648ebe8fe7243af7c8ab9aad1e37e",
+    "transcript": "ショートケーキ",
+    "avg_logprob": -0.6119441837072372,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "electric-plug",
+    "locale": "ja",
+    "target": "コンセント",
+    "file": "public/emoji-voice-ja/コンセント.mp3",
+    "sha256": "26a7279522b0f24cd52aa208ce1cb877afe141445646da5ebe68d3d88d1af19f",
+    "transcript": "コンセント",
+    "avg_logprob": -0.48482297148023334,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "hand-with-index-finger-and-thumb-crossed",
+    "locale": "ko",
+    "target": "엄지와 중지를 교차한 손",
+    "file": "public/emoji-voice-ko/엄지와 중지를 교차한 손.mp3",
+    "sha256": "5b58dcf665bf7229f759747443d127c79f0fb22f5a7c1bffbe9121788e2fc51b",
+    "transcript": "엄지와 중지를 극차한 손",
+    "avg_logprob": -0.5923844300783597,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "raccoon",
+    "locale": "ko",
+    "target": "너구리",
+    "file": "public/emoji-voice-ko/너구리.mp3",
+    "sha256": "c4cba79158339711cebd6381d87a59d19abba1f3b882a9fcc2238f1c0a98971f",
+    "transcript": "너구리",
+    "avg_logprob": -0.6755946576595306,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "eagle",
+    "locale": "ko",
+    "target": "독수리",
+    "file": "public/emoji-voice-ko/독수리.mp3",
+    "sha256": "cfbd4ea82a0e24d79abac6751a3b460a9a03dfc0220cafd9778bb6cb8a801f6d",
+    "transcript": "톡스위리",
+    "avg_logprob": -1.1906084484524198,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "rice-cracker",
+    "locale": "ko",
+    "target": "주먹밥",
+    "file": "public/emoji-voice-ko/주먹밥.mp3",
+    "sha256": "e6237e8ddde0c844bd30c81bd9cc854373002bd7343e458bf5e7c6bd1c3dd4ce",
+    "transcript": "주목박",
+    "avg_logprob": -0.6725804011027018,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "desert-island",
+    "locale": "ko",
+    "target": "사막 섬",
+    "file": "public/emoji-voice-ko/사막 섬.mp3",
+    "sha256": "81cee0a2c6b9aad42aba2fdaf87bac1acb4d0e64d7810b1d05dbd436d12e4473",
+    "transcript": "사막성",
+    "avg_logprob": -0.8830915888150533,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "safety-vest",
+    "locale": "ko",
+    "target": "구명조끼",
+    "file": "public/emoji-voice-ko/구명조끼.mp3",
+    "sha256": "bd7b09e3e12b7f5a2d4a5b4c7b73622dbefcd4abe795f8907ca2c821be0dca94",
+    "transcript": "구명 조기",
+    "avg_logprob": -0.7587060928344727,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  },
+  {
+    "id": "clamp",
+    "locale": "ko",
+    "target": "압축기",
+    "file": "public/emoji-voice-ko/압축기.mp3",
+    "sha256": "6ef5d9c79209cc18a7ed0ac7cba934278c32c6c40904c23320837b637f5ad47c",
+    "transcript": "압축기",
+    "avg_logprob": -0.6219097822904587,
+    "method": "faster-whisper tiny int8 CPU; no text prompt; local files only",
+    "verdict": "TRIAGE_ONLY_NOT_CERTIFIED"
+  }
+]

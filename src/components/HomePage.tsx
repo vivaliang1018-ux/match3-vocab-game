@@ -10,26 +10,37 @@ import {
   type PointerEvent,
 } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { useI18n } from '../i18n';
+import { useI18n, type Locale } from '../i18n';
+import { hasSavedCourseSelection, languageForCode, useCourse, type LanguageCode } from '../course';
+import { loadPendingQuiz } from '../lib/pendingQuiz';
+import { learningWordForCourse } from '../lib/courseWord';
+import { EMOJI_NOUN_CATEGORIES } from '../data/emojiNouns';
+import { COURSE_SETUP_COPY, HOME_SCENE_COPY, homeCourseHeadline } from '../lib/coursePresentation';
 import { isReviewUnlocked, loadModeUnlocks } from '../lib/modeUnlocks';
 import { liveDayStreak, loadPlayerSummary } from '../lib/playerSummary';
 import { completeSoftAuthPrompt, hasCompletedSoftAuthPrompt } from '../lib/authNudge';
 import { loadRoundLearnedIds } from '../lib/roundLearned';
 import { hydrateMatch3Memories, isDue, memoryKeyForWord } from '../lib/ebbinghausMemory';
 import { speakWordQuick } from '../lib/wordSpeech';
+import { ChevronDown, Languages, Mic, Video } from 'lucide-react';
 import {
+  AD_STAMINA_RESETS_DAILY_MAX,
   loadStaminaState,
+  resetStaminaFromRewardedAd,
+  saveStaminaState,
   msUntilNextStamina,
-  SAY_BLAST_DAILY_REWARD_MAX,
+  STAMINA_MAX,
 } from '../lib/stamina';
-import { canPlayMoodToday } from '../lib/moodBoard';
+import { canPlayMoodToday, loadMoodDailyState, saveMoodDailyState } from '../lib/moodBoard';
+import { isCloudQuotaAvailable, resetDailyQuotaFromRewardedAd, staminaFromDailyQuota, synchronizeDailyQuota } from '../lib/dailyQuotaCloud';
+import { rewardedAdsSupported, rewardedAdsTestMode, showStaminaRewardedAd } from '../lib/rewardedAds';
+import { REWARDED_AD_COPY } from '../i18n/rewardedAdCopy';
+import { hasPaidAdventureBoard } from '../lib/adventureResume';
+import { hasPaidModeBoard } from '../lib/modeBoardResume';
+import { useMembership } from '../membership/MembershipProvider';
 import { SkySparkleBackground } from './SkySparkleBackground';
+import { CoursePickerSheet } from './mobile/CoursePickerSheet';
 
-const AccountSettingsSheet = lazy(() =>
-  import('./mobile/AccountSettingsSheet').then((module) => ({
-    default: module.AccountSettingsSheet,
-  })),
-);
 const AccountPromptSheet = lazy(() =>
   import('./mobile/AccountPromptSheet').then((module) => ({
     default: module.AccountPromptSheet,
@@ -57,15 +68,20 @@ type EmojiLayout = Record<string, EmojiTransform>;
 type CanvasPoint = { x: number; y: number };
 
 const HOME_LAYOUT_KEY = 'matchingo-home-emoji-layout-v1';
+const COURSE_LANGUAGE_SHORT: Record<LanguageCode, string> = {
+  'zh-CN': '中文', en: 'EN', es: 'ES', fr: 'FR', de: 'DE', ja: 'JP', ko: 'KR',
+};
+const HOME_EMOJI_ITEMS = new Map(
+  EMOJI_NOUN_CATEGORIES.flatMap((category) => category.items)
+    .filter((item) => Boolean(item.emoji))
+    .map((item) => [item.emoji!, item] as const),
+);
 
-function formatStaminaCountdown(ms: number): string {
+function staminaCountdownParts(ms: number): { hours: number; minutes: number } {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-    : `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return { hours, minutes: hours === 0 && minutes === 0 && totalSeconds > 0 ? 1 : minutes };
 }
 
 const DEFAULT_EMOJI_LAYOUT: EmojiLayout = {
@@ -125,6 +141,7 @@ type DraggableEmojiProps = {
   id: string;
   emoji: string;
   word: string;
+  locale: Locale;
   className: string;
   transform: EmojiTransform;
   editable: boolean;
@@ -137,6 +154,7 @@ function DraggableEmoji({
   id,
   emoji,
   word,
+  locale,
   className,
   transform,
   editable,
@@ -173,7 +191,7 @@ function DraggableEmoji({
       onKeyDown={handleKeyDown}
       role="button"
       tabIndex={editable ? -1 : 0}
-      aria-label={editable ? `Move or pinch to resize ${word}` : `Hear ${word}`}
+      aria-label={editable ? HOME_SCENE_COPY[locale].move(word) : HOME_SCENE_COPY[locale].hear(word)}
     >
       <span className="home-page-drag-content">{emoji}</span>
     </span>
@@ -183,13 +201,48 @@ function DraggableEmoji({
 export function HomePage({ onPlay }: HomePageProps) {
   const spokenWordTimerRef = useRef<number | null>(null);
   const { user, ready: authReady, configured: authConfigured } = useAuth();
-  const { t, ui } = useI18n();
+  const { locale, t, ui } = useI18n();
+  const { courseId, course, sourceLanguage } = useCourse();
+  const { hasPremiumAccess, offerings, openPaywall } = useMembership();
+  const [hasCourseSelection, setHasCourseSelection] = useState(hasSavedCourseSelection);
+  const [courseSetupOpen, setCourseSetupOpen] = useState(() => !hasSavedCourseSelection());
   const [cloudRefreshKey, setCloudRefreshKey] = useState(0);
   const [dueReviewCount, setDueReviewCount] = useState(0);
   const [staminaClock, setStaminaClock] = useState(() => Date.now());
-  const stamina = useMemo(() => loadStaminaState(staminaClock), [staminaClock]);
+  const [rewardedAdBusy, setRewardedAdBusy] = useState(false);
+  const [rewardedAdStatus, setRewardedAdStatus] = useState<string | null>(null);
+  const stamina = useMemo(() => loadStaminaState(staminaClock, user?.uid ?? null), [staminaClock, user?.uid]);
+  useEffect(() => {
+    const uid = user?.uid ?? null;
+    if (!isCloudQuotaAvailable(uid)) return;
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const local = loadStaminaState(Date.now(), uid);
+        const quota = await synchronizeDailyQuota(uid, local, loadMoodDailyState({ userId: uid }).plays);
+        if (disposed) return;
+        saveStaminaState(staminaFromDailyQuota(quota, local), uid);
+        saveMoodDailyState({ dayKey: quota.dayKey, plays: quota.moodPlaysToday }, uid);
+        setStaminaClock(Date.now());
+        setCloudRefreshKey((key) => key + 1);
+      } catch (error) {
+        console.warn('[match3] daily quota sync failed', error);
+      }
+    };
+    void refresh();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      disposed = true;
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [user?.uid]);
   const journey = useMemo(() => {
     void cloudRefreshKey;
+    // Storage helpers namespace reads through the active course singleton.
+    void courseId;
     const userId = user?.uid ?? null;
     const learnedIds = loadRoundLearnedIds(userId);
     const unlocks = loadModeUnlocks(userId);
@@ -197,14 +250,21 @@ export function HomePage({ onPlay }: HomePageProps) {
     return {
       learnedCount: learnedIds.length,
       clears: unlocks.adventureClears,
+      pendingQuiz: Boolean(loadPendingQuiz(courseId, userId)),
       pendingForcedReview: unlocks.pendingForcedReview,
       dayStreak: liveDayStreak(summary),
       canReview: isReviewUnlocked(unlocks.adventureClears) && learnedIds.length >= 6,
-      canPlayMood: unlocks.adventureClears >= 3 && canPlayMoodToday(),
+      canPlayMood: unlocks.adventureClears >= 3 &&
+        (hasPaidModeBoard('mood', userId) ||
+          (canPlayMoodToday({ hasPremiumAccess, userId }) &&
+            (hasPremiumAccess || stamina.value > 0))),
       canPlaySayBlast:
         learnedIds.filter((id) => id.startsWith('emoji-')).length >= 6,
     };
-  }, [cloudRefreshKey, user?.uid]);
+  }, [cloudRefreshKey, user?.uid, courseId, hasPremiumAccess, stamina.value]);
+
+  const courseCopy = COURSE_SETUP_COPY[locale];
+  const homeHeadline = homeCourseHeadline(course.targetLanguage);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,9 +280,14 @@ export function HomePage({ onPlay }: HomePageProps) {
         if (cancelled) return;
         const wordsById = new Map<string, string>([
           ...EMOJI_NOUN_CATEGORIES.flatMap((category) =>
-            category.items.map((item) => [`emoji-${category.id}-${item.id}`, item.word] as const),
+            category.items.map((item) => [
+              `emoji-${category.id}-${item.id}`,
+              learningWordForCourse(item, courseId),
+            ] as const),
           ),
-          ...THIINGS_100.map((item) => [`thiings-${item.id}`, item.word] as const),
+          ...(course.targetLanguage === 'en'
+            ? THIINGS_100.map((item) => [`thiings-${item.id}`, item.word] as const)
+            : []),
         ]);
         setDueReviewCount(
           learnedIds.reduce((count, id) => {
@@ -236,15 +301,28 @@ export function HomePage({ onPlay }: HomePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [cloudRefreshKey, user?.uid]);
+  }, [cloudRefreshKey, user?.uid, courseId, course.targetLanguage]);
 
-  const adventureResting = journey.clears > 0 && stamina.value <= 0;
+  // Recovery choices depend on energy, not whether a saved round exists.
+  const adventureResting = !hasPremiumAccess && stamina.value <= 0;
+  const canResumeCurrentSet = journey.pendingQuiz || hasPaidAdventureBoard(courseId, user?.uid ?? null);
+  const resumeLabel: Record<Locale, string> = {
+    en: 'Resume current set', 'zh-CN': '继续当前组', es: 'Continuar la serie actual',
+    fr: 'Reprendre la série en cours', de: 'Aktuelles Set fortsetzen', ja: '現在のセットを再開', ko: '현재 세트 이어하기',
+  };
   const nextStaminaMs = adventureResting
     ? (msUntilNextStamina(stamina, staminaClock) ?? 0)
     : 0;
-  const canEarnStamina =
-    journey.canPlaySayBlast &&
-    stamina.sayBlastRewardsToday < SAY_BLAST_DAILY_REWARD_MAX;
+  const nextStaminaCountdown = staminaCountdownParts(nextStaminaMs);
+  const canEarnStamina = journey.canPlaySayBlast && stamina.value < STAMINA_MAX;
+  const adCopy = REWARDED_AD_COPY[locale];
+  const lifetimeDisplayPrice = offerings.lifetime.displayPrice === '—'
+    ? null
+    : offerings.lifetime.displayPrice;
+  const rewardedAdResetsRemaining = Math.max(
+    0,
+    AD_STAMINA_RESETS_DAILY_MAX - stamina.adResetsToday,
+  );
 
   useEffect(() => {
     if (!adventureResting) return;
@@ -253,7 +331,7 @@ export function HomePage({ onPlay }: HomePageProps) {
   }, [adventureResting]);
 
   const primaryEntry: HomeEntry = 'adventure';
-  const primaryLabel = journey.clears === 0
+  const primaryLabel = journey.clears === 0 && !journey.pendingQuiz
     ? ui.home.startAdventure
     : ui.home.continueAdventure;
   const progressLine = `${ui.learned.learnedCount(journey.learnedCount)} · 🔥 ${ui.roundResult.dayStreak(journey.dayStreak)}`;
@@ -262,7 +340,6 @@ export function HomePage({ onPlay }: HomePageProps) {
   const [accountPromptOpen, setAccountPromptOpen] = useState(false);
   const [progressSavedVisible, setProgressSavedVisible] = useState(false);
   const promptAuthStartedRef = useRef(false);
-  const [accountOpen, setAccountOpen] = useState(false);
   const [savedLayout, setSavedLayout] = useState<EmojiLayout>(loadEmojiLayout);
   const [emojiLayout, setEmojiLayout] = useState<EmojiLayout>(() => ({ ...savedLayout }));
   const [selectedEmoji, setSelectedEmoji] = useState<{ id: string; emoji: string } | null>(null);
@@ -299,7 +376,7 @@ export function HomePage({ onPlay }: HomePageProps) {
     if (!user?.uid) return;
     let cancelled = false;
     void import('../lib/memoryCloudSync')
-      .then(({ hydrateCoreProgressWithCloud }) => hydrateCoreProgressWithCloud(user.uid))
+      .then(({ hydrateCoreProgressWithCloud }) => hydrateCoreProgressWithCloud(user.uid, courseId))
       .then(() => {
         if (cancelled) return;
         setCloudRefreshKey((key) => key + 1);
@@ -312,10 +389,11 @@ export function HomePage({ onPlay }: HomePageProps) {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid]);
+  }, [user?.uid, courseId]);
 
   useEffect(() => {
     if (
+      !hasCourseSelection ||
       !authReady ||
       !authConfigured ||
       user ||
@@ -327,15 +405,7 @@ export function HomePage({ onPlay }: HomePageProps) {
       return;
     }
     setAccountPromptOpen(true);
-  }, [authConfigured, authReady, journey.clears, journey.learnedCount, journey.pendingForcedReview, user]);
-
-  const openAccount = () => {
-    if (user) setAccountOpen(true);
-    else {
-      setSignInInitialMode('signIn');
-      setSignInOpen(true);
-    }
-  };
+  }, [authConfigured, authReady, hasCourseSelection, journey.clears, journey.learnedCount, journey.pendingForcedReview, user]);
 
   const dismissAccountPrompt = () => {
     completeSoftAuthPrompt();
@@ -348,6 +418,54 @@ export function HomePage({ onPlay }: HomePageProps) {
     setAccountPromptOpen(false);
     setSignInInitialMode(mode);
     setSignInOpen(true);
+  };
+
+  const handleRewardedAd = async () => {
+    if (rewardedAdBusy) return;
+    if (rewardedAdResetsRemaining <= 0) {
+      setRewardedAdStatus(adCopy.dailyLimit);
+      return;
+    }
+    setRewardedAdBusy(true);
+    setRewardedAdStatus(adCopy.loading);
+    try {
+      await showStaminaRewardedAd();
+      const uid = user?.uid ?? null;
+      if (isCloudQuotaAvailable(uid)) {
+        const quota = await resetDailyQuotaFromRewardedAd(
+          uid,
+          stamina,
+          loadMoodDailyState({ userId: uid }).plays,
+        );
+        if (!quota) {
+          setRewardedAdStatus(adCopy.dailyLimit);
+          return;
+        }
+        saveStaminaState(staminaFromDailyQuota(quota, stamina), uid);
+        saveMoodDailyState({ dayKey: quota.dayKey, plays: quota.moodPlaysToday }, uid);
+      } else {
+        const reward = resetStaminaFromRewardedAd(stamina);
+        if (reward.outcome !== 'granted') {
+          setRewardedAdStatus(
+            reward.outcome === 'daily-limit' ? adCopy.dailyLimit : adCopy.rewarded,
+          );
+          return;
+        }
+        saveStaminaState(reward.state, uid);
+      }
+      setStaminaClock(Date.now());
+      setCloudRefreshKey((key) => key + 1);
+      setRewardedAdStatus(adCopy.rewarded);
+    } catch (error) {
+      console.warn('[match3] rewarded ad failed', error);
+      setRewardedAdStatus(
+        rewardedAdsTestMode()
+          ? `Test ad error: ${error instanceof Error ? error.message : String(error)}`
+          : adCopy.unavailable,
+      );
+    } finally {
+      setRewardedAdBusy(false);
+    }
   };
 
   const moveEmoji = (id: string, transform: EmojiTransform) => {
@@ -444,12 +562,16 @@ export function HomePage({ onPlay }: HomePageProps) {
     }, 1400);
   };
 
-  const emoji = (id: string, value: string, word: string, className: string) => (
+  const emoji = (id: string, value: string, word: string, className: string) => {
+    const courseItem = HOME_EMOJI_ITEMS.get(value);
+    const learningWord = courseItem ? learningWordForCourse(courseItem, courseId) : word;
+    return (
     <DraggableEmoji
       key={id}
       id={id}
       emoji={value}
-      word={word}
+      word={learningWord}
+      locale={locale}
       className={className}
       transform={emojiLayout[id] ?? { x: 0, y: 0, scale: 1 }}
       editable={editing}
@@ -459,7 +581,8 @@ export function HomePage({ onPlay }: HomePageProps) {
         setSelectedEmoji({ id: selectedId, emoji: selectedValue })
       }
     />
-  );
+    );
+  };
 
   const beginEditing = () => {
     setEmojiLayout({ ...savedLayout });
@@ -544,7 +667,19 @@ export function HomePage({ onPlay }: HomePageProps) {
       </div>
 
       <div className="home-page-card">
-        <h1 className="home-page-title">Match emoji.<span>Learn English, Spark joy.</span></h1>
+        <button
+          type="button"
+          className="home-page-course-switch"
+          aria-label={`${courseCopy.changeCourse}: ${course.label}`}
+          onClick={() => {
+            setCourseSetupOpen(true);
+          }}
+        >
+          <Languages size={17} strokeWidth={2.4} aria-hidden />
+          <span>{languageForCode(course.sourceLanguage).nativeName} → {COURSE_LANGUAGE_SHORT[course.targetLanguage]}</span>
+          <ChevronDown size={15} strokeWidth={3} aria-hidden />
+        </button>
+        <h1 className="home-page-title">{homeHeadline.primary}<span>{homeHeadline.secondary}</span></h1>
 
         <div className="home-page-animals">
           {emoji('cow', '🐄', 'Cow', 'home-page-animal home-page-animal--cow')}
@@ -561,58 +696,110 @@ export function HomePage({ onPlay }: HomePageProps) {
           <div className="home-page-actions">
             {journey.learnedCount > 0 && (
               <div className="home-page-progress-copy" aria-label={ui.home.todaysProgress}>
-                <div className="home-page-progress-meta">{progressLine}</div>
+                <div className="home-page-progress-meta">
+                  {progressLine} · ⚡ {hasPremiumAccess ? '∞' : `${stamina.value}/${STAMINA_MAX}`}
+                </div>
               </div>
             )}
             {adventureResting ? (
               <>
                 <div className="home-page-rest-status" role="status">
                   <strong>{t.modes.noStamina}</strong>
-                  <span>{ui.deadMachine.nextStamina} · {formatStaminaCountdown(nextStaminaMs)}</span>
+                  <span>{t.adventure.deadWait}</span>
+                  <span>{t.adventure.deadWaitRemaining(nextStaminaCountdown.hours, nextStaminaCountdown.minutes)}</span>
                 </div>
                 <div className="home-page-rest-modes">
-                  {canEarnStamina && (
-                    <button type="button" onClick={() => onPlay('say-blast')}>
-                      {ui.home.sayBlastStaminaEntry}
+                  {canResumeCurrentSet && (
+                    <button className="home-page-rest-secondary" type="button" onClick={() => onPlay('adventure')}>
+                      {resumeLabel[locale]} ›
                     </button>
                   )}
-                  {journey.canReview && (
-                    <button type="button" onClick={() => onPlay('review')}>
-                      {ui.deadMachine.playReview}
-                    </button>
-                  )}
-                  {journey.canPlayMood && (
-                    <button type="button" onClick={() => onPlay('mood')}>
-                      {ui.deadMachine.playMood}
-                    </button>
+                  <button
+                    className="home-page-rest-primary"
+                    type="button"
+                    onClick={() => openPaywall('profile')}
+                  >
+                    <span aria-hidden>👑</span> {adCopy.unlockPlus(lifetimeDisplayPrice)}
+                  </button>
+                  <div className="home-page-rest-recovery">
+                    {rewardedAdsSupported() && rewardedAdResetsRemaining > 0 && (
+                      <button
+                        className="home-page-rest-secondary"
+                        type="button"
+                        disabled={rewardedAdBusy}
+                        onClick={() => void handleRewardedAd()}
+                      >
+                        <span className="home-page-rest-label">
+                          <Video size={16} strokeWidth={2.7} aria-hidden />
+                          {rewardedAdBusy ? adCopy.loading : adCopy.watch}
+                        </span>
+                        {!rewardedAdBusy && (
+                          <small>
+                            {adCopy.watchReward}
+                            <span className="home-page-rest-quota"> · {adCopy.remaining(rewardedAdResetsRemaining)}</span>
+                          </small>
+                        )}
+                      </button>
+                    )}
+                    {canEarnStamina && (
+                      <button
+                        className="home-page-rest-secondary"
+                        type="button"
+                        onClick={() => onPlay('say-blast')}
+                      >
+                        <span className="home-page-rest-label">
+                          <Mic size={16} strokeWidth={2.7} aria-hidden />
+                          {adCopy.practiceForEnergy}
+                        </span>
+                        <small>{adCopy.practiceReward}</small>
+                      </button>
+                    )}
+                  </div>
+                  {(journey.canReview || journey.canPlayMood) && (
+                    <div className="home-page-rest-practice">
+                      {journey.canReview && (
+                        <button type="button" onClick={() => onPlay('review')}>
+                          {adCopy.reviewWhileWaiting} ›
+                        </button>
+                      )}
+                      {journey.canPlayMood && (
+                        <button type="button" onClick={() => onPlay('mood')}>
+                          {ui.deadMachine.playMood} ›
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
+                {rewardedAdStatus && (
+                  <div className="home-page-rest-feedback" role="status">
+                    {rewardedAdStatus}
+                  </div>
+                )}
               </>
             ) : (
               <button className="home-page-play" type="button" onClick={() => onPlay(primaryEntry)}>{primaryLabel}</button>
             )}
-            {!adventureResting && dueReviewCount > 0 && (
+            {journey.learnedCount > 0 && (
               <button className="home-page-review-entry" type="button" onClick={() => onPlay('learned')}>
-                🧠 {ui.home.reviewReady(dueReviewCount)}
+                🧠 {dueReviewCount > 0 ? ui.home.reviewReady(dueReviewCount) : ui.learned.myWords} ›
               </button>
             )}
-            <button className="home-page-account" type="button" onClick={openAccount}>{user ? t.profile.accountOpenSettings : t.profile.signInCta}</button>
           </div>
         )}
 
         {editing && (
-          <button className="home-page-done" type="button" onClick={saveEditing}>Done</button>
+          <button className="home-page-done" type="button" onClick={saveEditing}>{t.common.done}</button>
         )}
       </div>
 
       <div className="home-page-edit-actions">
         {editing ? (
           <>
-            <button type="button" onClick={cancelEditing}>Cancel</button>
-            <button type="button" onClick={resetLayout}>Reset</button>
+            <button type="button" onClick={cancelEditing}>{courseCopy.cancel}</button>
+            <button type="button" onClick={resetLayout}>{HOME_SCENE_COPY[locale].reset}</button>
           </>
         ) : (
-          <button type="button" onClick={beginEditing}>Edit Scene</button>
+          <button type="button" onClick={beginEditing}>{HOME_SCENE_COPY[locale].edit}</button>
         )}
       </div>
 
@@ -621,6 +808,19 @@ export function HomePage({ onPlay }: HomePageProps) {
       )}
 
       <Suspense fallback={null}>
+        {courseSetupOpen && (
+          <CoursePickerSheet
+            initialSourceLanguage={hasCourseSelection ? sourceLanguage : locale}
+            initialCourseId={courseId}
+            required={!hasCourseSelection}
+            onClose={() => setCourseSetupOpen(false)}
+            onConfirmed={() => {
+              setHasCourseSelection(true);
+              setCourseSetupOpen(false);
+              onPlay('adventure');
+            }}
+          />
+        )}
         {accountPromptOpen && (
           <AccountPromptSheet
             open
@@ -637,9 +837,6 @@ export function HomePage({ onPlay }: HomePageProps) {
             initialMode={signInInitialMode}
             onClose={() => setSignInOpen(false)}
           />
-        )}
-        {accountOpen && (
-          <AccountSettingsSheet open onClose={() => setAccountOpen(false)} />
         )}
       </Suspense>
     </main>

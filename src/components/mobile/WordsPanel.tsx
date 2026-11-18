@@ -5,8 +5,9 @@ import {
   EMOJI_NOUN_CATEGORIES,
   type EmojiNounItem,
 } from '../../data/emojiNouns';
-import { getEmojiLearningTranslation } from '../../data/emojiLocalizedNames';
 import { categoryDisplayName, useI18n } from '../../i18n';
+import { useCourse } from '../../course';
+import { learningWordForCourse, sourceWordForCourse } from '../../lib/courseWord';
 import {
   EMOJI_COLLECTION_ALBUMS,
   type EmojiCollectionAlbum,
@@ -97,6 +98,7 @@ export function WordsPanel({
   focusItemIds = [],
 }: WordsPanelProps) {
   const { locale, t, showChinese } = useI18n();
+  const { courseId } = useCourse();
   const copy = COLLECTION_COPY[locale];
   const [view, setView] = useState<'collection' | 'dictionary'>('collection');
   const [query, setQuery] = useState('');
@@ -179,17 +181,18 @@ export function WordsPanel({
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredCategories = useMemo(() => {
-    if (!normalizedQuery) return EMOJI_NOUN_CATEGORIES;
     return EMOJI_NOUN_CATEGORIES.map((category) => ({
       ...category,
-      items: category.items.filter(
-        (item) =>
-          item.word.toLowerCase().includes(normalizedQuery) ||
-          (getEmojiLearningTranslation(item, locale)?.toLowerCase().includes(normalizedQuery) ?? false) ||
-          item.emoji.includes(normalizedQuery),
-      ),
+      items: category.items
+        .filter((item) => !normalizedQuery || [
+          learningWordForCourse(item, courseId),
+          sourceWordForCourse(item, courseId),
+          item.word,
+          item.cn,
+          item.emoji,
+        ].some((value) => value?.toLowerCase().includes(normalizedQuery)))
     })).filter((category) => category.items.length > 0);
-  }, [locale, normalizedQuery]);
+  }, [courseId, normalizedQuery]);
 
   const openAlbum = (album: EmojiCollectionAlbum) => {
     setSelectedAlbum(album);
@@ -216,7 +219,7 @@ export function WordsPanel({
         return next;
       });
     }
-    speakWordQuick(item.word);
+    speakWordQuick(learningWordForCourse(item, courseId));
   };
 
   const claimBadge = (categoryId: string) => {
@@ -249,7 +252,7 @@ export function WordsPanel({
     <>
       <div className={cn('profile-candy-page pb-6', view === 'collection' && 'collection-page-environment')}>
         <div className="profile-candy-board">
-          <CandyFrostingHeader title="EMOJI" />
+          <CandyFrostingHeader title={t.tabs.words} />
 
           <div className="profile-candy-body">
             <div
@@ -374,15 +377,15 @@ export function WordsPanel({
                                 <button
                                   type="button"
                                   className="words-candy-row"
-                                  onClick={() => speakWordQuick(item.word)}
-                                  aria-label={`${item.word}, ${t.learned.playPronunciation}`}
+                                  onClick={() => speakWordQuick(learningWordForCourse(item, courseId))}
+                                  aria-label={`${learningWordForCourse(item, courseId)}, ${t.learned.playPronunciation}`}
                                 >
                                   <span className="words-candy-row-emoji">{item.emoji}</span>
                                   <div className="min-w-0 flex-1">
-                                    <div className="words-candy-row-word">{item.word}</div>
-                                    {getEmojiLearningTranslation(item, locale) && (
+                                    <div className="words-candy-row-word">{learningWordForCourse(item, courseId)}</div>
+                                    {sourceWordForCourse(item, courseId) !== learningWordForCourse(item, courseId) && (
                                       <div className="words-candy-row-cn">
-                                        {getEmojiLearningTranslation(item, locale)}
+                                        {sourceWordForCourse(item, courseId)}
                                       </div>
                                     )}
                                   </div>
@@ -442,6 +445,8 @@ export function WordsPanel({
 
               <div className="collection-item-grid">
                 {pageItems.map((item) => {
+                  const displayItem = { ...item, word: learningWordForCourse(item, courseId) };
+                  const sourceWord = sourceWordForCourse(item, courseId);
                   const collected = selectedIsDictionary || learnedSet.has(gameItemId(selectedAlbum.parentCategoryId, item.id));
                   const isNew = !selectedIsDictionary && collected && !seenKeys.has(itemCollectionKey(selectedAlbum.parentCategoryId, item));
                   return (
@@ -452,14 +457,14 @@ export function WordsPanel({
                       disabled={!collected}
                       className={cn('collection-item-card', !collected && 'collection-item-card-locked')}
                       onClick={() => collected && openCollectedItem(item)}
-                      aria-label={collected ? item.word : copy.locked}
+                      aria-label={collected ? displayItem.word : copy.locked}
                     >
                       {isNew && <span className="collection-item-new">{copy.newLabel}</span>}
                       <span className={cn('collection-item-emoji', !collected && 'collection-item-emoji-locked')} aria-hidden>{item.emoji}</span>
-                      <span className="collection-item-word">{collected ? item.word : '???'}</span>
-                      {collected && getEmojiLearningTranslation(item, locale) && (
+                      <span className="collection-item-word">{collected ? displayItem.word : '???'}</span>
+                      {collected && sourceWord && sourceWord !== displayItem.word && (
                         <span className="collection-item-cn">
-                          {getEmojiLearningTranslation(item, locale)}
+                          {sourceWord}
                         </span>
                       )}
                     </motion.button>
@@ -468,9 +473,9 @@ export function WordsPanel({
               </div>
 
               <div className="collection-pagination">
-                <button type="button" disabled={page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))} aria-label="Previous page"><ChevronLeft size={22} aria-hidden /></button>
+                <button type="button" disabled={page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))} aria-label={t.common.prev}><ChevronLeft size={22} aria-hidden /></button>
                 <span>{copy.page(page + 1, pageCount)}</span>
-                <button type="button" disabled={page >= pageCount - 1} onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))} aria-label="Next page"><ChevronRight size={22} aria-hidden /></button>
+                <button type="button" disabled={page >= pageCount - 1} onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))} aria-label={t.common.next}><ChevronRight size={22} aria-hidden /></button>
               </div>
             </motion.div>
           </motion.div>

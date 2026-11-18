@@ -31,9 +31,6 @@ export const REVIVE_HITS_PER_WORD = 2;
 /** Wrong answers / timeouts before revive fails immediately. */
 export const REVIVE_WRONG_LIMIT = 3;
 
-/** Moves granted after a failed Rescue before the adventure finally ends. */
-export const RESCUE_CONTINUE_MOVES = 8;
-
 /** @deprecated Prefer REVIVE_HITS_PER_WORD × set size. Kept for HUD defaults. */
 export const REVIVE_CORRECT_NEEDED = ADVENTURE_WORDS_PER_SET * REVIVE_HITS_PER_WORD;
 

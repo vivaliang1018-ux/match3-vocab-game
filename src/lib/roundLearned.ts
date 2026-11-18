@@ -4,11 +4,15 @@ import {
   readScopedProgress,
   writeScopedProgress,
 } from './progressScope';
+import { getActiveCourseId } from '../course';
+import type { CourseId } from '../courseConfig';
 
 const STORAGE_KEY = 'smellycat-match3-round-learned-v1';
+const courseStorageKey = (courseId: CourseId = getActiveCourseId()) => `${STORAGE_KEY}:${courseId}`;
 
-export function loadRoundLearnedIds(userUid?: string | null): string[] {
-  claimGuestProgress(STORAGE_KEY, userUid, (accountRaw, guestRaw) => {
+export function loadRoundLearnedIds(userUid?: string | null, courseId?: CourseId): string[] {
+  const key = courseStorageKey(courseId);
+  claimGuestProgress(key, userUid, (accountRaw, guestRaw) => {
     try {
       const account = JSON.parse(accountRaw);
       const guest = JSON.parse(guestRaw);
@@ -22,7 +26,7 @@ export function loadRoundLearnedIds(userUid?: string | null): string[] {
     }
   });
   try {
-    const raw = readScopedProgress(STORAGE_KEY, userUid);
+    const raw = readScopedProgress(key, userUid);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
@@ -31,12 +35,12 @@ export function loadRoundLearnedIds(userUid?: string | null): string[] {
   }
 }
 
-export function saveRoundLearnedIds(ids: string[], userUid?: string | null): void {
-  writeScopedProgress(STORAGE_KEY, JSON.stringify(ids), userUid);
+export function saveRoundLearnedIds(ids: string[], userUid?: string | null, courseId?: CourseId): void {
+  writeScopedProgress(courseStorageKey(courseId), JSON.stringify(ids), userUid);
 }
 
-export function clearRoundLearnedIds(userUid?: string | null): void {
-  clearScopedProgress(STORAGE_KEY, userUid);
+export function clearRoundLearnedIds(userUid?: string | null, courseId?: CourseId): void {
+  clearScopedProgress(courseStorageKey(courseId), userUid);
 }
 
 /** Words that cleared match-3 for the round and finished the quiz. */
@@ -44,6 +48,7 @@ export function markRoundLearnedItems(
   existing: string[],
   items: { id: string }[],
   userUid?: string | null,
+  courseId?: CourseId,
 ): string[] {
   if (items.length === 0) return existing;
   const set = new Set(existing);
@@ -51,7 +56,7 @@ export function markRoundLearnedItems(
     if (it.id) set.add(it.id);
   }
   const next = [...set];
-  saveRoundLearnedIds(next, userUid);
+  saveRoundLearnedIds(next, userUid, courseId);
   return next;
 }
 

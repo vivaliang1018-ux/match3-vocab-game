@@ -1,6 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { HomePage, type HomeEntry } from './components/HomePage';
+import { MembershipSheet } from './components/mobile/MembershipSheet';
+import { useAuth } from './auth/AuthProvider';
+import { useMembership } from './membership/MembershipProvider';
+import { useCourse } from './course';
+import { loadPendingQuiz } from './lib/pendingQuiz';
 import { unlockGameAudio } from './lib/gameSfx';
 import { unlockSpeechSynthesis } from './lib/wordSpeech';
 import {
@@ -27,6 +32,9 @@ function preloadGamePage() {
 const ItemMatchGamePage = lazy(preloadGamePage);
 
 export default function App() {
+  const { user, ready: authReady } = useAuth();
+  const { courseId } = useCourse();
+  const membership = useMembership();
   const [screen, setScreen] = useState<'home' | 'game'>('home');
   const [homeCoverVisible, setHomeCoverVisible] = useState(true);
   const [gameEntry, setGameEntry] = useState<HomeEntry>('adventure');
@@ -35,6 +43,7 @@ export default function App() {
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgmEnabledRef = useRef(bgmEnabled);
   const bgmPausedRef = useRef(bgmPaused);
+  const startupQuizCheckedRef = useRef(false);
 
   const handlePlay = useCallback((entry: HomeEntry = 'adventure') => {
     if (screen !== 'home') return;
@@ -54,6 +63,13 @@ export default function App() {
       });
     });
   }, [screen]);
+
+  useEffect(() => {
+    if (!authReady || startupQuizCheckedRef.current) return;
+    startupQuizCheckedRef.current = true;
+    // Resume only on cold entry, not whenever the user intentionally returns Home.
+    if (loadPendingQuiz(courseId, user?.uid ?? null)) handlePlay('adventure');
+  }, [authReady, courseId, user?.uid, handlePlay]);
 
   useEffect(() => {
     bgmEnabledRef.current = bgmEnabled;
@@ -187,6 +203,7 @@ export default function App() {
       {screen === 'game' && (
         <Suspense fallback={null}>
           <ItemMatchGamePage
+            key={courseId}
             initialEntry={gameEntry}
             bgmEnabled={bgmEnabled}
             onBgmEnabledChange={setBgmEnabled}
@@ -200,6 +217,20 @@ export default function App() {
         </Suspense>
       )}
       {homeCoverVisible && <HomePage onPlay={handlePlay} />}
+      <MembershipSheet
+        open={membership.paywallOpen && membership.storeSupported}
+        mode="paywall"
+        signedIn={Boolean(user)}
+        lifetimeDisplayPrice={membership.offerings.lifetime.displayPrice}
+        storeReady={membership.storeReady}
+        storeBusy={membership.storeBusy}
+        storeError={membership.storeError}
+        onStartTrial={membership.startTrial}
+        onSelectPlan={membership.purchasePlan}
+        onContinueFree={membership.continueWithFree}
+        onRestore={membership.restorePurchases}
+        onClose={membership.closePaywall}
+      />
     </>
   );
 }

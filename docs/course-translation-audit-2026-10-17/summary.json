@@ -1,0 +1,24 @@
+{
+  "items": 1117,
+  "sourceLanguages": 7,
+  "targetLanguages": 4,
+  "courses": 24,
+  "courseItemChecks": 26808,
+  "changedSincePreviousPass": 3346,
+  "bySource": {
+    "zh-CN": 525,
+    "en": 337,
+    "es": 404,
+    "ja": 432,
+    "ko": 441,
+    "fr": 596,
+    "de": 611
+  },
+  "byTarget": {
+    "en": 830,
+    "ja": 1098,
+    "es": 624,
+    "ko": 794
+  },
+  "scope": "First-pass semantic review plus structural regression; not native-speaker certification or audio listening certification."
+}

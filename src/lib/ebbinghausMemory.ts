@@ -4,6 +4,8 @@
  * - Quiz success advances the schedule.
  * - Review / revive misses pull the word back to a shorter interval.
  */
+import { getActiveCourseId } from '../course';
+import type { CourseId } from '../courseConfig';
 
 export const EBBINGHAUS_LABELS = ['12 小时', '1 天', '2 天', '4 天', '7 天', '15 天', '30 天'] as const;
 
@@ -42,8 +44,8 @@ export function memoryScopeForUserId(uid: string | null | undefined): string {
   return uid && uid.length > 0 ? uid : GUEST_MEMORY_SCOPE;
 }
 
-function storageKeyForScope(scope: string): string {
-  return `${STORAGE_KEY_PREFIX}${scope}`;
+function storageKeyForScope(scope: string, courseId: CourseId = getActiveCourseId()): string {
+  return `${STORAGE_KEY_PREFIX}${courseId}:${scope}`;
 }
 
 function parseMemoriesRaw(raw: string | null): Map<string, WordMemory> {
@@ -87,21 +89,21 @@ export function mergeWordMemoryMaps(a: Map<string, WordMemory>, b: Map<string, W
   return out;
 }
 
-export function loadWordMemoriesForScope(scope: string): Map<string, WordMemory> {
-  return parseMemoriesRaw(localStorage.getItem(storageKeyForScope(scope)));
+export function loadWordMemoriesForScope(scope: string, courseId?: CourseId): Map<string, WordMemory> {
+  return parseMemoriesRaw(localStorage.getItem(storageKeyForScope(scope, courseId)));
 }
 
-export function saveWordMemoriesForScope(map: Map<string, WordMemory>, scope: string) {
+export function saveWordMemoriesForScope(map: Map<string, WordMemory>, scope: string, courseId?: CourseId) {
   try {
-    localStorage.setItem(storageKeyForScope(scope), JSON.stringify([...map.values()]));
+    localStorage.setItem(storageKeyForScope(scope, courseId), JSON.stringify([...map.values()]));
   } catch {
     // ignore quota
   }
 }
 
-export function clearWordMemoriesForScope(scope: string) {
+export function clearWordMemoriesForScope(scope: string, courseId?: CourseId) {
   try {
-    localStorage.removeItem(storageKeyForScope(scope));
+    localStorage.removeItem(storageKeyForScope(scope, courseId));
   } catch {
     // ignore
   }
@@ -115,19 +117,19 @@ export function memoryKeyForWord(word: string): string {
  * Load memories for the signed-in user or guest. Signing in drains the guest
  * bucket into that account so the same guest data cannot leak into later users.
  */
-export function hydrateMatch3Memories(userUid: string | null | undefined): {
+export function hydrateMatch3Memories(userUid: string | null | undefined, courseId?: CourseId): {
   map: Map<string, WordMemory>;
   scope: string;
 } {
   const scope = memoryScopeForUserId(userUid);
   if (scope === GUEST_MEMORY_SCOPE) {
-    return { map: loadWordMemoriesForScope(GUEST_MEMORY_SCOPE), scope };
+    return { map: loadWordMemoriesForScope(GUEST_MEMORY_SCOPE, courseId), scope };
   }
-  const userMap = loadWordMemoriesForScope(scope);
-  const guestMap = loadWordMemoriesForScope(GUEST_MEMORY_SCOPE);
+  const userMap = loadWordMemoriesForScope(scope, courseId);
+  const guestMap = loadWordMemoriesForScope(GUEST_MEMORY_SCOPE, courseId);
   const merged = mergeWordMemoryMaps(userMap, guestMap);
-  saveWordMemoriesForScope(merged, scope);
-  if (guestMap.size > 0) clearWordMemoriesForScope(GUEST_MEMORY_SCOPE);
+  saveWordMemoriesForScope(merged, scope, courseId);
+  if (guestMap.size > 0) clearWordMemoriesForScope(GUEST_MEMORY_SCOPE, courseId);
   return { map: merged, scope };
 }
 
